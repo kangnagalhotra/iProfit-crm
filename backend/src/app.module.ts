@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AuthModule } from './auth/auth.module';
 import { LeadsModule } from './leads/leads.module';
+import { AccountsModule } from './accounts/accounts.module';
 
 @Module({
   imports: [
@@ -10,7 +11,8 @@ import { LeadsModule } from './leads/leads.module';
     ScheduleModule.forRoot(), // powers reminder/inactivity cron jobs
     AuthModule,
     LeadsModule,
-    // TasksModule, OpportunitiesModule, ActivitiesModule, AccountsModule,
+    AccountsModule,
+    // TasksModule, OpportunitiesModule, ActivitiesModule,
     // NotificationsModule — same pattern as LeadsModule (see docs)
   ],
 })

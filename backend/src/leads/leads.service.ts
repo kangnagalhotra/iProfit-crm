@@ -3,7 +3,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { AssignmentService } from './assignment.service';
-import { CreateLeadDto, UpdateLeadDto, ListLeadsQuery } from './dto';
+import { CreateLeadDto, UpdateLeadDto, ListLeadsQuery, ImportLeadRowDto } from './dto';
 import { Role } from '@prisma/client';
 
 interface AuthUser { id: string; role: Role; }
@@ -84,5 +84,39 @@ export class LeadsService {
     const owner = await this.prisma.user.findUnique({ where: { id: ownerId } });
     if (!owner) throw new NotFoundException('Target user not found');
     return this.prisma.lead.update({ where: { id }, data: { ownerId } });
+  }
+
+  // CSV import — never aborts the whole batch on a single bad row.
+  async bulkImport(rows: ImportLeadRowDto[], user: AuthUser) {
+    const created: any[] = [];
+    const errors: { row: number; email?: string; message: string }[] = [];
+    const seenEmails = new Set<string>();
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      try {
+        if (row.email) {
+          const key = row.email.toLowerCase();
+          if (seenEmails.has(key)) {
+            errors.push({ row: i + 1, email: row.email, message: 'Duplicate email within import file' });
+            continue;
+          }
+          const dupe = await this.prisma.lead.findUnique({ where: { email: row.email } });
+          if (dupe) {
+            errors.push({ row: i + 1, email: row.email, message: 'Lead with this email already exists' });
+            continue;
+          }
+          seenEmails.add(key);
+        }
+        const ownerId = (await this.assignment.pickOwner()) ?? user.id;
+        const lead = await this.prisma.lead.create({
+          data: { ...row, source: 'IMPORT', ownerId, lastActivityAt: new Date() },
+        });
+        created.push(lead);
+      } catch (e: any) {
+        errors.push({ row: i + 1, email: row.email, message: e.message ?? 'Unknown error' });
+      }
+    }
+    return { created, errors, summary: { total: rows.length, createdCount: created.length, errorCount: errors.length } };
   }
 }

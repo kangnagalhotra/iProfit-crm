@@ -2,7 +2,7 @@ import {
   Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards,
 } from '@nestjs/common';
 import { LeadsService } from './leads.service';
-import { CreateLeadDto, UpdateLeadDto, ListLeadsQuery } from './dto';
+import { CreateLeadDto, UpdateLeadDto, ListLeadsQuery, BulkImportLeadsDto } from './dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -17,6 +17,11 @@ export class LeadsController {
   @Post()
   create(@Body() dto: CreateLeadDto, @CurrentUser() user) {
     return this.leads.create(dto, user);
+  }
+
+  @Post('import')
+  import_(@Body() dto: BulkImportLeadsDto, @CurrentUser() user) {
+    return this.leads.bulkImport(dto.rows, user);
   }
 
   @Get()

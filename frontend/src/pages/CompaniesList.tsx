@@ -1,17 +1,17 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
-import type { Paginated, Lead } from '../api/types';
-import { LeadForm } from '../components/LeadForm';
-import { LeadImport } from '../components/LeadImport';
+import type { Paginated, Account } from '../api/types';
+import { CompanyForm } from '../components/CompanyForm';
+import { CompanyImport } from '../components/CompanyImport';
 import { AddContactsMenu } from '../components/AddContactsMenu';
-import { LeadsKanban } from '../components/LeadsKanban';
+import { CompaniesKanban } from '../components/CompaniesKanban';
 import { ViewToggle } from '../components/ViewToggle';
 import type { ListView } from '../components/ViewToggle';
 
-export function LeadsList() {
+export function CompaniesList() {
   const navigate = useNavigate();
-  const [leads, setLeads] = useState<Lead[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState('');
   const [view, setView] = useState<ListView>('board');
@@ -22,8 +22,8 @@ export function LeadsList() {
 
   const load = useCallback(() => {
     setLoading(true);
-    api.get<Paginated<Lead>>('/leads', { params: { search: search || undefined } })
-      .then(({ data }) => { setLeads(data.data); setTotal(data.total); })
+    api.get<Paginated<Account>>('/accounts', { params: { search: search || undefined } })
+      .then(({ data }) => { setAccounts(data.data); setTotal(data.total); })
       .finally(() => setLoading(false));
   }, [search]);
 
@@ -32,51 +32,51 @@ export function LeadsList() {
   return (
     <div>
       <div className="topbar">
-        <h2 style={{ margin: 0 }}>Leads {view === 'board' && <span style={{ color: 'var(--muted)', fontWeight: 400 }}>({total})</span>}</h2>
+        <h2 style={{ margin: 0 }}>Companies {view === 'board' && <span style={{ color: 'var(--muted)', fontWeight: 400 }}>({total})</span>}</h2>
         <div style={{ display: 'flex', gap: 10 }}>
           <ViewToggle value={view} onChange={setView} />
           {view === 'board' && (
-            <input placeholder="Search name or email" value={search}
+            <input placeholder="Search name or domain" value={search}
               onChange={(e) => setSearch(e.target.value)}
               style={{ padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 6 }} />
           )}
-          <AddContactsMenu onCreateNew={() => setShowForm(true)} onImport={() => setShowImport(true)} />
+          <AddContactsMenu label="Add companies" onCreateNew={() => setShowForm(true)} onImport={() => setShowImport(true)} />
         </div>
       </div>
 
       {view === 'board' ? (
-        loading ? <p>Loading…</p> : leads.length === 0 ? (
-          <p style={{ color: 'var(--muted)' }}>No leads yet. Create your first one.</p>
+        loading ? <p>Loading…</p> : accounts.length === 0 ? (
+          <p style={{ color: 'var(--muted)' }}>No companies yet. Create your first one.</p>
         ) : (
           <table>
             <thead>
-              <tr><th>Name</th><th>Email</th><th>Status</th><th>Owner</th><th>Company</th></tr>
+              <tr><th>Name</th><th>Domain</th><th>Status</th><th>Owner</th><th>Industry</th></tr>
             </thead>
             <tbody>
-              {leads.map((l) => (
-                <tr key={l.id}>
-                  <td><Link to={`/leads/${l.id}`}>{[l.firstName, l.lastName].filter(Boolean).join(' ') || '—'}</Link></td>
-                  <td>{l.email ?? '—'}</td>
-                  <td><span className="chip">{l.status}</span></td>
-                  <td>{l.owner?.fullName ?? '—'}</td>
-                  <td>{l.account ? <Link to={`/companies/${l.account.id}`}>{l.account.name}</Link> : '—'}</td>
+              {accounts.map((a) => (
+                <tr key={a.id}>
+                  <td><Link to={`/companies/${a.id}`}>{a.name}</Link></td>
+                  <td>{a.domain ?? '—'}</td>
+                  <td><span className="chip">{a.status}</span></td>
+                  <td>{a.owner?.fullName ?? '—'}</td>
+                  <td>{a.industry ?? '—'}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         )
       ) : (
-        <LeadsKanban key={kanbanKey} />
+        <CompaniesKanban key={kanbanKey} />
       )}
 
       {showForm && (
-        <LeadForm
+        <CompanyForm
           onClose={() => setShowForm(false)}
-          onSaved={(lead) => { setShowForm(false); navigate(`/leads/${lead.id}`); }}
+          onSaved={(account) => { setShowForm(false); navigate(`/companies/${account.id}`); }}
         />
       )}
       {showImport && (
-        <LeadImport
+        <CompanyImport
           onClose={() => setShowImport(false)}
           onImported={() => {
             setShowImport(false);

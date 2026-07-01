@@ -4,6 +4,8 @@ import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { LeadsList } from './pages/LeadsList';
 import { LeadDetail } from './pages/LeadDetail';
+import { CompaniesList } from './pages/CompaniesList';
+import { CompanyDetail } from './pages/CompanyDetail';
 import type { ReactNode } from 'react';
 
 function Shell({ children }: { children: ReactNode }) {
@@ -16,6 +18,7 @@ function Shell({ children }: { children: ReactNode }) {
         <nav>
           <NavLink to="/" end>Home</NavLink>
           <NavLink to="/leads">Leads</NavLink>
+          <NavLink to="/companies">Companies</NavLink>
           <NavLink to="/pipeline">Pipeline</NavLink>
           <NavLink to="/tasks">Tasks</NavLink>
         </nav>
@@ -46,6 +49,8 @@ export function App() {
       <Route path="/" element={<Protected><Dashboard /></Protected>} />
       <Route path="/leads" element={<Protected><LeadsList /></Protected>} />
       <Route path="/leads/:id" element={<Protected><LeadDetail /></Protected>} />
+      <Route path="/companies" element={<Protected><CompaniesList /></Protected>} />
+      <Route path="/companies/:id" element={<Protected><CompanyDetail /></Protected>} />
       <Route path="/pipeline" element={<Protected><div><h2>Pipeline</h2><p>Kanban board — build per spec (Day 17–19).</p></div></Protected>} />
       <Route path="/tasks" element={<Protected><div><h2>Tasks</h2><p>Task list — build per spec (Day 13–14).</p></div></Protected>} />
       <Route path="*" element={<Navigate to="/" replace />} />

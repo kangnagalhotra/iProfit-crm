@@ -36,6 +36,19 @@ enum LeadSource {
   API
 }
 
+enum AccountStatus {
+  PROSPECT
+  ACTIVE_CUSTOMER
+  ON_HOLD
+  CHURNED
+}
+
+enum PreferredContactMethod {
+  EMAIL
+  PHONE
+  SMS
+}
+
 enum ActivityType {
   CALL
   EMAIL
@@ -111,6 +124,7 @@ model Account {
   city          String?  @db.VarChar(120)
   state         String?  @db.VarChar(120)
   country       String?  @db.VarChar(120)
+  status        AccountStatus @default(PROSPECT)
   ownerId       String?
   owner         User?    @relation("AccountOwner", fields: [ownerId], references: [id])
   createdAt     DateTime @default(now())
@@ -123,6 +137,7 @@ model Account {
 
   @@index([domain])
   @@index([ownerId])
+  @@index([status])
 }
 
 model Lead {
@@ -132,6 +147,8 @@ model Lead {
   email      String?    @db.VarChar(255)
   phone      String?    @db.VarChar(40)
   jobTitle   String?    @db.VarChar(150)
+  city       String?    @db.VarChar(120)
+  preferredContactMethod PreferredContactMethod?
   status     LeadStatus @default(NEW)
   source     LeadSource @default(MANUAL)
   score      Int        @default(0)
