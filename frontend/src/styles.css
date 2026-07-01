@@ -1,0 +1,38 @@
+:root {
+  --navy: #1C2A45;
+  --blue: #025ADF;
+  --pale: #EAF1FC;
+  --ink: #1a2233;
+  --muted: #6b7280;
+  --line: #e5e7eb;
+  --bg: #f7f8fa;
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, Arial, sans-serif; color: var(--ink); background: var(--bg); }
+a { color: var(--blue); text-decoration: none; }
+.layout { display: flex; min-height: 100vh; }
+.sidebar { width: 220px; background: var(--navy); color: #fff; padding: 20px 0; }
+.sidebar h1 { font-size: 18px; padding: 0 20px 20px; margin: 0; border-bottom: 1px solid rgba(255,255,255,.1); }
+.sidebar nav a { display: block; color: #cbd5e1; padding: 12px 20px; font-size: 14px; }
+.sidebar nav a.active, .sidebar nav a:hover { background: rgba(255,255,255,.08); color: #fff; }
+.main { flex: 1; padding: 28px 32px; }
+.topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+.btn { background: var(--blue); color: #fff; border: none; padding: 9px 16px; border-radius: 6px; font-size: 14px; cursor: pointer; }
+.btn.secondary { background: #fff; color: var(--ink); border: 1px solid var(--line); }
+.cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
+.card { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 18px; }
+.card .label { font-size: 13px; color: var(--muted); }
+.card .value { font-size: 26px; font-weight: 700; margin-top: 6px; }
+table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 10px; overflow: hidden; }
+th, td { text-align: left; padding: 12px 14px; font-size: 14px; border-bottom: 1px solid var(--line); }
+th { background: var(--pale); color: var(--navy); font-weight: 600; }
+tr:nth-child(even) td { background: #fafbfc; }
+.chip { font-size: 12px; padding: 3px 9px; border-radius: 999px; background: var(--pale); color: var(--navy); }
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: flex; justify-content: flex-end; }
+.modal { width: 420px; background: #fff; height: 100%; padding: 24px; overflow-y: auto; }
+.field { margin-bottom: 14px; }
+.field label { display: block; font-size: 13px; margin-bottom: 5px; color: var(--muted); }
+.field input, .field select { width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 6px; font-size: 14px; }
+.auth-wrap { display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+.auth-card { width: 360px; background: #fff; padding: 32px; border-radius: 12px; border: 1px solid var(--line); }
+.error { color: #b91c1c; font-size: 13px; margin: 8px 0; }
