@@ -10,9 +10,12 @@ import { SearchSelect } from './SearchSelect';
 import type { SearchSelectOption } from './SearchSelect';
 import { CreateUserModal } from './CreateUserModal';
 import { useAuth } from '../context/AuthContext';
+import {
+  stripPhoneDigits, formatPhoneDisplay, isValidPhone, PHONE_ERROR_MESSAGE,
+  stripEmailInput, isValidEmail, EMAIL_ERROR_MESSAGE,
+} from '../utils/validation';
 
 const SOURCES: LeadSource[] = ['OUTREACH', 'EMAIL', 'CAMPAIGN', 'REFERRAL', 'WEBSITE', 'SOCIAL_MEDIA', 'EVENT', 'PARTNER', 'OTHER'];
-const PHONE_PATTERN = /^\+?\d{10}$/;
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -31,7 +34,7 @@ export function LeadForm({
   const { user: currentUser } = useAuth();
   const isEdit = !!lead;
   const [form, setForm] = useState({
-    firstName: lead?.firstName ?? '', lastName: lead?.lastName ?? '', phone: lead?.phone ?? '', email: lead?.email ?? '',
+    firstName: lead?.firstName ?? '', lastName: lead?.lastName ?? '', phone: stripPhoneDigits(lead?.phone ?? ''), email: lead?.email ?? '',
     accountId: lead?.account?.id ?? '', companyName: '', jobTitle: lead?.jobTitle ?? '', city: lead?.city ?? '',
     source: (lead?.source ?? 'OTHER') as LeadSource,
     ownerId: lead?.owner?.id ?? '', stageId: lead?.stage.id ?? defaultStageId ?? '',
@@ -41,6 +44,8 @@ export function LeadForm({
   const [users, setUsers] = useState<User[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [error, setError] = useState('');
+  const [phoneError, setPhoneError] = useState('');
+  const [emailError, setEmailError] = useState('');
   const [saving, setSaving] = useState(false);
   const [showCreateUser, setShowCreateUser] = useState(false);
 
@@ -69,6 +74,18 @@ export function LeadForm({
     setForm((f) => ({ ...f, [k]: v }));
   }
 
+  function validatePhone(digits: string): boolean {
+    if (digits && !isValidPhone(digits)) { setPhoneError(PHONE_ERROR_MESSAGE); return false; }
+    setPhoneError('');
+    return true;
+  }
+
+  function validateEmail(value: string): boolean {
+    if (value && !isValidEmail(value)) { setEmailError(EMAIL_ERROR_MESSAGE); return false; }
+    setEmailError('');
+    return true;
+  }
+
   const ownerOptions: SearchSelectOption[] = [
     { value: '', label: 'Auto-assign' },
     ...users.map((u) => ({ value: u.id, label: u.fullName, sublabel: u.email })),
@@ -81,10 +98,9 @@ export function LeadForm({
 
   async function submit() {
     setError('');
-    if (form.phone && !PHONE_PATTERN.test(form.phone)) {
-      setError('Phone number must contain exactly 10 digits.');
-      return;
-    }
+    const trimmedEmail = form.email.trim();
+    if (trimmedEmail !== form.email) set('email', trimmedEmail);
+    if (!validatePhone(form.phone) || !validateEmail(trimmedEmail)) return;
     if (form.value !== '' && Number(form.value) < 0) {
       setError('Lead value cannot be negative.');
       return;
@@ -92,7 +108,9 @@ export function LeadForm({
     setSaving(true);
     try {
       // strip empty strings so optional fields don't overwrite with blanks
-      const payload = Object.fromEntries(Object.entries(form).filter(([, v]) => v !== ''));
+      const payload = Object.fromEntries(
+        Object.entries({ ...form, email: trimmedEmail }).filter(([, v]) => v !== ''),
+      );
       const data = isEdit
         ? await updateLead(lead!.id, payload)
         : await createLead(payload);
@@ -114,9 +132,28 @@ export function LeadForm({
           <div className="field"><label>Last name</label>
             <input value={form.lastName} onChange={(e) => set('lastName', e.target.value)} /></div>
           <div className="field"><label>Phone</label>
-            <input value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="9876543210" /></div>
+            <input
+              value={formatPhoneDisplay(form.phone)}
+              onChange={(e) => set('phone', stripPhoneDigits(e.target.value))}
+              onBlur={() => validatePhone(form.phone)}
+              placeholder="98765-43210"
+              inputMode="numeric"
+            />
+            {phoneError && <div className="error" style={{ margin: '4px 0 0' }}>{phoneError}</div>}
+          </div>
           <div className="field"><label>Email</label>
-            <input value={form.email} onChange={(e) => set('email', e.target.value)} /></div>
+            <input
+              type="email"
+              value={form.email}
+              onChange={(e) => set('email', stripEmailInput(e.target.value))}
+              onBlur={(e) => {
+                const trimmed = e.target.value.trim();
+                set('email', trimmed);
+                validateEmail(trimmed);
+              }}
+            />
+            {emailError && <div className="error" style={{ margin: '4px 0 0' }}>{emailError}</div>}
+          </div>
 
           {leadNamePreview && (
             <div className="field">

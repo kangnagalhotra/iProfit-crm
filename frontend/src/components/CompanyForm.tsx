@@ -7,6 +7,10 @@ import { SearchSelect } from './SearchSelect';
 import type { SearchSelectOption } from './SearchSelect';
 import { CreateUserModal } from './CreateUserModal';
 import { useAuth } from '../context/AuthContext';
+import {
+  stripPhoneDigits, formatPhoneDisplay, isValidPhone, PHONE_ERROR_MESSAGE,
+  stripEmailInput, isValidEmail, EMAIL_ERROR_MESSAGE,
+} from '../utils/validation';
 
 const COMPANY_SIZES = ['1-10', '11-50', '51-100', '101-250', '251-500', '501-1000', '1001-5000', '5001-10000', '10000+'];
 const COMPANY_TYPES = [
@@ -50,7 +54,7 @@ export function CompanyForm({
   const [form, setForm] = useState({
     name: account?.name ?? '', domain: account?.domain ? stripWww(account.domain) : '', industry: account?.industry ?? '',
     sizeBucket: account?.sizeBucket ?? '', annualRevenue: account?.annualRevenue ?? '',
-    companyType: account?.companyType ?? '', email: account?.email ?? '', phone: account?.phone ?? '',
+    companyType: account?.companyType ?? '', email: account?.email ?? '', phone: stripPhoneDigits(account?.phone ?? ''),
     address: account?.address ?? '', description: account?.description ?? '',
     city: account?.city ?? '', state: account?.state ?? '', country: account?.country ?? '',
     ownerId: account?.owner?.id ?? '', stageId: account?.stage.id ?? defaultStageId ?? '',
@@ -59,6 +63,8 @@ export function CompanyForm({
   const [users, setUsers] = useState<User[]>([]);
   const [error, setError] = useState('');
   const [domainError, setDomainError] = useState('');
+  const [phoneError, setPhoneError] = useState('');
+  const [emailError, setEmailError] = useState('');
   const [saving, setSaving] = useState(false);
   const [showCreateUser, setShowCreateUser] = useState(false);
 
@@ -88,6 +94,18 @@ export function CompanyForm({
     return true;
   }
 
+  function validatePhone(digits: string): boolean {
+    if (digits && !isValidPhone(digits)) { setPhoneError(PHONE_ERROR_MESSAGE); return false; }
+    setPhoneError('');
+    return true;
+  }
+
+  function validateEmail(value: string): boolean {
+    if (value && !isValidEmail(value)) { setEmailError(EMAIL_ERROR_MESSAGE); return false; }
+    setEmailError('');
+    return true;
+  }
+
   const ownerOptions: SearchSelectOption[] = [
     { value: '', label: 'Assign to me' },
     ...users.map((u) => ({ value: u.id, label: u.fullName, sublabel: u.email })),
@@ -96,12 +114,14 @@ export function CompanyForm({
 
   async function submit() {
     setError('');
-    if (!validateDomain(form.domain)) return;
+    const trimmedEmail = form.email.trim();
+    if (trimmedEmail !== form.email) set('email', trimmedEmail);
+    if (!validateDomain(form.domain) || !validatePhone(form.phone) || !validateEmail(trimmedEmail)) return;
     setSaving(true);
     try {
       const domain = normalizeDomainInput(form.domain);
       const payload = Object.fromEntries(
-        Object.entries({ ...form, domain: domain ? `www.${domain}` : '' }).filter(([, v]) => v !== ''),
+        Object.entries({ ...form, domain: domain ? `www.${domain}` : '', email: trimmedEmail }).filter(([, v]) => v !== ''),
       );
       const data = isEdit
         ? await updateAccount(account!.id, payload)
@@ -183,9 +203,28 @@ export function CompanyForm({
           />
         </div>
         <div className="field"><label>Email</label>
-          <input value={form.email} onChange={(e) => set('email', e.target.value)} /></div>
+          <input
+            type="email"
+            value={form.email}
+            onChange={(e) => set('email', stripEmailInput(e.target.value))}
+            onBlur={(e) => {
+              const trimmed = e.target.value.trim();
+              set('email', trimmed);
+              validateEmail(trimmed);
+            }}
+          />
+          {emailError && <div className="error" style={{ margin: '4px 0 0' }}>{emailError}</div>}
+        </div>
         <div className="field"><label>Phone</label>
-          <input value={form.phone} onChange={(e) => set('phone', e.target.value)} /></div>
+          <input
+            value={formatPhoneDisplay(form.phone)}
+            onChange={(e) => set('phone', stripPhoneDigits(e.target.value))}
+            onBlur={() => validatePhone(form.phone)}
+            placeholder="98765-43210"
+            inputMode="numeric"
+          />
+          {phoneError && <div className="error" style={{ margin: '4px 0 0' }}>{phoneError}</div>}
+        </div>
         <div className="field"><label>Address</label>
           <input value={form.address} onChange={(e) => set('address', e.target.value)} /></div>
         <div className="field"><label>City</label>

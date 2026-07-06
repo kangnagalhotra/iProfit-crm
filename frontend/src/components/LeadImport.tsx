@@ -3,9 +3,10 @@ import Papa from 'papaparse';
 import { bulkImport } from '../api/bulkImport';
 import type { ImportLeadsResult } from '../api/types';
 import { downloadExcelTemplate } from '../utils/excelTemplate';
+import { isValidEmail, stripPhoneDigits, isValidPhone } from '../utils/validation';
 
 const TEMPLATE_HEADERS = ['First Name', 'Last Name', 'Email', 'Phone', 'Job Title', 'Stage'];
-const TEMPLATE_SAMPLE = ['Jane', 'Doe', 'jane.doe@example.com', '555-0100', 'Sales Manager', 'New'];
+const TEMPLATE_SAMPLE = ['Jane', 'Doe', 'jane.doe@example.com', '9876543210', 'Sales Manager', 'New'];
 
 const HEADER_MAP: Record<string, string> = {
   'first name': 'firstName',
@@ -20,8 +21,6 @@ const HEADER_MAP: Record<string, string> = {
   status: 'stageName',
   stage: 'stageName',
 };
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 interface PreviewRow {
   firstName?: string;
@@ -40,8 +39,12 @@ function mapRow(raw: Record<string, string>): PreviewRow {
     const field = HEADER_MAP[header];
     if (field && value?.trim()) mapped[field] = value.trim();
   }
-  if (mapped.email && !EMAIL_RE.test(mapped.email)) {
+  if (mapped.phone) mapped.phone = stripPhoneDigits(mapped.phone);
+  if (mapped.email && !isValidEmail(mapped.email)) {
     return { ...mapped, valid: false, reason: 'Invalid email format' };
+  }
+  if (mapped.phone && !isValidPhone(mapped.phone)) {
+    return { ...mapped, valid: false, reason: 'Invalid phone number (must be 10 digits)' };
   }
   return {
     firstName: mapped.firstName,
@@ -130,7 +133,7 @@ export function LeadImport({ onClose, onImported }: { onClose: () => void; onImp
               <>
                 <p style={{ fontSize: 14, color: 'var(--muted)' }}>
                   {rows.length} row(s) found — {validRows.length} ready to import
-                  {invalidCount > 0 && `, ${invalidCount} skipped (invalid email)`}.
+                  {invalidCount > 0 && `, ${invalidCount} skipped (invalid email/phone)`}.
                 </p>
                 <div style={{ maxHeight: 260, overflowY: 'auto', border: '1px solid var(--line)', borderRadius: 8 }}>
                   <table>
