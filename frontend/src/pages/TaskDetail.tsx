@@ -5,6 +5,7 @@ import { getTask, completeTask } from '../api/tasks';
 import { createActivity } from '../api/activities';
 import { TaskForm } from '../components/TaskForm';
 import { ActivityTimeline } from '../components/ActivityTimeline';
+import { Icon } from '../components/Icon';
 import { useToast } from '../context/ToastContext';
 
 const textareaStyle = {
@@ -61,7 +62,8 @@ export function TaskDetail() {
     <div>
       <p><Link to="/tasks">← Tasks</Link></p>
 
-      <div className="card" style={{ maxWidth: 640, marginBottom: 20 }}>
+      <div className="detail-page-layout">
+      <div className="card detail-header-card">
         <div className="detail-header">
           <div className="avatar">{(task.assignee?.fullName ?? '?')[0].toUpperCase()}</div>
           <div>
@@ -73,20 +75,21 @@ export function TaskDetail() {
 
         <div className="quick-actions">
           <button className="quick-action" onClick={() => setEditing(true)}>
-            <span className="icon">✎</span>Edit
+            <span className="icon"><Icon name="edit" size={18} /></span>Edit
           </button>
           <button className="quick-action" onClick={() => setAddingUpdate(true)}>
-            <span className="icon">📝</span>Add Update
+            <span className="icon"><Icon name="note" size={18} /></span>Add Update
           </button>
           {task.status !== 'COMPLETED' && (
             <button className="quick-action" onClick={async () => { await completeTask(task.id); load(); setActivityKey((k) => k + 1); toast.success('Task marked complete'); }}>
-              <span className="icon">☑</span>Complete
+              <span className="icon"><Icon name="check" size={18} /></span>Complete
             </button>
           )}
         </div>
       </div>
 
-      <div className="card" style={{ maxWidth: 640 }}>
+      <div className="detail-sidebar">
+      <div className="card">
         <h3 style={{ marginTop: 0 }}>Task details</h3>
         <div className="key-info">
           <Row label="Type" value={task.type.replace('_', ' ')} />
@@ -102,8 +105,12 @@ export function TaskDetail() {
           </div>
         )}
       </div>
+      </div>
 
+      <div className="detail-main">
       <ActivityTimeline key={activityKey} taskId={task.id} showNotes />
+      </div>
+      </div>
 
       {editing && (
         <TaskForm

@@ -12,6 +12,7 @@ import { ActivityTimeline } from '../components/ActivityTimeline';
 import { EditableRow } from '../components/EditableRow';
 import { SearchSelect } from '../components/SearchSelect';
 import { LeadForm } from '../components/LeadForm';
+import { Icon } from '../components/Icon';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 import { timeAgo } from '../utils/timeAgo';
@@ -161,7 +162,8 @@ export function LeadDetail() {
     <div>
       <p><Link to="/leads">← Leads</Link></p>
 
-      <div className="card" style={{ maxWidth: 640, marginBottom: 20 }}>
+      <div className="detail-page-layout">
+      <div className="card detail-header-card">
         <div className="detail-header-top">
           <div className="detail-header">
             <div className="avatar">{initials(lead)}</div>
@@ -171,7 +173,7 @@ export function LeadDetail() {
                 <span>
                   <a href={`mailto:${lead.email}`}>{lead.email}</a>{' '}
                   <button className="copy-btn" onClick={copyEmail} title="Copy email">
-                    {copied ? '✓' : '⧉'}
+                    <Icon name={copied ? 'check' : 'copy'} size={14} />
                   </button>
                 </span>
               )}
@@ -189,11 +191,11 @@ export function LeadDetail() {
             </div>
           </div>
           <div className="detail-header-actions">
-            <button className="btn" onClick={() => setShowEditModal(true)}>✏️ Edit Details</button>
-            <button className="btn secondary" onClick={scrollToTasks}>☑ Add Task</button>
-            <button className="btn secondary" disabled title="Coming soon — Meeting scheduling not built yet">📅 Schedule Meeting</button>
+            <button className="btn btn-icon" onClick={() => setShowEditModal(true)}><Icon name="edit" size={14} /> Edit Details</button>
+            <button className="btn secondary btn-icon" onClick={scrollToTasks}><Icon name="check" size={14} /> Add Task</button>
+            <button className="btn secondary btn-icon" disabled title="Coming soon — Meeting scheduling not built yet"><Icon name="calendar" size={14} /> Schedule Meeting</button>
             <div className="dropdown-wrap" ref={moreRef}>
-              <button className="btn secondary" onClick={() => setMoreOpen((o) => !o)}>⋯ More Actions</button>
+              <button className="btn secondary btn-icon" onClick={() => setMoreOpen((o) => !o)}><Icon name="dots" size={14} /> More Actions</button>
               {moreOpen && (
                 <div className="dropdown-menu">
                   <button onClick={() => { setMoreOpen(false); setShowEditModal(true); }}>Edit Details</button>
@@ -219,7 +221,7 @@ export function LeadDetail() {
             tabIndex={lead.email ? 0 : -1}
             title={lead.email ? `Email ${lead.email}` : 'No email on file'}
           >
-            <span className="icon">✉</span>Email
+            <span className="icon"><Icon name="mail" size={18} /></span>Email
           </a>
           <a
             className={`quick-action${lead.phone ? '' : ' disabled'}`}
@@ -228,21 +230,22 @@ export function LeadDetail() {
             tabIndex={lead.phone ? 0 : -1}
             title={lead.phone ? `Call ${lead.phone}` : 'No phone number on file'}
           >
-            <span className="icon">☎</span>Call
+            <span className="icon"><Icon name="phone" size={18} /></span>Call
           </a>
           <button className="quick-action" onClick={scrollToNotes}>
-            <span className="icon">📝</span>Note
+            <span className="icon"><Icon name="note" size={18} /></span>Note
           </button>
           <button className="quick-action" onClick={scrollToTasks}>
-            <span className="icon">☑</span>Task
+            <span className="icon"><Icon name="check" size={18} /></span>Task
           </button>
           <button className="quick-action" disabled title="Coming soon — Meeting scheduling not built yet">
-            <span className="icon">📅</span>Meeting
+            <span className="icon"><Icon name="calendar" size={18} /></span>Meeting
           </button>
         </div>
       </div>
 
-      <div className="card" style={{ maxWidth: 640 }}>
+      <div className="detail-sidebar">
+      <div className="card">
         <h3 style={{ marginTop: 0 }}>Key information</h3>
         <div className="key-info">
           <EditableRow
@@ -328,10 +331,14 @@ export function LeadDetail() {
           </div>
         )}
       </div>
+      </div>
 
+      <div className="detail-main">
       <ActivityTimeline key={activityKey} leadId={lead.id} />
       <TasksWidget leadId={lead.id} />
       <NotesSection leadId={lead.id} />
+      </div>
+      </div>
 
       {showEditModal && (
         <LeadForm

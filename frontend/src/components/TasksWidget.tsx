@@ -7,6 +7,7 @@ import {
 import { TaskForm } from './TaskForm';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
+import { Icon } from './Icon';
 
 const STATUSES: TaskStatus[] = ['NOT_STARTED', 'IN_PROGRESS', 'WAITING', 'COMPLETED', 'CANCELLED'];
 
@@ -59,20 +60,27 @@ export function TasksWidget({
   }
 
   return (
-    <div className="card" id="tasks-section" style={{ maxWidth: 640, marginTop: 20 }}>
+    <div className="card" id="tasks-section">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h3 style={{ marginTop: 0 }}>Tasks</h3>
         <button className="btn secondary" onClick={() => setShowForm(true)}>+ Add task</button>
       </div>
 
       <div>
-        {loading ? <p style={{ color: 'var(--muted)' }}>Loading…</p> : tasks.length === 0 ? (
-          <p style={{ color: 'var(--muted)' }}>No tasks yet.</p>
+        {loading ? (
+          <>
+            <div className="skeleton-row"><div className="skeleton-lines"><div className="skeleton-line" /><div className="skeleton-line short" /></div></div>
+          </>
+        ) : tasks.length === 0 ? (
+          <div className="empty-state">
+            <span className="icon"><Icon name="check" size={18} /></span>
+            <p>No tasks yet — add one to keep this moving.</p>
+          </div>
         ) : tasks.map((task) => (
           <div key={task.id} className="task-card">
             <div className="task-card-top">
               <Link to={`/tasks/${task.id}`} className={`task-card-title${task.status === 'COMPLETED' ? ' done' : ''}`}>{task.title}</Link>
-              <button className="task-delete-btn" onClick={() => deleteTask(task.id)} title="Delete task">🗑</button>
+              <button className="task-delete-btn" onClick={() => deleteTask(task.id)} title="Delete task"><Icon name="trash" size={14} /></button>
             </div>
             <div className="task-card-meta">
               <span className="chip" style={{ background: priorityColor(task.priority) + '22', color: priorityColor(task.priority), marginRight: 6 }}>

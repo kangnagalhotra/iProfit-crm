@@ -16,6 +16,7 @@ import { ActivityTimeline } from '../components/ActivityTimeline';
 import { EditableRow } from '../components/EditableRow';
 import { SearchSelect } from '../components/SearchSelect';
 import { DealForm } from '../components/DealForm';
+import { Icon } from '../components/Icon';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 import { timeAgo } from '../utils/timeAgo';
@@ -166,7 +167,8 @@ export function DealDetail() {
     <div>
       <p><Link to="/deals">← Deals</Link></p>
 
-      <div className="card" style={{ maxWidth: 640, marginBottom: 20 }}>
+      <div className="detail-page-layout">
+      <div className="card detail-header-card">
         <div className="detail-header-top">
           <div className="detail-header">
             <div className="avatar">{initials(deal.name)}</div>
@@ -187,11 +189,11 @@ export function DealDetail() {
             </div>
           </div>
           <div className="detail-header-actions">
-            <button className="btn" onClick={() => setShowEditModal(true)}>✏️ Edit Details</button>
-            <button className="btn secondary" onClick={scrollToTasks}>☑ Add Task</button>
-            <button className="btn secondary" disabled title="Coming soon — Meeting scheduling not built yet">📅 Schedule Meeting</button>
+            <button className="btn btn-icon" onClick={() => setShowEditModal(true)}><Icon name="edit" size={14} /> Edit Details</button>
+            <button className="btn secondary btn-icon" onClick={scrollToTasks}><Icon name="check" size={14} /> Add Task</button>
+            <button className="btn secondary btn-icon" disabled title="Coming soon — Meeting scheduling not built yet"><Icon name="calendar" size={14} /> Schedule Meeting</button>
             <div className="dropdown-wrap" ref={moreRef}>
-              <button className="btn secondary" onClick={() => setMoreOpen((o) => !o)}>⋯ More Actions</button>
+              <button className="btn secondary btn-icon" onClick={() => setMoreOpen((o) => !o)}><Icon name="dots" size={14} /> More Actions</button>
               {moreOpen && (
                 <div className="dropdown-menu">
                   <button onClick={() => { setMoreOpen(false); setShowEditModal(true); }}>Edit Details</button>
@@ -211,18 +213,19 @@ export function DealDetail() {
 
         <div className="quick-actions">
           <button className="quick-action" onClick={scrollToNotes}>
-            <span className="icon">📝</span>Note
+            <span className="icon"><Icon name="note" size={18} /></span>Note
           </button>
           <button className="quick-action" onClick={scrollToTasks}>
-            <span className="icon">☑</span>Task
+            <span className="icon"><Icon name="check" size={18} /></span>Task
           </button>
           <button className="quick-action" disabled title="Coming soon — Meeting scheduling not built yet">
-            <span className="icon">📅</span>Meeting
+            <span className="icon"><Icon name="calendar" size={18} /></span>Meeting
           </button>
         </div>
       </div>
 
-      <div className="card" style={{ maxWidth: 640 }}>
+      <div className="detail-sidebar">
+      <div className="card">
         <h3 style={{ marginTop: 0 }}>Key information</h3>
         <div className="key-info">
           <EditableRow
@@ -315,10 +318,14 @@ export function DealDetail() {
           </div>
         )}
       </div>
+      </div>
 
+      <div className="detail-main">
       <ActivityTimeline key={activityKey} opportunityId={deal.id} />
       <TasksWidget opportunityId={deal.id} />
       <NotesSection opportunityId={deal.id} />
+      </div>
+      </div>
 
       {showEditModal && (
         <DealForm

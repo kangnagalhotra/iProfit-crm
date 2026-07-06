@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react';
 import type { Activity, ActivityType } from '../api/types';
 import { listActivities } from '../api/activities';
 import { timeAgo } from '../utils/timeAgo';
+import { Icon } from './Icon';
 
-const ACTIVITY_ICONS: Record<ActivityType, string> = {
-  CALL: '☎',
-  EMAIL: '✉',
-  MEETING: '📅',
-  NOTE: '📝',
-  FIELD_UPDATE: '✎',
+const ACTIVITY_ICONS: Record<ActivityType, 'phone' | 'mail' | 'calendar' | 'note' | 'edit'> = {
+  CALL: 'phone',
+  EMAIL: 'mail',
+  MEETING: 'calendar',
+  NOTE: 'note',
+  FIELD_UPDATE: 'edit',
 };
 
 function creatorInitials(name: string) {
@@ -36,13 +37,21 @@ export function ActivityTimeline({
   }, [leadId, accountId, opportunityId, taskId]);
 
   return (
-    <div className="card" style={{ maxWidth: 640, marginTop: 20 }}>
+    <div className="card">
       <h3 style={{ marginTop: 0 }}>Activity</h3>
-      {loading ? <p style={{ color: 'var(--muted)' }}>Loading…</p> : activities.length === 0 ? (
-        <p style={{ color: 'var(--muted)' }}>No activity yet.</p>
+      {loading ? (
+        <>
+          <div className="skeleton-row"><div className="skeleton-circle" /><div className="skeleton-lines"><div className="skeleton-line" /><div className="skeleton-line short" /></div></div>
+          <div className="skeleton-row"><div className="skeleton-circle" /><div className="skeleton-lines"><div className="skeleton-line" /><div className="skeleton-line short" /></div></div>
+        </>
+      ) : activities.length === 0 ? (
+        <div className="empty-state">
+          <span className="icon"><Icon name="edit" size={18} /></span>
+          <p>No activity yet — updates will show up here.</p>
+        </div>
       ) : activities.map((a) => (
         <div key={a.id} className="activity-item">
-          <div className="activity-icon" title={a.type}>{ACTIVITY_ICONS[a.type]}</div>
+          <div className="activity-icon" title={a.type}><Icon name={ACTIVITY_ICONS[a.type]} size={14} /></div>
           <div className="activity-body">
             <div className="activity-text">{a.body}</div>
             <div className="activity-meta">
