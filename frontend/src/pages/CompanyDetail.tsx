@@ -310,6 +310,7 @@ export function CompanyDetail() {
             value={[account.address, account.city, account.state, account.country].filter(Boolean).join(', ') || undefined}
             onEmptyClick={() => setShowEditModal(true)}
           />
+          <Row label="Associated Leads" value={associatedLeads.length} />
         </div>
         {account.description && (
           <div style={{ marginTop: 18, paddingTop: 18, borderTop: '1px solid var(--line)' }}>
@@ -328,8 +329,8 @@ export function CompanyDetail() {
             <thead>
               <tr>
                 <th>Lead Name</th>
-                <th>Stage</th>
                 <th>Owner</th>
+                <th>Stage</th>
                 <th>Email</th>
                 <th>Phone</th>
                 <th>Last Activity</th>
@@ -339,10 +340,10 @@ export function CompanyDetail() {
               {associatedLeads.map((l) => {
                 const leadName = l.leadName || [l.firstName, l.lastName].filter(Boolean).join(' ') || l.email || 'Untitled lead';
                 return (
-                  <tr key={l.id}>
-                    <td><Link to={`/leads/${l.id}`}>{leadName}</Link></td>
-                    <td><span className="chip" style={{ background: l.stage.color + '22', color: l.stage.color }}>{l.stage.name}</span></td>
+                  <tr key={l.id} className="clickable-row" onClick={() => navigate(`/leads/${l.id}`)}>
+                    <td><Link to={`/leads/${l.id}`} onClick={(e) => e.stopPropagation()}>{leadName}</Link></td>
                     <td>{l.owner?.fullName ?? '—'}</td>
+                    <td><span className="chip" style={{ background: l.stage.color + '22', color: l.stage.color }}>{l.stage.name}</span></td>
                     <td>{l.email ?? '—'}</td>
                     <td>{l.phone ?? '—'}</td>
                     <td>{l.lastActivityAt ? new Date(l.lastActivityAt).toLocaleDateString() : '—'}</td>

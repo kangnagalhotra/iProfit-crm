@@ -14,7 +14,7 @@ import {
 
 const COMPANY_SIZES = ['1-10', '11-50', '51-100', '101-250', '251-500', '501-1000', '1001-5000', '5001-10000', '10000+'];
 const COMPANY_TYPES = [
-  'Prospect', 'Customer', 'Partner', 'Vendor', 'Reseller', 'Distributor', 'Investor', 'Consultant', 'Agency', 'Enterprise', 'Startup', 'Other',
+  'Prospect', 'Customer', 'Partner', 'Vendor', 'Agency', 'Reseller', 'Startup', 'Enterprise', 'Other',
 ];
 const INDUSTRIES = [
   'Technology', 'Finance', 'Healthcare', 'Retail', 'Manufacturing', 'Education', 'Real Estate', 'Hospitality',
