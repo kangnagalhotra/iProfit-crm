@@ -1,7 +1,11 @@
 import { useState } from 'react';
 import Papa from 'papaparse';
 import { api } from '../api/client';
-import type { ImportLeadsResult, LeadStatus } from '../api/types';
+import type { ImportLeadsResult } from '../api/types';
+import { downloadExcelTemplate } from '../utils/excelTemplate';
+
+const TEMPLATE_HEADERS = ['First Name', 'Last Name', 'Email', 'Phone', 'Job Title', 'Stage'];
+const TEMPLATE_SAMPLE = ['Jane', 'Doe', 'jane.doe@example.com', '555-0100', 'Sales Manager', 'New'];
 
 const HEADER_MAP: Record<string, string> = {
   'first name': 'firstName',
@@ -13,16 +17,8 @@ const HEADER_MAP: Record<string, string> = {
   'phone number': 'phone',
   'job title': 'jobTitle',
   jobtitle: 'jobTitle',
-  status: 'status',
-};
-
-const STATUS_MAP: Record<string, LeadStatus> = {
-  new: 'NEW',
-  open: 'OPEN',
-  'in progress': 'IN_PROGRESS',
-  in_progress: 'IN_PROGRESS',
-  connected: 'CONNECTED',
-  unqualified: 'UNQUALIFIED',
+  status: 'stageName',
+  stage: 'stageName',
 };
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -33,7 +29,7 @@ interface PreviewRow {
   email?: string;
   phone?: string;
   jobTitle?: string;
-  status?: LeadStatus;
+  stageName?: string;
   valid: boolean;
   reason?: string;
 }
@@ -47,15 +43,13 @@ function mapRow(raw: Record<string, string>): PreviewRow {
   if (mapped.email && !EMAIL_RE.test(mapped.email)) {
     return { ...mapped, valid: false, reason: 'Invalid email format' };
   }
-  let status: LeadStatus | undefined;
-  if (mapped.status) status = STATUS_MAP[mapped.status.toLowerCase()];
   return {
     firstName: mapped.firstName,
     lastName: mapped.lastName,
     email: mapped.email,
     phone: mapped.phone,
     jobTitle: mapped.jobTitle,
-    status,
+    stageName: mapped.stageName,
     valid: true,
   };
 }
@@ -114,13 +108,20 @@ export function LeadImport({ onClose, onImported }: { onClose: () => void; onImp
         {!result && (
           <>
             <div className="field">
-              <label>CSV file (First Name, Last Name, Email, Phone, Job Title, Status)</label>
+              <label>CSV file (First Name, Last Name, Email, Phone, Job Title, Stage)</label>
               <input
                 type="file"
                 accept=".csv,text/csv"
                 onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
               />
             </div>
+            <button
+              className="btn secondary"
+              style={{ marginBottom: 14 }}
+              onClick={() => downloadExcelTemplate('leads-import-template.xlsx', TEMPLATE_HEADERS, TEMPLATE_SAMPLE)}
+            >
+              ⬇ Download Excel template
+            </button>
 
             {parseError && <div className="error">{parseError}</div>}
 
@@ -133,14 +134,14 @@ export function LeadImport({ onClose, onImported }: { onClose: () => void; onImp
                 <div style={{ maxHeight: 260, overflowY: 'auto', border: '1px solid var(--line)', borderRadius: 8 }}>
                   <table>
                     <thead>
-                      <tr><th>Name</th><th>Email</th><th>Status</th></tr>
+                      <tr><th>Name</th><th>Email</th><th>Stage</th></tr>
                     </thead>
                     <tbody>
                       {rows.map((r, i) => (
                         <tr key={i} style={r.valid ? undefined : { opacity: 0.5 }}>
                           <td>{[r.firstName, r.lastName].filter(Boolean).join(' ') || '—'}</td>
                           <td>{r.email ?? '—'}{!r.valid && <span className="error" style={{ margin: 0 }}> {r.reason}</span>}</td>
-                          <td>{r.status ?? 'NEW'}</td>
+                          <td>{r.stageName ?? 'Default'}</td>
                         </tr>
                       ))}
                     </tbody>

@@ -6,6 +6,11 @@ import { LeadsList } from './pages/LeadsList';
 import { LeadDetail } from './pages/LeadDetail';
 import { CompaniesList } from './pages/CompaniesList';
 import { CompanyDetail } from './pages/CompanyDetail';
+import { DealsList } from './pages/DealsList';
+import { DealDetail } from './pages/DealDetail';
+import { TasksPage } from './pages/TasksPage';
+import { TaskDetail } from './pages/TaskDetail';
+import { NotificationBell } from './components/NotificationBell';
 import type { ReactNode } from 'react';
 
 function Shell({ children }: { children: ReactNode }) {
@@ -19,15 +24,16 @@ function Shell({ children }: { children: ReactNode }) {
           <NavLink to="/" end>Home</NavLink>
           <NavLink to="/leads">Leads</NavLink>
           <NavLink to="/companies">Companies</NavLink>
-          <NavLink to="/pipeline">Pipeline</NavLink>
+          <NavLink to="/deals">Deals</NavLink>
           <NavLink to="/tasks">Tasks</NavLink>
         </nav>
       </aside>
       <div className="main">
         <div className="topbar">
           <div />
-          <div>
-            <span style={{ marginRight: 12, fontSize: 14 }}>{user?.fullName} ({user?.role})</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <NotificationBell />
+            <span style={{ fontSize: 14 }}>{user?.fullName} ({user?.role})</span>
             <button className="btn secondary" onClick={() => { logout(); nav('/login'); }}>Sign out</button>
           </div>
         </div>
@@ -51,8 +57,10 @@ export function App() {
       <Route path="/leads/:id" element={<Protected><LeadDetail /></Protected>} />
       <Route path="/companies" element={<Protected><CompaniesList /></Protected>} />
       <Route path="/companies/:id" element={<Protected><CompanyDetail /></Protected>} />
-      <Route path="/pipeline" element={<Protected><div><h2>Pipeline</h2><p>Kanban board — build per spec (Day 17–19).</p></div></Protected>} />
-      <Route path="/tasks" element={<Protected><div><h2>Tasks</h2><p>Task list — build per spec (Day 13–14).</p></div></Protected>} />
+      <Route path="/deals" element={<Protected><DealsList /></Protected>} />
+      <Route path="/deals/:id" element={<Protected><DealDetail /></Protected>} />
+      <Route path="/tasks" element={<Protected><TasksPage /></Protected>} />
+      <Route path="/tasks/:id" element={<Protected><TaskDetail /></Protected>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

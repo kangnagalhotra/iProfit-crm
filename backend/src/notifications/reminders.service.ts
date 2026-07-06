@@ -17,7 +17,7 @@ export class RemindersService {
   async sendDueReminders() {
     const now = new Date();
     const due = await this.prisma.task.findMany({
-      where: { status: 'PENDING', reminderAt: { lte: now } },
+      where: { status: { notIn: ['COMPLETED', 'CANCELLED'] }, reminderAt: { lte: now } },
     });
     for (const task of due) {
       await this.prisma.notification.create({
@@ -39,7 +39,7 @@ export class RemindersService {
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const stale = await this.prisma.lead.findMany({
       where: {
-        status: { notIn: ['UNQUALIFIED'] },
+        stage: { isWon: false, isLost: false },
         lastActivityAt: { lt: sevenDaysAgo },
         ownerId: { not: null },
       },

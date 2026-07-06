@@ -4,6 +4,13 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { AuthModule } from './auth/auth.module';
 import { LeadsModule } from './leads/leads.module';
 import { AccountsModule } from './accounts/accounts.module';
+import { LeadStagesModule } from './lead-stages/lead-stages.module';
+import { AccountStagesModule } from './account-stages/account-stages.module';
+import { ActivitiesModule } from './activities/activities.module';
+import { DealStagesModule } from './deal-stages/deal-stages.module';
+import { OpportunitiesModule } from './opportunities/opportunities.module';
+import { TasksModule } from './tasks/tasks.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -12,8 +19,13 @@ import { AccountsModule } from './accounts/accounts.module';
     AuthModule,
     LeadsModule,
     AccountsModule,
-    // TasksModule, OpportunitiesModule, ActivitiesModule,
-    // NotificationsModule — same pattern as LeadsModule (see docs)
+    LeadStagesModule,
+    AccountStagesModule,
+    ActivitiesModule,
+    DealStagesModule,
+    OpportunitiesModule,
+    TasksModule,
+    NotificationsModule,
   ],
 })
 export class AppModule {}

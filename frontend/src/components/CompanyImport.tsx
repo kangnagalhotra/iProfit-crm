@@ -1,7 +1,11 @@
 import { useState } from 'react';
 import Papa from 'papaparse';
 import { api } from '../api/client';
-import type { AccountStatus, ImportAccountsResult } from '../api/types';
+import type { ImportAccountsResult } from '../api/types';
+import { downloadExcelTemplate } from '../utils/excelTemplate';
+
+const TEMPLATE_HEADERS = ['Name', 'Domain', 'Industry', 'City', 'State', 'Country', 'Stage'];
+const TEMPLATE_SAMPLE = ['Acme Inc', 'acme.com', 'Software', 'Austin', 'TX', 'USA', 'Prospect'];
 
 const HEADER_MAP: Record<string, string> = {
   name: 'name',
@@ -10,17 +14,8 @@ const HEADER_MAP: Record<string, string> = {
   city: 'city',
   state: 'state',
   country: 'country',
-  status: 'status',
-};
-
-const STATUS_MAP: Record<string, AccountStatus> = {
-  prospect: 'PROSPECT',
-  'active customer': 'ACTIVE_CUSTOMER',
-  active_customer: 'ACTIVE_CUSTOMER',
-  active: 'ACTIVE_CUSTOMER',
-  'on hold': 'ON_HOLD',
-  on_hold: 'ON_HOLD',
-  churned: 'CHURNED',
+  status: 'stageName',
+  stage: 'stageName',
 };
 
 interface PreviewRow {
@@ -30,7 +25,7 @@ interface PreviewRow {
   city?: string;
   state?: string;
   country?: string;
-  status?: AccountStatus;
+  stageName?: string;
   valid: boolean;
   reason?: string;
 }
@@ -44,8 +39,6 @@ function mapRow(raw: Record<string, string>): PreviewRow {
   if (!mapped.name) {
     return { ...mapped, valid: false, reason: 'Missing company name' };
   }
-  let status: AccountStatus | undefined;
-  if (mapped.status) status = STATUS_MAP[mapped.status.toLowerCase()];
   return {
     name: mapped.name,
     domain: mapped.domain,
@@ -53,7 +46,7 @@ function mapRow(raw: Record<string, string>): PreviewRow {
     city: mapped.city,
     state: mapped.state,
     country: mapped.country,
-    status,
+    stageName: mapped.stageName,
     valid: true,
   };
 }
@@ -112,13 +105,20 @@ export function CompanyImport({ onClose, onImported }: { onClose: () => void; on
         {!result && (
           <>
             <div className="field">
-              <label>CSV file (Name, Domain, Industry, City, State, Country, Status)</label>
+              <label>CSV file (Name, Domain, Industry, City, State, Country, Stage)</label>
               <input
                 type="file"
                 accept=".csv,text/csv"
                 onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
               />
             </div>
+            <button
+              className="btn secondary"
+              style={{ marginBottom: 14 }}
+              onClick={() => downloadExcelTemplate('companies-import-template.xlsx', TEMPLATE_HEADERS, TEMPLATE_SAMPLE)}
+            >
+              ⬇ Download Excel template
+            </button>
 
             {parseError && <div className="error">{parseError}</div>}
 
@@ -131,14 +131,14 @@ export function CompanyImport({ onClose, onImported }: { onClose: () => void; on
                 <div style={{ maxHeight: 260, overflowY: 'auto', border: '1px solid var(--line)', borderRadius: 8 }}>
                   <table>
                     <thead>
-                      <tr><th>Name</th><th>Domain</th><th>Status</th></tr>
+                      <tr><th>Name</th><th>Domain</th><th>Stage</th></tr>
                     </thead>
                     <tbody>
                       {rows.map((r, i) => (
                         <tr key={i} style={r.valid ? undefined : { opacity: 0.5 }}>
                           <td>{r.name ?? '—'}{!r.valid && <span className="error" style={{ margin: 0 }}> {r.reason}</span>}</td>
                           <td>{r.domain ?? '—'}</td>
-                          <td>{r.status ?? 'PROSPECT'}</td>
+                          <td>{r.stageName ?? 'Default'}</td>
                         </tr>
                       ))}
                     </tbody>

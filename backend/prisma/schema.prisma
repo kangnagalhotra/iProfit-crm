@@ -21,32 +21,17 @@ enum Role {
   SALES_REP
 }
 
-enum LeadStatus {
-  NEW
-  OPEN
-  IN_PROGRESS
-  UNQUALIFIED
-  CONNECTED
-}
-
 enum LeadSource {
-  MANUAL
-  IMPORT
-  WEB_FORM
-  API
-}
-
-enum AccountStatus {
-  PROSPECT
-  ACTIVE_CUSTOMER
-  ON_HOLD
-  CHURNED
-}
-
-enum PreferredContactMethod {
+  IMPORT // system-set only (CSV import) — not shown in the manual-entry dropdown
+  OUTREACH
   EMAIL
-  PHONE
-  SMS
+  CAMPAIGN
+  REFERRAL
+  WEBSITE
+  SOCIAL_MEDIA
+  EVENT
+  PARTNER
+  OTHER
 }
 
 enum ActivityType {
@@ -54,6 +39,7 @@ enum ActivityType {
   EMAIL
   MEETING
   NOTE
+  FIELD_UPDATE
 }
 
 enum TaskType {
@@ -64,8 +50,18 @@ enum TaskType {
 }
 
 enum TaskStatus {
-  PENDING
+  NOT_STARTED
+  IN_PROGRESS
+  WAITING
   COMPLETED
+  CANCELLED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
 }
 
 enum DealType {
@@ -114,6 +110,18 @@ model User {
   @@index([email])
 }
 
+model AccountStage {
+  id        String    @id @default(uuid())
+  name      String    @db.VarChar(100)
+  order     Int
+  color     String    @db.VarChar(20)
+  isDefault Boolean   @default(false)
+  accounts  Account[]
+  createdAt DateTime  @default(now())
+
+  @@index([order])
+}
+
 model Account {
   id            String   @id @default(uuid())
   name          String   @db.VarChar(200)
@@ -124,7 +132,13 @@ model Account {
   city          String?  @db.VarChar(120)
   state         String?  @db.VarChar(120)
   country       String?  @db.VarChar(120)
-  status        AccountStatus @default(PROSPECT)
+  companyType   String?  @db.VarChar(80)
+  email         String?  @db.VarChar(255)
+  phone         String?  @db.VarChar(40)
+  address       String?  @db.VarChar(255)
+  description   String?  @db.Text
+  stageId       String
+  stage         AccountStage @relation(fields: [stageId], references: [id])
   ownerId       String?
   owner         User?    @relation("AccountOwner", fields: [ownerId], references: [id])
   createdAt     DateTime @default(now())
@@ -137,20 +151,37 @@ model Account {
 
   @@index([domain])
   @@index([ownerId])
-  @@index([status])
+  @@index([stageId])
+}
+
+model LeadStage {
+  id        String   @id @default(uuid())
+  name      String   @db.VarChar(100)
+  order     Int
+  color     String   @db.VarChar(20)
+  isWon     Boolean  @default(false)
+  isLost    Boolean  @default(false)
+  isDefault Boolean  @default(false)
+  leads     Lead[]
+  createdAt DateTime @default(now())
+
+  @@index([order])
 }
 
 model Lead {
   id         String     @id @default(uuid())
+  leadName   String?    @db.VarChar(200)
   firstName  String?    @db.VarChar(100)
   lastName   String?    @db.VarChar(100)
   email      String?    @db.VarChar(255)
   phone      String?    @db.VarChar(40)
   jobTitle   String?    @db.VarChar(150)
   city       String?    @db.VarChar(120)
-  preferredContactMethod PreferredContactMethod?
-  status     LeadStatus @default(NEW)
-  source     LeadSource @default(MANUAL)
+  value      Decimal?   @db.Decimal(15, 2)
+  notes      String?    @db.Text
+  stageId    String
+  stage      LeadStage  @relation(fields: [stageId], references: [id])
+  source     LeadSource @default(OTHER)
   score      Int        @default(0)
 
   ownerId    String?
@@ -170,7 +201,7 @@ model Lead {
 
   @@unique([email])
   @@index([ownerId])
-  @@index([status])
+  @@index([stageId])
   @@index([lastActivityAt])
 }
 
@@ -189,6 +220,8 @@ model Stage {
   pipeline    Pipeline @relation(fields: [pipelineId], references: [id])
   name        String   @db.VarChar(100)
   order       Int
+  color       String   @db.VarChar(20)
+  isDefault   Boolean  @default(false)
   winProbability Int   @default(0) // 0-100
   isClosedWon  Boolean @default(false)
   isClosedLost Boolean @default(false)
@@ -203,6 +236,8 @@ model Opportunity {
   amount      Decimal? @db.Decimal(15, 2)
   closeDate   DateTime?
   dealType    DealType @default(NEW_BUSINESS)
+  description String?  @db.Text
+  source      String?  @db.VarChar(80)
 
   pipelineId  String
   pipeline    Pipeline @relation(fields: [pipelineId], references: [id])
@@ -261,21 +296,25 @@ model Activity {
   account       Account?     @relation(fields: [accountId], references: [id])
   opportunityId String?
   opportunity   Opportunity? @relation(fields: [opportunityId], references: [id])
+  taskId        String?
+  task          Task?        @relation(fields: [taskId], references: [id])
 
   createdAt   DateTime     @default(now())
 
   @@index([leadId])
   @@index([opportunityId])
+  @@index([taskId])
   @@index([creatorId])
 }
 
 model Task {
-  id          String     @id @default(uuid())
-  title       String     @db.VarChar(250)
-  type        TaskType   @default(TODO)
-  status      TaskStatus @default(PENDING)
+  id          String       @id @default(uuid())
+  title       String       @db.VarChar(250)
+  type        TaskType     @default(TODO)
+  status      TaskStatus   @default(NOT_STARTED)
+  priority    TaskPriority @default(MEDIUM)
   dueAt       DateTime
-  notes       String?    @db.Text
+  notes       String?      @db.Text
   reminderAt  DateTime?
 
   assigneeId  String
@@ -291,6 +330,8 @@ model Task {
   completedAt DateTime?
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
+
+  activities  Activity[]
 
   @@index([assigneeId])
   @@index([dueAt])

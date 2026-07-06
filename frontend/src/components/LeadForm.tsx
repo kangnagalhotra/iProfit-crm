@@ -1,28 +1,97 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '../api/client';
-import type { Lead, LeadStatus, PreferredContactMethod } from '../api/types';
+import type {
+  Account, Lead, LeadSource, LeadStage, Paginated, User,
+} from '../api/types';
+import { SearchSelect } from './SearchSelect';
+import type { SearchSelectOption } from './SearchSelect';
+import { CreateUserModal } from './CreateUserModal';
+import { useAuth } from '../context/AuthContext';
 
-const STATUSES: LeadStatus[] = ['NEW', 'OPEN', 'IN_PROGRESS', 'CONNECTED', 'UNQUALIFIED'];
-const CONTACT_METHODS: PreferredContactMethod[] = ['EMAIL', 'PHONE', 'SMS'];
+const SOURCES: LeadSource[] = ['OUTREACH', 'EMAIL', 'CAMPAIGN', 'REFERRAL', 'WEBSITE', 'SOCIAL_MEDIA', 'EVENT', 'PARTNER', 'OTHER'];
+const PHONE_PATTERN = /^\+?\d{10}$/;
 
-export function LeadForm({ onClose, onSaved }: { onClose: () => void; onSaved: (lead: Lead) => void }) {
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  return parts.slice(0, 2).map((p) => p[0].toUpperCase()).join('');
+}
+
+export function LeadForm({
+  lead, defaultStageId, onClose, onSaved,
+}: {
+  lead?: Lead;
+  defaultStageId?: string;
+  onClose: () => void;
+  onSaved: (lead: Lead) => void;
+}) {
+  const { user: currentUser } = useAuth();
+  const isEdit = !!lead;
   const [form, setForm] = useState({
-    firstName: '', lastName: '', email: '', phone: '', jobTitle: '', status: 'NEW' as LeadStatus,
-    city: '', preferredContactMethod: '' as PreferredContactMethod | '',
+    firstName: lead?.firstName ?? '', lastName: lead?.lastName ?? '', phone: lead?.phone ?? '', email: lead?.email ?? '',
+    accountId: lead?.account?.id ?? '', companyName: '', jobTitle: lead?.jobTitle ?? '', city: lead?.city ?? '',
+    source: (lead?.source ?? 'OTHER') as LeadSource,
+    ownerId: lead?.owner?.id ?? '', stageId: lead?.stage.id ?? defaultStageId ?? '',
+    value: lead?.value ?? '', notes: lead?.notes ?? '',
   });
+  const [stages, setStages] = useState<LeadStage[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [showCreateUser, setShowCreateUser] = useState(false);
+
+  const canAddOwner = currentUser?.role === 'ADMIN' || currentUser?.role === 'SALES_MANAGER';
+  const leadNamePreview = [form.firstName, form.lastName].filter(Boolean).join(' ');
+
+  useEffect(() => {
+    Promise.all([
+      api.get<LeadStage[]>('/lead-stages'),
+      api.get<User[]>('/users'),
+      api.get<Paginated<Account>>('/accounts', { params: { pageSize: 100 } }),
+    ]).then(([stageRes, userRes, accountRes]) => {
+      setStages(stageRes.data);
+      setUsers(userRes.data);
+      setAccounts(accountRes.data.data);
+      if (!isEdit && !defaultStageId) {
+        const defaultStage = stageRes.data.find((s) => s.isDefault) ?? stageRes.data[0];
+        if (defaultStage) set('stageId', defaultStage.id);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function set<K extends keyof typeof form>(k: K, v: (typeof form)[K]) {
     setForm((f) => ({ ...f, [k]: v }));
   }
 
+  const ownerOptions: SearchSelectOption[] = [
+    { value: '', label: 'Auto-assign' },
+    ...users.map((u) => ({ value: u.id, label: u.fullName, sublabel: u.email })),
+  ];
+  const companyOptions: SearchSelectOption[] = accounts.map((a) => ({ value: a.id, label: a.name }));
+
+  function setCompany(v: string) {
+    if (accounts.some((a) => a.id === v)) { set('accountId', v); set('companyName', ''); } else { set('accountId', ''); set('companyName', v); }
+  }
+
   async function submit() {
-    setError(''); setSaving(true);
+    setError('');
+    if (form.phone && !PHONE_PATTERN.test(form.phone)) {
+      setError('Phone number must contain exactly 10 digits.');
+      return;
+    }
+    if (form.value !== '' && Number(form.value) < 0) {
+      setError('Lead value cannot be negative.');
+      return;
+    }
+    setSaving(true);
     try {
       // strip empty strings so backend optional validators pass
       const payload = Object.fromEntries(Object.entries(form).filter(([, v]) => v !== ''));
-      const { data } = await api.post<Lead>('/leads', payload);
+      const { data } = isEdit
+        ? await api.patch<Lead>(`/leads/${lead!.id}`, payload)
+        : await api.post<Lead>('/leads', payload);
       onSaved(data);
     } catch (e: any) {
       setError(e.response?.data?.message ?? 'Could not save lead');
@@ -32,38 +101,86 @@ export function LeadForm({ onClose, onSaved }: { onClose: () => void; onSaved: (
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h3 style={{ marginTop: 0 }}>Create lead</h3>
-        <div className="field"><label>First name</label>
-          <input value={form.firstName} onChange={(e) => set('firstName', e.target.value)} /></div>
-        <div className="field"><label>Last name</label>
-          <input value={form.lastName} onChange={(e) => set('lastName', e.target.value)} /></div>
-        <div className="field"><label>Phone</label>
-          <input value={form.phone} onChange={(e) => set('phone', e.target.value)} /></div>
-        <div className="field"><label>Email</label>
-          <input value={form.email} onChange={(e) => set('email', e.target.value)} /></div>
-        <div className="field"><label>Job title</label>
-          <input value={form.jobTitle} onChange={(e) => set('jobTitle', e.target.value)} /></div>
-        <div className="field"><label>Status</label>
-          <select value={form.status} onChange={(e) => set('status', e.target.value as LeadStatus)}>
-            {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
-        </div>
-        <div className="field"><label>City</label>
-          <input value={form.city} onChange={(e) => set('city', e.target.value)} /></div>
-        <div className="field"><label>Preferred communication method</label>
-          <select value={form.preferredContactMethod} onChange={(e) => set('preferredContactMethod', e.target.value as PreferredContactMethod)}>
-            <option value="">—</option>
-            {CONTACT_METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
-          </select>
-        </div>
-        {error && <div className="error">{error}</div>}
-        <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-          <button className="btn" onClick={submit} disabled={saving}>{saving ? 'Saving…' : 'Create'}</button>
-          <button className="btn secondary" onClick={onClose}>Cancel</button>
+    <>
+      <div className="modal-overlay" onClick={onClose}>
+        <div className="modal" onClick={(e) => e.stopPropagation()}>
+          <h3 style={{ marginTop: 0 }}>{isEdit ? 'Edit lead' : 'Create lead'}</h3>
+          <div className="field"><label>First name</label>
+            <input value={form.firstName} onChange={(e) => set('firstName', e.target.value)} /></div>
+          <div className="field"><label>Last name</label>
+            <input value={form.lastName} onChange={(e) => set('lastName', e.target.value)} /></div>
+          <div className="field"><label>Phone</label>
+            <input value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="9876543210" /></div>
+          <div className="field"><label>Email</label>
+            <input value={form.email} onChange={(e) => set('email', e.target.value)} /></div>
+
+          {leadNamePreview && (
+            <div className="field">
+              <label>Lead name</label>
+              <div className="helper-text" style={{ marginTop: 0 }}>{leadNamePreview}</div>
+            </div>
+          )}
+          <div className="field"><label>Company</label>
+            <SearchSelect
+              options={companyOptions}
+              value={form.accountId || form.companyName}
+              onChange={setCompany}
+              allowCustom
+              placeholder="Search or type a new company…"
+            />
+          </div>
+          <div className="field"><label>Job title</label>
+            <input value={form.jobTitle} onChange={(e) => set('jobTitle', e.target.value)} /></div>
+          <div className="field"><label>City</label>
+            <input value={form.city} onChange={(e) => set('city', e.target.value)} /></div>
+          <div className="field"><label>Lead source</label>
+            <select value={form.source} onChange={(e) => set('source', e.target.value as LeadSource)}>
+              {SOURCES.map((s) => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
+            </select>
+          </div>
+          <div className="field"><label>Owner</label>
+            <SearchSelect
+              options={ownerOptions}
+              value={form.ownerId}
+              onChange={(v) => set('ownerId', v)}
+              placeholder="Search owner…"
+              renderAvatar={(opt) => (opt.value ? <div className="avatar avatar-sm">{initials(opt.label)}</div> : undefined)}
+              onCreateNew={canAddOwner ? () => setShowCreateUser(true) : undefined}
+              createNewLabel="+ Add new owner"
+            />
+          </div>
+          <div className="field"><label>Stage</label>
+            <select value={form.stageId} onChange={(e) => set('stageId', e.target.value)}>
+              {stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </div>
+          <div className="field"><label>Lead value</label>
+            <input type="number" min="0" value={form.value} onChange={(e) => set('value', e.target.value)} placeholder="0.00" /></div>
+          <div className="field"><label>Notes</label>
+            <textarea rows={3} value={form.notes} onChange={(e) => set('notes', e.target.value)}
+              style={{ width: '100%', padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 6, fontSize: 14, fontFamily: 'inherit' }} />
+          </div>
+
+          {error && <div className="error">{error}</div>}
+          <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+            <button className="btn" onClick={submit} disabled={saving}>
+              {saving ? 'Saving…' : isEdit ? 'Save' : 'Create'}
+            </button>
+            <button className="btn secondary" onClick={onClose}>Cancel</button>
+          </div>
         </div>
       </div>
-    </div>
+
+      {showCreateUser && (
+        <CreateUserModal
+          onClose={() => setShowCreateUser(false)}
+          onCreated={(newUser) => {
+            setUsers((us) => [...us, newUser].sort((a, b) => a.fullName.localeCompare(b.fullName)));
+            set('ownerId', newUser.id);
+            setShowCreateUser(false);
+          }}
+        />
+      )}
+    </>
   );
 }

@@ -2,7 +2,10 @@ import {
   Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards,
 } from '@nestjs/common';
 import { LeadsService } from './leads.service';
-import { CreateLeadDto, UpdateLeadDto, ListLeadsQuery, BulkImportLeadsDto } from './dto';
+import {
+  CreateLeadDto, UpdateLeadDto, ListLeadsQuery, BulkImportLeadsDto,
+  BulkStageDto, BulkOwnerDto, BulkDeleteDto,
+} from './dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -49,5 +52,22 @@ export class LeadsController {
   @Roles(Role.ADMIN, Role.SALES_MANAGER)
   assign(@Param('id') id: string, @Body('ownerId') ownerId: string) {
     return this.leads.assign(id, ownerId);
+  }
+
+  @Patch('bulk/stage')
+  bulkStage(@Body() dto: BulkStageDto, @CurrentUser() user) {
+    return this.leads.bulkUpdateStage(dto.ids, dto.stageId, user);
+  }
+
+  @Patch('bulk/owner')
+  @Roles(Role.ADMIN, Role.SALES_MANAGER)
+  bulkOwner(@Body() dto: BulkOwnerDto, @CurrentUser() user) {
+    return this.leads.bulkUpdateOwner(dto.ids, dto.ownerId, user);
+  }
+
+  @Post('bulk/delete')
+  @Roles(Role.ADMIN, Role.SALES_MANAGER)
+  bulkDelete(@Body() dto: BulkDeleteDto, @CurrentUser() user) {
+    return this.leads.bulkDelete(dto.ids, user);
   }
 }
