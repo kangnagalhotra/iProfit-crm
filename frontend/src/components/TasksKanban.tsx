@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { api } from '../api/client';
-import type { Paginated, Task, TaskStatus } from '../api/types';
+import type { Task, TaskStatus } from '../api/types';
+import { listTasks, updateTask, deleteTask } from '../api/tasks';
 import { Kanban } from './kanban/Kanban';
 import type { KanbanColumn } from './kanban/Kanban';
 import { StageColumnHeader } from './kanban/StageColumnHeader';
@@ -21,7 +21,7 @@ async function loadAllTasks(): Promise<Task[]> {
   let page = 1;
   let all: Task[] = [];
   for (;;) {
-    const { data } = await api.get<Paginated<Task>>('/tasks', { params: { page, pageSize: 100 } });
+    const data = await listTasks({ page, pageSize: 100 });
     all = all.concat(data.data);
     if (all.length >= data.total || data.data.length === 0) break;
     page += 1;
@@ -70,9 +70,9 @@ export function TasksKanban() {
     const prev = tasks;
     setTasks((ts) => ts.map((t) => (t.id === taskId ? { ...t, status: toStatus as TaskStatus } : t)));
     setError('');
-    api.patch(`/tasks/${taskId}`, { status: toStatus }).catch((e) => {
+    updateTask(taskId, { status: toStatus }).catch((e) => {
       setTasks(prev);
-      setError(e.response?.data?.message ?? 'Could not update task status');
+      setError(e.message ?? 'Could not update task status');
     });
   }, [tasks]);
 
@@ -80,11 +80,11 @@ export function TasksKanban() {
     const ok = await confirm(`Delete "${task.title}"? This cannot be undone.`, { title: 'Delete task' });
     if (!ok) return;
     try {
-      await api.delete(`/tasks/${task.id}`);
+      await deleteTask(task.id);
       setTasks((ts) => ts.filter((t) => t.id !== task.id));
       toast.success('Task deleted');
     } catch (e: any) {
-      toast.error(e.response?.data?.message ?? 'Could not delete task');
+      toast.error(e.message ?? 'Could not delete task');
     }
   }
 
@@ -113,7 +113,6 @@ export function TasksKanban() {
               }}
               count={col.items.length}
               editable={false}
-              apiBase=""
               allStageIds={statusIds}
               myIndex={statusIds.indexOf(status.id)}
               onChanged={() => {}}

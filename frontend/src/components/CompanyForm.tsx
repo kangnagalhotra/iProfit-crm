@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
-import { api } from '../api/client';
 import type { Account, AccountStage, User } from '../api/types';
+import { createAccount, updateAccount } from '../api/accounts';
+import { listStages } from '../api/stages';
+import { listUsers } from '../api/users';
 import { SearchSelect } from './SearchSelect';
 import type { SearchSelectOption } from './SearchSelect';
 import { CreateUserModal } from './CreateUserModal';
@@ -61,12 +63,13 @@ export function CompanyForm({
   const [showCreateUser, setShowCreateUser] = useState(false);
 
   useEffect(() => {
-    Promise.all([api.get<AccountStage[]>('/account-stages'), api.get<User[]>('/users')])
+    Promise.all([listStages('account_stages'), listUsers()])
       .then(([stageRes, userRes]) => {
-        setStages(stageRes.data);
-        setUsers(userRes.data);
+        const stagesTyped = stageRes as AccountStage[];
+        setStages(stagesTyped);
+        setUsers(userRes);
         if (!isEdit && !defaultStageId) {
-          const defaultStage = stageRes.data.find((s) => s.isDefault) ?? stageRes.data[0];
+          const defaultStage = stagesTyped.find((s) => s.isDefault) ?? stagesTyped[0];
           if (defaultStage) set('stageId', defaultStage.id);
         }
       });
@@ -100,12 +103,12 @@ export function CompanyForm({
       const payload = Object.fromEntries(
         Object.entries({ ...form, domain: domain ? `www.${domain}` : '' }).filter(([, v]) => v !== ''),
       );
-      const { data } = isEdit
-        ? await api.patch<Account>(`/accounts/${account!.id}`, payload)
-        : await api.post<Account>('/accounts', payload);
+      const data = isEdit
+        ? await updateAccount(account!.id, payload)
+        : await createAccount(payload);
       onSaved(data);
     } catch (e: any) {
-      setError(e.response?.data?.message ?? 'Could not save company');
+      setError(e.message ?? 'Could not save company');
     } finally {
       setSaving(false);
     }

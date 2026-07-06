@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { api } from '../api/client';
 import type { Task } from '../api/types';
+import { getTask, completeTask } from '../api/tasks';
+import { createActivity } from '../api/activities';
 import { TaskForm } from '../components/TaskForm';
 import { ActivityTimeline } from '../components/ActivityTimeline';
 import { useToast } from '../context/ToastContext';
@@ -46,7 +47,8 @@ export function TaskDetail() {
   const [activityKey, setActivityKey] = useState(0);
 
   function load() {
-    api.get<Task>(`/tasks/${id}`).then(({ data }) => setTask(data)).catch(() => {});
+    if (!id) return;
+    getTask(id).then(setTask).catch(() => {});
   }
 
   useEffect(() => { load(); }, [id]);
@@ -77,7 +79,7 @@ export function TaskDetail() {
             <span className="icon">📝</span>Add Update
           </button>
           {task.status !== 'COMPLETED' && (
-            <button className="quick-action" onClick={async () => { await api.patch(`/tasks/${task.id}/complete`); load(); setActivityKey((k) => k + 1); toast.success('Task marked complete'); }}>
+            <button className="quick-action" onClick={async () => { await completeTask(task.id); load(); setActivityKey((k) => k + 1); toast.success('Task marked complete'); }}>
               <span className="icon">☑</span>Complete
             </button>
           )}
@@ -134,10 +136,10 @@ function AddUpdateModal({
     if (!trimmed) return;
     setSaving(true); setError('');
     try {
-      await api.post('/activities', { type: 'NOTE', taskId, body: trimmed });
+      await createActivity({ type: 'NOTE', taskId, body: trimmed });
       onSaved();
     } catch (e: any) {
-      setError(e.response?.data?.message ?? 'Could not add update');
+      setError(e.message ?? 'Could not add update');
     } finally {
       setSaving(false);
     }

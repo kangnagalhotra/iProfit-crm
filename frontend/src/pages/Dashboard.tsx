@@ -3,11 +3,14 @@ import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
-import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import type {
-  Paginated, Lead, Opportunity, DealStage, User,
+  Lead, Opportunity, DealStage, User,
 } from '../api/types';
+import { listLeads } from '../api/leads';
+import { listDeals } from '../api/deals';
+import { listStages } from '../api/stages';
+import { listUsers } from '../api/users';
 import { countByDay, countBy } from '../utils/aggregate';
 
 type RangeOption = 7 | 30 | 90;
@@ -25,7 +28,7 @@ async function fetchAllLeads(params: Record<string, any>): Promise<Lead[]> {
   let page = 1;
   let all: Lead[] = [];
   for (;;) {
-    const { data } = await api.get<Paginated<Lead>>('/leads', { params: { ...params, page, pageSize: 100 } });
+    const data = await listLeads({ ...params, page, pageSize: 100 });
     all = all.concat(data.data);
     if (all.length >= data.total || data.data.length === 0) break;
     page += 1;
@@ -37,7 +40,7 @@ async function fetchAllDeals(params: Record<string, any>): Promise<Opportunity[]
   let page = 1;
   let all: Opportunity[] = [];
   for (;;) {
-    const { data } = await api.get<Paginated<Opportunity>>('/deals', { params: { ...params, page, pageSize: 100 } });
+    const data = await listDeals({ ...params, page, pageSize: 100 });
     all = all.concat(data.data);
     if (all.length >= data.total || data.data.length === 0) break;
     page += 1;
@@ -62,11 +65,11 @@ export function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (canFilterByOwner) api.get<User[]>('/users').then(({ data }) => setUsers(data));
+    if (canFilterByOwner) listUsers().then(setUsers);
   }, [canFilterByOwner]);
 
   useEffect(() => {
-    api.get<DealStage[]>('/deal-stages').then(({ data }) => setDealStages(data));
+    listStages('deal_stages').then((data) => setDealStages(data as DealStage[]));
   }, []);
 
   useEffect(() => {

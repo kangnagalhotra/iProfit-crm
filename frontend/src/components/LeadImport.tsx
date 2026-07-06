@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import Papa from 'papaparse';
-import { api } from '../api/client';
+import { bulkImport } from '../api/bulkImport';
 import type { ImportLeadsResult } from '../api/types';
 import { downloadExcelTemplate } from '../utils/excelTemplate';
 
@@ -89,12 +89,13 @@ export function LeadImport({ onClose, onImported }: { onClose: () => void; onImp
   async function submit() {
     setImporting(true);
     try {
-      const { data } = await api.post<ImportLeadsResult>('/leads/import', {
-        rows: validRows.map(({ valid: _v, reason: _r, ...row }) => row),
-      });
-      setResult(data);
+      const data = await bulkImport<ImportLeadsResult['errors'][number]>(
+        'leads',
+        validRows.map(({ valid: _v, reason: _r, ...row }) => row),
+      );
+      setResult(data as ImportLeadsResult);
     } catch (e: any) {
-      setParseError(e.response?.data?.message ?? 'Import failed');
+      setParseError(e.message ?? 'Import failed');
     } finally {
       setImporting(false);
     }

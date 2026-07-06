@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { api } from '../api/client';
 import type { Activity, ActivityType } from '../api/types';
+import { listActivities } from '../api/activities';
 import { timeAgo } from '../utils/timeAgo';
 
 const ACTIVITY_ICONS: Record<ActivityType, string> = {
@@ -25,12 +25,12 @@ export function ActivityTimeline({
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const params = leadId ? { leadId } : accountId ? { accountId } : taskId ? { taskId } : { opportunityId };
-
   useEffect(() => {
     setLoading(true);
-    api.get<Activity[]>('/activities', { params })
-      .then(({ data }) => setActivities(showNotes ? data : data.filter((a) => a.type !== 'NOTE')))
+    listActivities({
+      leadId, accountId, opportunityId, taskId,
+    })
+      .then((data) => setActivities(showNotes ? data : data.filter((a) => a.type !== 'NOTE')))
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leadId, accountId, opportunityId, taskId]);

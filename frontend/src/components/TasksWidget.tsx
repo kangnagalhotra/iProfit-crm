@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api } from '../api/client';
 import type { Task, TaskPriority, TaskStatus } from '../api/types';
+import {
+  listTasksFor, completeTask, updateTask, deleteTask as deleteTaskApi,
+} from '../api/tasks';
 import { TaskForm } from './TaskForm';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
@@ -21,12 +23,10 @@ export function TasksWidget({
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
 
-  const params = leadId ? { leadId } : accountId ? { accountId } : { opportunityId };
-
   function load() {
     setLoading(true);
-    api.get<Task[]>('/tasks', { params })
-      .then(({ data }) => setTasks(data))
+    listTasksFor({ leadId, accountId, opportunityId })
+      .then(setTasks)
       .finally(() => setLoading(false));
   }
 
@@ -37,12 +37,12 @@ export function TasksWidget({
 
   async function changeStatus(task: Task, status: TaskStatus) {
     try {
-      const { data } = status === 'COMPLETED'
-        ? await api.patch<Task>(`/tasks/${task.id}/complete`)
-        : await api.patch<Task>(`/tasks/${task.id}`, { status });
+      const data = status === 'COMPLETED'
+        ? await completeTask(task.id)
+        : await updateTask(task.id, { status });
       setTasks((ts) => ts.map((t) => (t.id === task.id ? data : t)));
     } catch (e: any) {
-      toast.error(e.response?.data?.message ?? 'Could not update task');
+      toast.error(e.message ?? 'Could not update task');
     }
   }
 
@@ -50,11 +50,11 @@ export function TasksWidget({
     const ok = await confirm('Delete this task?', { title: 'Delete task' });
     if (!ok) return;
     try {
-      await api.delete(`/tasks/${id}`);
+      await deleteTaskApi(id);
       setTasks((ts) => ts.filter((t) => t.id !== id));
       toast.success('Task deleted');
     } catch (e: any) {
-      toast.error(e.response?.data?.message ?? 'Could not delete task');
+      toast.error(e.message ?? 'Could not delete task');
     }
   }
 

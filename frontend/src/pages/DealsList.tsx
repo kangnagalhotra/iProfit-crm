@@ -1,9 +1,11 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { api } from '../api/client';
 import type {
-  Paginated, Opportunity, DealStage, User,
+  Opportunity, DealStage, User,
 } from '../api/types';
+import { listDeals, updateDeal, bulkDeleteDeals } from '../api/deals';
+import { listStages } from '../api/stages';
+import { listUsers } from '../api/users';
 import { DealForm } from '../components/DealForm';
 import { DealImport } from '../components/DealImport';
 import { AddContactsMenu } from '../components/AddContactsMenu';
@@ -49,7 +51,7 @@ async function fetchAllDeals(search: string): Promise<Opportunity[]> {
   let page = 1;
   let all: Opportunity[] = [];
   for (;;) {
-    const { data } = await api.get<Paginated<Opportunity>>('/deals', { params: { search: search || undefined, page, pageSize: 100 } });
+    const data = await listDeals({ search: search || undefined, page, pageSize: 100 });
     all = all.concat(data.data);
     if (all.length >= data.total || data.data.length === 0) break;
     page += 1;
@@ -79,14 +81,16 @@ export function DealsList() {
   const [editingCell, setEditingCell] = useState<{ id: string; field: 'stage' | 'owner' } | null>(null);
 
   useEffect(() => {
-    Promise.all([api.get<DealStage[]>('/deal-stages'), api.get<User[]>('/users')])
-      .then(([stageRes, userRes]) => { setStages(stageRes.data); setUsers(userRes.data); });
+    Promise.all([listStages('deal_stages'), listUsers()])
+      .then(([stageRes, userRes]) => { setStages(stageRes as DealStage[]); setUsers(userRes); });
   }, []);
 
   const load = useCallback(() => {
     setLoading(true);
-    api.get<Paginated<Opportunity>>('/deals', { params: { search: search || undefined, page, pageSize, sortBy, sortDir } })
-      .then(({ data }) => { setDeals(data.data); setTotal(data.total); setSelected(new Set()); })
+    listDeals({
+      search: search || undefined, page, pageSize, sortBy, sortDir,
+    })
+      .then((data) => { setDeals(data.data); setTotal(data.total); setSelected(new Set()); })
       .finally(() => setLoading(false));
   }, [search, page, pageSize, sortBy, sortDir]);
 
@@ -112,10 +116,10 @@ export function DealsList() {
 
   async function inlineUpdate(deal: Opportunity, data: Record<string, any>) {
     try {
-      await api.patch(`/deals/${deal.id}`, data);
+      await updateDeal(deal.id, data);
       load();
     } catch (e: any) {
-      toast.error(e.response?.data?.message ?? 'Could not update deal');
+      toast.error(e.message ?? 'Could not update deal');
     }
   }
 
@@ -123,12 +127,12 @@ export function DealsList() {
     const ok = await confirm(`Delete ${selected.size} selected deal(s)? This cannot be undone.`, { title: 'Delete deals' });
     if (!ok) return;
     try {
-      const { data } = await api.post('/deals/bulk/delete', { ids: [...selected] });
+      const data = await bulkDeleteDeals([...selected]);
       toast.success(`Deleted ${data.succeeded} deal(s)`);
       if (data.failed) toast.error(`${data.failed} deal(s) could not be deleted`);
       load();
     } catch (e: any) {
-      toast.error(e.response?.data?.message ?? 'Bulk delete failed');
+      toast.error(e.message ?? 'Bulk delete failed');
     }
   }
 

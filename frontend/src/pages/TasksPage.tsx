@@ -1,9 +1,13 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { api } from '../api/client';
 import type {
-  Paginated, Task, TaskPriority, TaskStatus, TaskSummary, User,
+  Task, TaskPriority, TaskStatus, TaskSummary, User,
 } from '../api/types';
+import {
+  listTasks, getTaskSummary, updateTask, completeTask as completeTaskApi,
+  bulkUpdateTaskStatus, bulkUpdateTaskOwner, bulkDeleteTasks,
+} from '../api/tasks';
+import { listUsers } from '../api/users';
 import { TaskForm } from '../components/TaskForm';
 import { TaskImport } from '../components/TaskImport';
 import { AddContactsMenu } from '../components/AddContactsMenu';
@@ -61,7 +65,7 @@ async function fetchAllTasks(params: Record<string, any>): Promise<Task[]> {
   let page = 1;
   let all: Task[] = [];
   for (;;) {
-    const { data } = await api.get<Paginated<Task>>('/tasks', { params: { ...params, page, pageSize: 100 } });
+    const data = await listTasks({ ...params, page, pageSize: 100 });
     all = all.concat(data.data);
     if (all.length >= data.total || data.data.length === 0) break;
     page += 1;
@@ -94,11 +98,11 @@ export function TasksPage() {
   const [editingCell, setEditingCell] = useState<{ id: string; field: 'owner' | 'status' } | null>(null);
 
   useEffect(() => {
-    api.get<User[]>('/users').then(({ data }) => setUsers(data));
+    listUsers().then(setUsers);
   }, []);
 
   function loadSummary() {
-    api.get<TaskSummary>('/tasks/summary').then(({ data }) => setSummary(data));
+    getTaskSummary().then(setSummary);
   }
 
   const queryParams = {
@@ -110,8 +114,10 @@ export function TasksPage() {
 
   const load = useCallback(() => {
     setLoading(true);
-    api.get<Paginated<Task>>('/tasks', { params: { ...queryParams, page, pageSize, sortBy, sortDir } })
-      .then(({ data }) => { setTasks(data.data); setTotal(data.total); setSelected(new Set()); })
+    listTasks({
+      ...queryParams, page, pageSize, sortBy, sortDir,
+    })
+      .then((data) => { setTasks(data.data); setTotal(data.total); setSelected(new Set()); })
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, dueFilter, priorityFilter, ownerFilter, page, pageSize, sortBy, sortDir]);
@@ -145,24 +151,24 @@ export function TasksPage() {
   async function bulkChangeStatus(status: string) {
     if (!status) return;
     try {
-      const { data } = await api.patch('/tasks/bulk/status', { ids: [...selected], status });
+      const data = await bulkUpdateTaskStatus([...selected], status as TaskStatus);
       toast.success(`Updated ${data.succeeded} task(s)`);
       if (data.failed) toast.error(`${data.failed} task(s) could not be updated`);
       refreshAfterChange();
     } catch (e: any) {
-      toast.error(e.response?.data?.message ?? 'Bulk status update failed');
+      toast.error(e.message ?? 'Bulk status update failed');
     }
   }
 
   async function bulkChangeOwner(ownerId: string) {
     if (!ownerId) return;
     try {
-      const { data } = await api.patch('/tasks/bulk/owner', { ids: [...selected], ownerId });
+      const data = await bulkUpdateTaskOwner([...selected], ownerId);
       toast.success(`Reassigned ${data.succeeded} task(s)`);
       if (data.failed) toast.error(`${data.failed} task(s) could not be reassigned`);
       refreshAfterChange();
     } catch (e: any) {
-      toast.error(e.response?.data?.message ?? 'Bulk reassignment failed');
+      toast.error(e.message ?? 'Bulk reassignment failed');
     }
   }
 
@@ -170,31 +176,31 @@ export function TasksPage() {
     const ok = await confirm(`Delete ${selected.size} selected task(s)? This cannot be undone.`, { title: 'Delete tasks' });
     if (!ok) return;
     try {
-      const { data } = await api.post('/tasks/bulk/delete', { ids: [...selected] });
+      const data = await bulkDeleteTasks([...selected]);
       toast.success(`Deleted ${data.succeeded} task(s)`);
       if (data.failed) toast.error(`${data.failed} task(s) could not be deleted`);
       refreshAfterChange();
     } catch (e: any) {
-      toast.error(e.response?.data?.message ?? 'Bulk delete failed');
+      toast.error(e.message ?? 'Bulk delete failed');
     }
   }
 
   async function completeTask(task: Task) {
     try {
-      await api.patch(`/tasks/${task.id}/complete`);
+      await completeTaskApi(task.id);
       refreshAfterChange();
       toast.success('Task marked complete');
     } catch (e: any) {
-      toast.error(e.response?.data?.message ?? 'Could not update task');
+      toast.error(e.message ?? 'Could not update task');
     }
   }
 
   async function inlineUpdate(task: Task, data: Record<string, any>) {
     try {
-      await api.patch(`/tasks/${task.id}`, data);
+      await updateTask(task.id, data);
       refreshAfterChange();
     } catch (e: any) {
-      toast.error(e.response?.data?.message ?? 'Could not update task');
+      toast.error(e.message ?? 'Could not update task');
     }
   }
 

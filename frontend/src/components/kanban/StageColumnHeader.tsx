@@ -1,17 +1,18 @@
 import { useRef, useState } from 'react';
-import { api } from '../../api/client';
 import type { Stage } from '../../api/types';
+import type { StageTable } from '../../api/stages';
+import { updateStage, deleteStage as deleteStageRow, reorderStages } from '../../api/stages';
 import { STAGE_COLORS } from '../../constants/stageColors';
 import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../context/ConfirmContext';
 
 export function StageColumnHeader<T extends Stage>({
-  stage, count, editable, apiBase, allStageIds, myIndex, onChanged, onDeleted, onReordered, subtitle,
+  stage, count, editable, table, allStageIds, myIndex, onChanged, onDeleted, onReordered, subtitle,
 }: {
   stage: T;
   count: number;
   editable: boolean;
-  apiBase: string;
+  table?: StageTable;
   allStageIds: string[];
   myIndex: number;
   onChanged: (stage: T) => void;
@@ -40,25 +41,27 @@ export function StageColumnHeader<T extends Stage>({
     );
   }
 
+  const stageTable = table!;
+
   async function saveName() {
     setEditingName(false);
     const trimmed = name.trim();
     if (!trimmed || trimmed === stage.name) { setName(stage.name); return; }
     try {
-      const { data } = await api.patch<T>(`${apiBase}/${stage.id}`, { name: trimmed });
-      onChanged(data);
+      const data = await updateStage(stageTable, stage.id, { name: trimmed });
+      onChanged(data as T);
     } catch (e: any) {
       setName(stage.name);
-      toast.error(e.response?.data?.message ?? 'Could not rename stage');
+      toast.error(e.message ?? 'Could not rename stage');
     }
   }
 
   async function saveColor(color: string) {
     try {
-      const { data } = await api.patch<T>(`${apiBase}/${stage.id}`, { color });
-      onChanged(data);
+      const data = await updateStage(stageTable, stage.id, { color });
+      onChanged(data as T);
     } catch (e: any) {
-      toast.error(e.response?.data?.message ?? 'Could not update color');
+      toast.error(e.message ?? 'Could not update color');
     }
   }
 
@@ -67,11 +70,11 @@ export function StageColumnHeader<T extends Stage>({
     const ok = await confirm(`Delete the "${stage.name}" stage? This cannot be undone.`, { title: 'Delete stage' });
     if (!ok) return;
     try {
-      await api.delete(`${apiBase}/${stage.id}`);
+      await deleteStageRow(stageTable, stage.id);
       onDeleted(stage.id);
       toast.success(`Deleted "${stage.name}"`);
     } catch (e: any) {
-      toast.error(e.response?.data?.message ?? 'Could not delete stage');
+      toast.error(e.message ?? 'Could not delete stage');
     }
   }
 
@@ -82,10 +85,10 @@ export function StageColumnHeader<T extends Stage>({
     const reordered = [...allStageIds];
     [reordered[myIndex], reordered[newIndex]] = [reordered[newIndex], reordered[myIndex]];
     try {
-      const { data } = await api.patch<T[]>(`${apiBase}/reorder`, { orderedIds: reordered });
-      onReordered(data);
+      const data = await reorderStages(stageTable, reordered);
+      onReordered(data as T[]);
     } catch (e: any) {
-      toast.error(e.response?.data?.message ?? 'Could not reorder stages');
+      toast.error(e.message ?? 'Could not reorder stages');
     }
   }
 

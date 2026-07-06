@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { api } from '../api/client';
+import { createUser } from '../api/users';
 import type { Role, User } from '../api/types';
 
 const ROLES: { value: Role; label: string }[] = [
@@ -21,10 +21,10 @@ export function CreateUserModal({ onClose, onCreated }: { onClose: () => void; o
   async function submit() {
     setError(''); setSaving(true);
     try {
-      const { data } = await api.post<User>('/users', form);
+      const data = await createUser(form as { fullName: string; email: string; password: string; role: 'SALES_REP' | 'SALES_MANAGER' });
       onCreated(data);
     } catch (e: any) {
-      setError(e.response?.data?.message ?? 'Could not create user');
+      setError(e.message ?? 'Could not create user');
     } finally {
       setSaving(false);
     }

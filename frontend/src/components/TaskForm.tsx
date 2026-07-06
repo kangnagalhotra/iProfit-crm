@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react';
-import { api } from '../api/client';
 import type {
-  Account, Lead, Opportunity, Paginated, Task, TaskPriority, TaskStatus, TaskType, User,
+  Account, Lead, Opportunity, Task, TaskPriority, TaskStatus, TaskType, User,
 } from '../api/types';
+import { createTask, updateTask } from '../api/tasks';
+import { listUsers } from '../api/users';
+import { listLeads } from '../api/leads';
+import { listAccounts } from '../api/accounts';
+import { listDeals } from '../api/deals';
 
 const TASK_TYPES: TaskType[] = ['TODO', 'CALL', 'EMAIL', 'FOLLOW_UP'];
 const PRIORITIES: TaskPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
@@ -63,16 +67,16 @@ export function TaskForm({
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    api.get<User[]>('/users').then(({ data }) => setUsers(data));
+    listUsers().then(setUsers);
     if (!isScoped) {
       Promise.all([
-        api.get<Paginated<Lead>>('/leads', { params: { pageSize: 100 } }),
-        api.get<Paginated<Account>>('/accounts', { params: { pageSize: 100 } }),
-        api.get<Paginated<Opportunity>>('/deals', { params: { pageSize: 100 } }),
+        listLeads({ pageSize: 100 }),
+        listAccounts({ pageSize: 100 }),
+        listDeals({ pageSize: 100 }),
       ]).then(([leadRes, accountRes, dealRes]) => {
-        setLeads(leadRes.data.data);
-        setAccounts(accountRes.data.data);
-        setDeals(dealRes.data.data);
+        setLeads(leadRes.data);
+        setAccounts(accountRes.data);
+        setDeals(dealRes.data);
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -105,12 +109,12 @@ export function TaskForm({
         reminderAt: computeReminderAt(form.dueAt, reminderOffset),
       };
       Object.keys(payload).forEach((k) => { if (payload[k] === '' || payload[k] === undefined) delete payload[k]; });
-      const { data } = isEdit
-        ? await api.patch<Task>(`/tasks/${task!.id}`, payload)
-        : await api.post<Task>('/tasks', payload);
+      const data = isEdit
+        ? await updateTask(task!.id, payload)
+        : await createTask(payload);
       onSaved(data);
     } catch (e: any) {
-      setError(e.response?.data?.message ?? 'Could not save task');
+      setError(e.message ?? 'Could not save task');
     } finally {
       setSaving(false);
     }

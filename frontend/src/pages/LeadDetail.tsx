@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { api } from '../api/client';
 import type { Lead, LeadStage, User } from '../api/types';
+import {
+  getLead, updateLead, createLead, deleteLead,
+} from '../api/leads';
+import { listStages } from '../api/stages';
+import { listUsers } from '../api/users';
 import { NotesSection } from '../components/NotesSection';
 import { TasksWidget } from '../components/TasksWidget';
 import { ActivityTimeline } from '../components/ActivityTimeline';
@@ -75,13 +79,14 @@ export function LeadDetail() {
   const moreRef = useRef<HTMLDivElement>(null);
 
   function load() {
-    api.get<Lead>(`/leads/${id}`).then(({ data }) => setLead(data)).catch(() => {});
+    if (!id) return;
+    getLead(id).then(setLead).catch(() => {});
   }
 
   useEffect(() => {
     load();
-    Promise.all([api.get<User[]>('/users'), api.get<LeadStage[]>('/lead-stages')])
-      .then(([userRes, stageRes]) => { setUsers(userRes.data); setStages(stageRes.data); });
+    Promise.all([listUsers(), listStages('lead_stages')])
+      .then(([userRes, stageRes]) => { setUsers(userRes); setStages(stageRes as LeadStage[]); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -106,13 +111,13 @@ export function LeadDetail() {
 
   async function saveField(data: Record<string, any>) {
     try {
-      const { data: updated } = await api.patch<Lead>(`/leads/${lead!.id}`, data);
+      const updated = await updateLead(lead!.id, data);
       setLead(updated);
       setEditingField(null);
       setActivityKey((k) => k + 1);
       toast.success('Lead updated');
     } catch (e: any) {
-      toast.error(e.response?.data?.message ?? 'Could not update lead');
+      toast.error(e.message ?? 'Could not update lead');
     }
   }
 
@@ -132,11 +137,11 @@ export function LeadDetail() {
         notes: lead!.notes,
       };
       const cleaned = Object.fromEntries(Object.entries(payload).filter(([, v]) => v !== undefined && v !== ''));
-      const { data } = await api.post<Lead>('/leads', cleaned);
+      const data = await createLead(cleaned);
       toast.success('Lead duplicated');
       navigate(`/leads/${data.id}`);
     } catch (e: any) {
-      toast.error(e.response?.data?.message ?? 'Could not duplicate lead');
+      toast.error(e.message ?? 'Could not duplicate lead');
     }
   }
 
@@ -144,11 +149,11 @@ export function LeadDetail() {
     const ok = await confirm(`Delete "${name}"? This cannot be undone.`, { title: 'Delete lead' });
     if (!ok) return;
     try {
-      await api.delete(`/leads/${lead!.id}`);
+      await deleteLead(lead!.id);
       toast.success('Lead deleted');
       navigate('/leads');
     } catch (e: any) {
-      toast.error(e.response?.data?.message ?? 'Could not delete lead');
+      toast.error(e.message ?? 'Could not delete lead');
     }
   }
 

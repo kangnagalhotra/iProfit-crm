@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { api } from '../api/client';
-import type { DealStage, Opportunity, Paginated } from '../api/types';
+import type { DealStage, Opportunity } from '../api/types';
+import { listDeals, updateDeal, deleteDeal } from '../api/deals';
+import { listStages, createStage } from '../api/stages';
 import { Kanban } from './kanban/Kanban';
 import type { KanbanColumn } from './kanban/Kanban';
 import { StageColumnHeader } from './kanban/StageColumnHeader';
@@ -14,7 +15,7 @@ async function loadAllDeals(): Promise<Opportunity[]> {
   let page = 1;
   let all: Opportunity[] = [];
   for (;;) {
-    const { data } = await api.get<Paginated<Opportunity>>('/deals', { params: { page, pageSize: 100 } });
+    const data = await listDeals({ page, pageSize: 100 });
     all = all.concat(data.data);
     if (all.length >= data.total || data.data.length === 0) break;
     page += 1;
@@ -50,8 +51,8 @@ export function DealsKanban() {
   const [formState, setFormState] = useState<{ deal?: Opportunity; defaultStageId?: string } | null>(null);
 
   useEffect(() => {
-    Promise.all([loadAllDeals(), api.get<DealStage[]>('/deal-stages')])
-      .then(([dealRows, stageRes]) => { setDeals(dealRows); setStages(stageRes.data); })
+    Promise.all([loadAllDeals(), listStages('deal_stages')])
+      .then(([dealRows, stageRes]) => { setDeals(dealRows); setStages(stageRes as DealStage[]); })
       .finally(() => setLoading(false));
   }, []);
 
@@ -59,9 +60,9 @@ export function DealsKanban() {
     const prev = deals;
     setDeals((ds) => ds.map((d) => (d.id === dealId ? { ...d, stage: stages.find((s) => s.id === toStageId)! } : d)));
     setError('');
-    api.patch(`/deals/${dealId}`, { stageId: toStageId }).catch((e) => {
+    updateDeal(dealId, { stageId: toStageId }).catch((e) => {
       setDeals(prev);
-      setError(e.response?.data?.message ?? 'Could not update deal stage');
+      setError(e.message ?? 'Could not update deal stage');
     });
   }, [deals, stages]);
 
@@ -69,11 +70,11 @@ export function DealsKanban() {
     const ok = await confirm(`Delete "${deal.name}"? This cannot be undone.`, { title: 'Delete deal' });
     if (!ok) return;
     try {
-      await api.delete(`/deals/${deal.id}`);
+      await deleteDeal(deal.id);
       setDeals((ds) => ds.filter((d) => d.id !== deal.id));
       toast.success('Deal deleted');
     } catch (e: any) {
-      toast.error(e.response?.data?.message ?? 'Could not delete deal');
+      toast.error(e.message ?? 'Could not delete deal');
     }
   }
 
@@ -81,11 +82,11 @@ export function DealsKanban() {
     const name = newStageName.trim();
     if (!name) { setAddingStage(false); return; }
     try {
-      const { data } = await api.post<DealStage>('/deal-stages', { name, color: '#6B7280' });
-      setStages((s) => [...s, data]);
+      const data = await createStage('deal_stages', { name, color: '#6B7280' });
+      setStages((s) => [...s, data as DealStage]);
       toast.success(`Added stage "${name}"`);
     } catch (e: any) {
-      toast.error(e.response?.data?.message ?? 'Could not add stage');
+      toast.error(e.message ?? 'Could not add stage');
     } finally {
       setNewStageName('');
       setAddingStage(false);
@@ -116,7 +117,7 @@ export function DealsKanban() {
               stage={stage}
               count={col.items.length}
               editable={canManageStages}
-              apiBase="/deal-stages"
+              table="deal_stages"
               allStageIds={stageIds}
               myIndex={stageIds.indexOf(stage.id)}
               onChanged={(updated) => setStages((s) => s.map((st) => (st.id === updated.id ? updated : st)))}

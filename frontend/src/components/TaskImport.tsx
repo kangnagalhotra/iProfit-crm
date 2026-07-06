@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import Papa from 'papaparse';
-import { api } from '../api/client';
+import { bulkImport } from '../api/bulkImport';
 import { downloadExcelTemplate } from '../utils/excelTemplate';
 
 const TEMPLATE_HEADERS = ['Task Name', 'Type', 'Priority', 'Due Date', 'Status', 'Related Module', 'Related Record'];
@@ -93,12 +93,13 @@ export function TaskImport({ onClose, onImported }: { onClose: () => void; onImp
   async function submit() {
     setImporting(true);
     try {
-      const { data } = await api.post<ImportResult>('/tasks/import', {
-        rows: validRows.map(({ valid: _v, reason: _r, ...row }) => row),
-      });
-      setResult(data);
+      const data = await bulkImport<ImportResult['errors'][number]>(
+        'tasks',
+        validRows.map(({ valid: _v, reason: _r, ...row }) => row),
+      );
+      setResult(data as ImportResult);
     } catch (e: any) {
-      setParseError(e.response?.data?.message ?? 'Import failed');
+      setParseError(e.message ?? 'Import failed');
     } finally {
       setImporting(false);
     }

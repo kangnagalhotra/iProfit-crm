@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import Papa from 'papaparse';
-import { api } from '../api/client';
+import { bulkImport } from '../api/bulkImport';
 import type { ImportAccountsResult } from '../api/types';
 import { downloadExcelTemplate } from '../utils/excelTemplate';
 
@@ -86,12 +86,13 @@ export function CompanyImport({ onClose, onImported }: { onClose: () => void; on
   async function submit() {
     setImporting(true);
     try {
-      const { data } = await api.post<ImportAccountsResult>('/accounts/import', {
-        rows: validRows.map(({ valid: _v, reason: _r, ...row }) => row),
-      });
-      setResult(data);
+      const data = await bulkImport<ImportAccountsResult['errors'][number]>(
+        'accounts',
+        validRows.map(({ valid: _v, reason: _r, ...row }) => row),
+      );
+      setResult(data as ImportAccountsResult);
     } catch (e: any) {
-      setParseError(e.response?.data?.message ?? 'Import failed');
+      setParseError(e.message ?? 'Import failed');
     } finally {
       setImporting(false);
     }

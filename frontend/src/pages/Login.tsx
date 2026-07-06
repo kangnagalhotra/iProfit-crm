@@ -16,7 +16,7 @@ export function Login() {
       await login(email, password);
       nav('/');
     } catch (e: any) {
-      setError(e.response?.data?.message ?? 'Email or password is incorrect');
+      setError(e.message ?? 'Email or password is incorrect');
     } finally {
       setLoading(false);
     }

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
-import { api } from '../api/client';
 import type { Activity } from '../api/types';
+import {
+  listActivities, createActivity, updateActivity, deleteActivity,
+} from '../api/activities';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
@@ -22,13 +24,13 @@ export function NotesSection({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState('');
 
-  const params = leadId ? { leadId } : accountId ? { accountId } : { opportunityId };
+  const params = { leadId, accountId, opportunityId };
   const canModerate = user?.role === 'ADMIN' || user?.role === 'SALES_MANAGER';
 
   function load() {
     setLoading(true);
-    api.get<Activity[]>('/activities', { params })
-      .then(({ data }) => setNotes(data.filter((a) => a.type === 'NOTE')))
+    listActivities(params)
+      .then((data) => setNotes(data.filter((a) => a.type === 'NOTE')))
       .finally(() => setLoading(false));
   }
 
@@ -39,12 +41,12 @@ export function NotesSection({
     if (!body) return;
     setSaving(true);
     try {
-      await api.post('/activities', { type: 'NOTE', body, ...params });
+      await createActivity({ type: 'NOTE', body, ...params });
       setDraft('');
       load();
       toast.success('Note added');
     } catch (e: any) {
-      toast.error(e.response?.data?.message ?? 'Could not add note');
+      toast.error(e.message ?? 'Could not add note');
     } finally {
       setSaving(false);
     }
@@ -55,10 +57,10 @@ export function NotesSection({
     setEditingId(null);
     if (!body) return;
     try {
-      await api.patch(`/activities/${id}`, { body });
+      await updateActivity(id, body);
       load();
     } catch (e: any) {
-      toast.error(e.response?.data?.message ?? 'Could not update note');
+      toast.error(e.message ?? 'Could not update note');
     }
   }
 
@@ -66,11 +68,11 @@ export function NotesSection({
     const ok = await confirm('Delete this note?', { title: 'Delete note' });
     if (!ok) return;
     try {
-      await api.delete(`/activities/${id}`);
+      await deleteActivity(id);
       setNotes((n) => n.filter((x) => x.id !== id));
       toast.success('Note deleted');
     } catch (e: any) {
-      toast.error(e.response?.data?.message ?? 'Could not delete note');
+      toast.error(e.message ?? 'Could not delete note');
     }
   }
 

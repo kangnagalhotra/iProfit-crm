@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../api/client';
 import type { Notification } from '../api/types';
+import {
+  listNotifications, markNotificationRead, markAllNotificationsRead,
+} from '../api/notifications';
 
 export function NotificationBell() {
   const navigate = useNavigate();
@@ -10,7 +12,7 @@ export function NotificationBell() {
   const ref = useRef<HTMLDivElement>(null);
 
   function load() {
-    api.get<Notification[]>('/notifications').then(({ data }) => setNotifications(data)).catch(() => {});
+    listNotifications().then(setNotifications).catch(() => {});
   }
 
   useEffect(() => {
@@ -32,14 +34,14 @@ export function NotificationBell() {
   async function handleClick(n: Notification) {
     setOpen(false);
     if (!n.isRead) {
-      await api.patch(`/notifications/${n.id}/read`);
+      await markNotificationRead(n.id);
       setNotifications((ns) => ns.map((x) => (x.id === n.id ? { ...x, isRead: true } : x)));
     }
     if (n.linkUrl) navigate(n.linkUrl);
   }
 
   async function markAllRead() {
-    await api.patch('/notifications/read-all');
+    await markAllNotificationsRead();
     setNotifications((ns) => ns.map((n) => ({ ...n, isRead: true })));
   }
 

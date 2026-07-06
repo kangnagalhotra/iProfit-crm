@@ -1,7 +1,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { api } from '../api/client';
-import type { Paginated, Account, AccountStage, User } from '../api/types';
+import type { Account, AccountStage, User } from '../api/types';
+import { listAccounts, updateAccount, bulkDeleteAccounts } from '../api/accounts';
+import { listStages } from '../api/stages';
+import { listUsers } from '../api/users';
 import { CompanyForm } from '../components/CompanyForm';
 import { CompanyImport } from '../components/CompanyImport';
 import { CompaniesKanban } from '../components/CompaniesKanban';
@@ -38,7 +40,7 @@ async function fetchAllAccounts(search: string): Promise<Account[]> {
   let page = 1;
   let all: Account[] = [];
   for (;;) {
-    const { data } = await api.get<Paginated<Account>>('/accounts', { params: { search: search || undefined, page, pageSize: 100 } });
+    const data = await listAccounts({ search: search || undefined, page, pageSize: 100 });
     all = all.concat(data.data);
     if (all.length >= data.total || data.data.length === 0) break;
     page += 1;
@@ -68,14 +70,16 @@ export function CompaniesList() {
   const [editingCell, setEditingCell] = useState<{ id: string; field: 'stage' | 'owner' } | null>(null);
 
   useEffect(() => {
-    Promise.all([api.get<AccountStage[]>('/account-stages'), api.get<User[]>('/users')])
-      .then(([stageRes, userRes]) => { setStages(stageRes.data); setUsers(userRes.data); });
+    Promise.all([listStages('account_stages'), listUsers()])
+      .then(([stageRes, userRes]) => { setStages(stageRes as AccountStage[]); setUsers(userRes); });
   }, []);
 
   const load = useCallback(() => {
     setLoading(true);
-    api.get<Paginated<Account>>('/accounts', { params: { search: search || undefined, page, pageSize, sortBy, sortDir } })
-      .then(({ data }) => { setAccounts(data.data); setTotal(data.total); setSelected(new Set()); })
+    listAccounts({
+      search: search || undefined, page, pageSize, sortBy, sortDir,
+    })
+      .then((data) => { setAccounts(data.data); setTotal(data.total); setSelected(new Set()); })
       .finally(() => setLoading(false));
   }, [search, page, pageSize, sortBy, sortDir]);
 
@@ -101,10 +105,10 @@ export function CompaniesList() {
 
   async function inlineUpdate(account: Account, data: Record<string, any>) {
     try {
-      await api.patch(`/accounts/${account.id}`, data);
+      await updateAccount(account.id, data);
       load();
     } catch (e: any) {
-      toast.error(e.response?.data?.message ?? 'Could not update company');
+      toast.error(e.message ?? 'Could not update company');
     }
   }
 
@@ -112,12 +116,12 @@ export function CompaniesList() {
     const ok = await confirm(`Delete ${selected.size} selected compan${selected.size === 1 ? 'y' : 'ies'}? This cannot be undone.`, { title: 'Delete companies' });
     if (!ok) return;
     try {
-      const { data } = await api.post('/accounts/bulk/delete', { ids: [...selected] });
+      const data = await bulkDeleteAccounts([...selected]);
       toast.success(`Deleted ${data.succeeded} compan${data.succeeded === 1 ? 'y' : 'ies'}`);
       if (data.failed) toast.error(`${data.failed} could not be deleted`);
       load();
     } catch (e: any) {
-      toast.error(e.response?.data?.message ?? 'Bulk delete failed');
+      toast.error(e.message ?? 'Bulk delete failed');
     }
   }
 

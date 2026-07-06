@@ -1,0 +1,173 @@
+import { supabase } from '../lib/supabase';
+import type { Lead, Paginated } from './types';
+
+const SELECT = '*, stage:lead_stages(*), owner:profiles(id, full_name), account:accounts(id, name)';
+
+const SORT_COLUMN: Record<string, string> = {
+  firstName: 'first_name', lastName: 'last_name', value: 'value', updatedAt: 'updated_at', createdAt: 'created_at',
+};
+
+function mapLead(row: any): Lead {
+  return {
+    id: row.id,
+    leadName: row.lead_name ?? undefined,
+    firstName: row.first_name ?? undefined,
+    lastName: row.last_name ?? undefined,
+    email: row.email ?? undefined,
+    phone: row.phone ?? undefined,
+    jobTitle: row.job_title ?? undefined,
+    city: row.city ?? undefined,
+    value: row.value !== null && row.value !== undefined ? String(row.value) : undefined,
+    notes: row.notes ?? undefined,
+    stage: {
+      id: row.stage.id, name: row.stage.name, order: row.stage.order, color: row.stage.color,
+      isDefault: row.stage.is_default, isWon: row.stage.is_won, isLost: row.stage.is_lost,
+    },
+    source: row.source ?? undefined,
+    score: row.score,
+    owner: row.owner ? { id: row.owner.id, fullName: row.owner.full_name } : undefined,
+    account: row.account ? { id: row.account.id, name: row.account.name } : undefined,
+    lastActivityAt: row.last_activity_at ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export interface ListLeadsParams {
+  page?: number; pageSize?: number; sortBy?: string; sortDir?: 'asc' | 'desc';
+  search?: string; stageId?: string; ownerId?: string; accountId?: string; createdAfter?: string;
+}
+
+export async function listLeads(params: ListLeadsParams = {}): Promise<Paginated<Lead>> {
+  const page = Math.max(1, params.page ?? 1);
+  const pageSize = Math.min(100, params.pageSize ?? 25);
+  let query = supabase.from('leads').select(SELECT, { count: 'exact' });
+
+  if (params.stageId) query = query.eq('stage_id', params.stageId);
+  if (params.ownerId) query = query.eq('owner_id', params.ownerId);
+  if (params.accountId) query = query.eq('account_id', params.accountId);
+  if (params.createdAfter) query = query.gte('created_at', params.createdAfter);
+  if (params.search) {
+    const term = `%${params.search}%`;
+    query = query.or(`first_name.ilike.${term},last_name.ilike.${term},email.ilike.${term}`);
+  }
+
+  if (params.sortBy === 'stage') {
+    query = query.order('order', { foreignTable: 'lead_stages', ascending: params.sortDir !== 'desc' });
+  } else {
+    const column = SORT_COLUMN[params.sortBy ?? ''] ?? 'updated_at';
+    query = query.order(column, { ascending: params.sortDir === 'asc' });
+  }
+
+  query = query.range((page - 1) * pageSize, page * pageSize - 1);
+
+  const { data, error, count } = await query;
+  if (error) throw error;
+  return {
+    data: (data ?? []).map(mapLead), page, pageSize, total: count ?? 0,
+  };
+}
+
+export async function getLead(id: string): Promise<Lead> {
+  const { data, error } = await supabase.from('leads').select(SELECT).eq('id', id).single();
+  if (error) throw error;
+  return mapLead(data);
+}
+
+async function resolveCompany(companyName: string, ownerId?: string): Promise<string> {
+  const { data, error } = await supabase.functions.invoke('resolve-company', { body: { companyName, ownerId } });
+  if (error) throw error;
+  return data.id;
+}
+
+async function pickOwner(): Promise<string | null> {
+  const { data, error } = await supabase.functions.invoke('pick-owner', { body: {} });
+  if (error) throw error;
+  return data.id;
+}
+
+async function defaultLeadStageId(): Promise<string> {
+  const { data, error } = await supabase.from('lead_stages').select('id').eq('is_default', true).single();
+  if (error) throw error;
+  return data.id;
+}
+
+function translateError(error: any): never {
+  if (error.code === '23505' && error.message?.includes('leads_email_key')) {
+    throw new Error('Lead with this email exists');
+  }
+  throw new Error(error.message ?? 'Something went wrong');
+}
+
+export async function createLead(input: Record<string, any>): Promise<Lead> {
+  const { companyName, accountId: inputAccountId, ...rest } = input;
+  const currentUser = (await supabase.auth.getUser()).data.user;
+  const ownerId = rest.ownerId ?? (await pickOwner()) ?? currentUser?.id;
+  const accountId = inputAccountId ?? (companyName ? await resolveCompany(companyName, ownerId) : undefined);
+  const stageId = rest.stageId ?? (await defaultLeadStageId());
+
+  const row: Record<string, any> = {
+    first_name: rest.firstName, last_name: rest.lastName, email: rest.email, phone: rest.phone,
+    job_title: rest.jobTitle, city: rest.city, value: rest.value, notes: rest.notes,
+    source: rest.source, owner_id: ownerId, account_id: accountId, stage_id: stageId,
+    lead_name: [rest.firstName, rest.lastName].filter(Boolean).join(' ') || undefined,
+    last_activity_at: new Date().toISOString(),
+  };
+  Object.keys(row).forEach((k) => { if (row[k] === undefined) delete row[k]; });
+
+  const { data, error } = await supabase.from('leads').insert(row).select(SELECT).single();
+  if (error) translateError(error);
+  return mapLead(data);
+}
+
+export async function updateLead(id: string, input: Record<string, any>): Promise<Lead> {
+  const { companyName, accountId: inputAccountId, ...rest } = input;
+  let accountId = inputAccountId;
+  if (accountId === undefined && companyName) {
+    const { data: current } = await supabase.from('leads').select('owner_id').eq('id', id).single();
+    accountId = await resolveCompany(companyName, current?.owner_id);
+  }
+
+  const row: Record<string, any> = {
+    first_name: rest.firstName, last_name: rest.lastName, email: rest.email, phone: rest.phone,
+    job_title: rest.jobTitle, city: rest.city, value: rest.value, notes: rest.notes,
+    source: rest.source, owner_id: rest.ownerId, stage_id: rest.stageId, score: rest.score, account_id: accountId,
+  };
+  Object.keys(row).forEach((k) => { if (row[k] === undefined) delete row[k]; });
+
+  // Lead Name is never user-typed — regenerate it from the merged effective names
+  // whenever either name is part of this update (mirrors the old leads.service.ts).
+  if (row.first_name !== undefined || row.last_name !== undefined) {
+    const { data: current } = await supabase.from('leads').select('first_name, last_name').eq('id', id).single();
+    const first = row.first_name !== undefined ? row.first_name : current?.first_name;
+    const last = row.last_name !== undefined ? row.last_name : current?.last_name;
+    row.lead_name = [first, last].filter(Boolean).join(' ') || null;
+  }
+
+  const { data, error } = await supabase.from('leads').update(row).eq('id', id).select(SELECT).single();
+  if (error) translateError(error);
+  return mapLead(data);
+}
+
+export async function deleteLead(id: string): Promise<void> {
+  const { error } = await supabase.from('leads').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export async function bulkDeleteLeads(ids: string[]): Promise<{ succeeded: number; failed: number; total: number }> {
+  const { error, count } = await supabase.from('leads').delete({ count: 'exact' }).in('id', ids);
+  if (error) return { succeeded: 0, failed: ids.length, total: ids.length };
+  return { succeeded: count ?? 0, failed: ids.length - (count ?? 0), total: ids.length };
+}
+
+export async function bulkUpdateLeadStage(ids: string[], stageId: string) {
+  const { error, count } = await supabase.from('leads').update({ stage_id: stageId }, { count: 'exact' }).in('id', ids);
+  if (error) return { succeeded: 0, failed: ids.length, total: ids.length };
+  return { succeeded: count ?? 0, failed: ids.length - (count ?? 0), total: ids.length };
+}
+
+export async function bulkUpdateLeadOwner(ids: string[], ownerId: string) {
+  const { error, count } = await supabase.from('leads').update({ owner_id: ownerId }, { count: 'exact' }).in('id', ids);
+  if (error) return { succeeded: 0, failed: ids.length, total: ids.length };
+  return { succeeded: count ?? 0, failed: ids.length - (count ?? 0), total: ids.length };
+}

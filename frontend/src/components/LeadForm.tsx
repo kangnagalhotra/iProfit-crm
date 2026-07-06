@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
-import { api } from '../api/client';
 import type {
-  Account, Lead, LeadSource, LeadStage, Paginated, User,
+  Account, Lead, LeadSource, LeadStage, User,
 } from '../api/types';
+import { createLead, updateLead } from '../api/leads';
+import { listStages } from '../api/stages';
+import { listUsers } from '../api/users';
+import { listAccounts } from '../api/accounts';
 import { SearchSelect } from './SearchSelect';
 import type { SearchSelectOption } from './SearchSelect';
 import { CreateUserModal } from './CreateUserModal';
@@ -46,15 +49,16 @@ export function LeadForm({
 
   useEffect(() => {
     Promise.all([
-      api.get<LeadStage[]>('/lead-stages'),
-      api.get<User[]>('/users'),
-      api.get<Paginated<Account>>('/accounts', { params: { pageSize: 100 } }),
+      listStages('lead_stages'),
+      listUsers(),
+      listAccounts({ pageSize: 100 }),
     ]).then(([stageRes, userRes, accountRes]) => {
-      setStages(stageRes.data);
-      setUsers(userRes.data);
-      setAccounts(accountRes.data.data);
+      const stagesTyped = stageRes as LeadStage[];
+      setStages(stagesTyped);
+      setUsers(userRes);
+      setAccounts(accountRes.data);
       if (!isEdit && !defaultStageId) {
-        const defaultStage = stageRes.data.find((s) => s.isDefault) ?? stageRes.data[0];
+        const defaultStage = stagesTyped.find((s) => s.isDefault) ?? stagesTyped[0];
         if (defaultStage) set('stageId', defaultStage.id);
       }
     });
@@ -87,14 +91,14 @@ export function LeadForm({
     }
     setSaving(true);
     try {
-      // strip empty strings so backend optional validators pass
+      // strip empty strings so optional fields don't overwrite with blanks
       const payload = Object.fromEntries(Object.entries(form).filter(([, v]) => v !== ''));
-      const { data } = isEdit
-        ? await api.patch<Lead>(`/leads/${lead!.id}`, payload)
-        : await api.post<Lead>('/leads', payload);
+      const data = isEdit
+        ? await updateLead(lead!.id, payload)
+        : await createLead(payload);
       onSaved(data);
     } catch (e: any) {
-      setError(e.response?.data?.message ?? 'Could not save lead');
+      setError(e.message ?? 'Could not save lead');
     } finally {
       setSaving(false);
     }

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { api } from '../api/client';
-import type { Account, AccountStage, Paginated } from '../api/types';
+import type { Account, AccountStage } from '../api/types';
+import { listAccounts, updateAccount, deleteAccount } from '../api/accounts';
+import { listStages, createStage } from '../api/stages';
 import { Kanban } from './kanban/Kanban';
 import type { KanbanColumn } from './kanban/Kanban';
 import { StageColumnHeader } from './kanban/StageColumnHeader';
@@ -14,7 +15,7 @@ async function loadAllAccounts(): Promise<Account[]> {
   let page = 1;
   let all: Account[] = [];
   for (;;) {
-    const { data } = await api.get<Paginated<Account>>('/accounts', { params: { page, pageSize: 100 } });
+    const data = await listAccounts({ page, pageSize: 100 });
     all = all.concat(data.data);
     if (all.length >= data.total || data.data.length === 0) break;
     page += 1;
@@ -50,8 +51,8 @@ export function CompaniesKanban() {
   const [formState, setFormState] = useState<{ account?: Account; defaultStageId?: string } | null>(null);
 
   useEffect(() => {
-    Promise.all([loadAllAccounts(), api.get<AccountStage[]>('/account-stages')])
-      .then(([accountRows, stageRes]) => { setAccounts(accountRows); setStages(stageRes.data); })
+    Promise.all([loadAllAccounts(), listStages('account_stages')])
+      .then(([accountRows, stageRes]) => { setAccounts(accountRows); setStages(stageRes as AccountStage[]); })
       .finally(() => setLoading(false));
   }, []);
 
@@ -59,9 +60,9 @@ export function CompaniesKanban() {
     const prev = accounts;
     setAccounts((as) => as.map((a) => (a.id === accountId ? { ...a, stage: stages.find((s) => s.id === toStageId)! } : a)));
     setError('');
-    api.patch(`/accounts/${accountId}`, { stageId: toStageId }).catch((e) => {
+    updateAccount(accountId, { stageId: toStageId }).catch((e) => {
       setAccounts(prev);
-      setError(e.response?.data?.message ?? 'Could not update company stage');
+      setError(e.message ?? 'Could not update company stage');
     });
   }, [accounts, stages]);
 
@@ -69,11 +70,11 @@ export function CompaniesKanban() {
     const ok = await confirm(`Delete "${account.name}"? This cannot be undone.`, { title: 'Delete company' });
     if (!ok) return;
     try {
-      await api.delete(`/accounts/${account.id}`);
+      await deleteAccount(account.id);
       setAccounts((as) => as.filter((a) => a.id !== account.id));
       toast.success('Company deleted');
     } catch (e: any) {
-      toast.error(e.response?.data?.message ?? 'Could not delete company');
+      toast.error(e.message ?? 'Could not delete company');
     }
   }
 
@@ -81,11 +82,11 @@ export function CompaniesKanban() {
     const name = newStageName.trim();
     if (!name) { setAddingStage(false); return; }
     try {
-      const { data } = await api.post<AccountStage>('/account-stages', { name, color: '#6B7280' });
-      setStages((s) => [...s, data]);
+      const data = await createStage('account_stages', { name, color: '#6B7280' });
+      setStages((s) => [...s, data as AccountStage]);
       toast.success(`Added stage "${name}"`);
     } catch (e: any) {
-      toast.error(e.response?.data?.message ?? 'Could not add stage');
+      toast.error(e.message ?? 'Could not add stage');
     } finally {
       setNewStageName('');
       setAddingStage(false);
@@ -115,7 +116,7 @@ export function CompaniesKanban() {
               stage={stage}
               count={col.items.length}
               editable={canManageStages}
-              apiBase="/account-stages"
+              table="account_stages"
               allStageIds={stageIds}
               myIndex={stageIds.indexOf(stage.id)}
               onChanged={(updated) => setStages((s) => s.map((st) => (st.id === updated.id ? updated : st)))}

@@ -44,7 +44,8 @@ function Shell({ children }: { children: ReactNode }) {
 }
 
 function Protected({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  if (loading) return <p>Loading…</p>;
   return user ? <Shell>{children}</Shell> : <Navigate to="/login" replace />;
 }
 

@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react';
-import { api } from '../api/client';
 import type {
-  Account, DealStage, DealType, Lead, Opportunity, Paginated, User,
+  Account, DealStage, DealType, Lead, Opportunity, User,
 } from '../api/types';
+import { createDeal, updateDeal } from '../api/deals';
+import { listStages } from '../api/stages';
+import { listUsers } from '../api/users';
+import { listAccounts } from '../api/accounts';
+import { listLeads } from '../api/leads';
 
 const DEAL_TYPES: DealType[] = ['NEW_BUSINESS', 'EXISTING_BUSINESS', 'RENEWAL'];
 
@@ -36,17 +40,18 @@ export function DealForm({
 
   useEffect(() => {
     Promise.all([
-      api.get<DealStage[]>('/deal-stages'),
-      api.get<User[]>('/users'),
-      api.get<Paginated<Account>>('/accounts', { params: { pageSize: 100 } }),
-      api.get<Paginated<Lead>>('/leads', { params: { pageSize: 100 } }),
+      listStages('deal_stages'),
+      listUsers(),
+      listAccounts({ pageSize: 100 }),
+      listLeads({ pageSize: 100 }),
     ]).then(([stageRes, userRes, accountRes, leadRes]) => {
-      setStages(stageRes.data);
-      setUsers(userRes.data);
-      setAccounts(accountRes.data.data);
-      setLeads(leadRes.data.data);
+      const stagesTyped = stageRes as DealStage[];
+      setStages(stagesTyped);
+      setUsers(userRes);
+      setAccounts(accountRes.data);
+      setLeads(leadRes.data);
       if (!isEdit && !defaultStageId) {
-        const defaultStage = stageRes.data.find((s) => s.isDefault) ?? stageRes.data[0];
+        const defaultStage = stagesTyped.find((s) => s.isDefault) ?? stagesTyped[0];
         if (defaultStage) set('stageId', defaultStage.id);
       }
     });
@@ -63,12 +68,12 @@ export function DealForm({
     setError(''); setSaving(true);
     try {
       const payload = Object.fromEntries(Object.entries(form).filter(([, v]) => v !== ''));
-      const { data } = isEdit
-        ? await api.patch<Opportunity>(`/deals/${deal!.id}`, payload)
-        : await api.post<Opportunity>('/deals', payload);
+      const data = isEdit
+        ? await updateDeal(deal!.id, payload)
+        : await createDeal(payload);
       onSaved(data);
     } catch (e: any) {
-      setError(e.response?.data?.message ?? 'Could not save deal');
+      setError(e.message ?? 'Could not save deal');
     } finally {
       setSaving(false);
     }

@@ -1,7 +1,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { api } from '../api/client';
-import type { Paginated, Lead, LeadStage, User } from '../api/types';
+import type { Lead, LeadStage, User } from '../api/types';
+import { listLeads, updateLead, bulkDeleteLeads } from '../api/leads';
+import { listStages } from '../api/stages';
+import { listUsers } from '../api/users';
 import { LeadForm } from '../components/LeadForm';
 import { LeadImport } from '../components/LeadImport';
 import { AddContactsMenu } from '../components/AddContactsMenu';
@@ -40,7 +42,7 @@ async function fetchAllLeads(search: string): Promise<Lead[]> {
   let page = 1;
   let all: Lead[] = [];
   for (;;) {
-    const { data } = await api.get<Paginated<Lead>>('/leads', { params: { search: search || undefined, page, pageSize: 100 } });
+    const data = await listLeads({ search: search || undefined, page, pageSize: 100 });
     all = all.concat(data.data);
     if (all.length >= data.total || data.data.length === 0) break;
     page += 1;
@@ -70,14 +72,16 @@ export function LeadsList() {
   const [editingCell, setEditingCell] = useState<{ id: string; field: 'stage' | 'owner' } | null>(null);
 
   useEffect(() => {
-    Promise.all([api.get<LeadStage[]>('/lead-stages'), api.get<User[]>('/users')])
-      .then(([stageRes, userRes]) => { setStages(stageRes.data); setUsers(userRes.data); });
+    Promise.all([listStages('lead_stages'), listUsers()])
+      .then(([stageRes, userRes]) => { setStages(stageRes as LeadStage[]); setUsers(userRes); });
   }, []);
 
   const load = useCallback(() => {
     setLoading(true);
-    api.get<Paginated<Lead>>('/leads', { params: { search: search || undefined, page, pageSize, sortBy, sortDir } })
-      .then(({ data }) => { setLeads(data.data); setTotal(data.total); setSelected(new Set()); })
+    listLeads({
+      search: search || undefined, page, pageSize, sortBy, sortDir,
+    })
+      .then((data) => { setLeads(data.data); setTotal(data.total); setSelected(new Set()); })
       .finally(() => setLoading(false));
   }, [search, page, pageSize, sortBy, sortDir]);
 
@@ -103,10 +107,10 @@ export function LeadsList() {
 
   async function inlineUpdate(lead: Lead, data: Record<string, any>) {
     try {
-      await api.patch(`/leads/${lead.id}`, data);
+      await updateLead(lead.id, data);
       load();
     } catch (e: any) {
-      toast.error(e.response?.data?.message ?? 'Could not update lead');
+      toast.error(e.message ?? 'Could not update lead');
     }
   }
 
@@ -114,12 +118,12 @@ export function LeadsList() {
     const ok = await confirm(`Delete ${selected.size} selected lead(s)? This cannot be undone.`, { title: 'Delete leads' });
     if (!ok) return;
     try {
-      const { data } = await api.post('/leads/bulk/delete', { ids: [...selected] });
+      const data = await bulkDeleteLeads([...selected]);
       toast.success(`Deleted ${data.succeeded} lead(s)`);
       if (data.failed) toast.error(`${data.failed} lead(s) could not be deleted`);
       load();
     } catch (e: any) {
-      toast.error(e.response?.data?.message ?? 'Bulk delete failed');
+      toast.error(e.message ?? 'Bulk delete failed');
     }
   }
 

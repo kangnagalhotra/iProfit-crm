@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { api } from '../api/client';
-import type { Lead, LeadStage, Paginated } from '../api/types';
+import type { Lead, LeadStage } from '../api/types';
+import { listLeads, updateLead, deleteLead } from '../api/leads';
+import { listStages, createStage } from '../api/stages';
 import { Kanban } from './kanban/Kanban';
 import type { KanbanColumn } from './kanban/Kanban';
 import { StageColumnHeader } from './kanban/StageColumnHeader';
@@ -15,7 +16,7 @@ async function loadAllLeads(): Promise<Lead[]> {
   let all: Lead[] = [];
   // Server caps pageSize at 100 — page through until every lead is fetched.
   for (;;) {
-    const { data } = await api.get<Paginated<Lead>>('/leads', { params: { page, pageSize: 100 } });
+    const data = await listLeads({ page, pageSize: 100 });
     all = all.concat(data.data);
     if (all.length >= data.total || data.data.length === 0) break;
     page += 1;
@@ -51,8 +52,8 @@ export function LeadsKanban() {
   const [formState, setFormState] = useState<{ lead?: Lead; defaultStageId?: string } | null>(null);
 
   useEffect(() => {
-    Promise.all([loadAllLeads(), api.get<LeadStage[]>('/lead-stages')])
-      .then(([leadRows, stageRes]) => { setLeads(leadRows); setStages(stageRes.data); })
+    Promise.all([loadAllLeads(), listStages('lead_stages')])
+      .then(([leadRows, stageRes]) => { setLeads(leadRows); setStages(stageRes as LeadStage[]); })
       .finally(() => setLoading(false));
   }, []);
 
@@ -60,9 +61,9 @@ export function LeadsKanban() {
     const prev = leads;
     setLeads((ls) => ls.map((l) => (l.id === leadId ? { ...l, stage: stages.find((s) => s.id === toStageId)! } : l)));
     setError('');
-    api.patch(`/leads/${leadId}`, { stageId: toStageId }).catch((e) => {
+    updateLead(leadId, { stageId: toStageId }).catch((e) => {
       setLeads(prev); // revert optimistic move
-      setError(e.response?.data?.message ?? 'Could not update lead stage');
+      setError(e.message ?? 'Could not update lead stage');
     });
   }, [leads, stages]);
 
@@ -71,11 +72,11 @@ export function LeadsKanban() {
     const ok = await confirm(`Delete "${name}"? This cannot be undone.`, { title: 'Delete lead' });
     if (!ok) return;
     try {
-      await api.delete(`/leads/${lead.id}`);
+      await deleteLead(lead.id);
       setLeads((ls) => ls.filter((l) => l.id !== lead.id));
       toast.success('Lead deleted');
     } catch (e: any) {
-      toast.error(e.response?.data?.message ?? 'Could not delete lead');
+      toast.error(e.message ?? 'Could not delete lead');
     }
   }
 
@@ -83,11 +84,11 @@ export function LeadsKanban() {
     const name = newStageName.trim();
     if (!name) { setAddingStage(false); return; }
     try {
-      const { data } = await api.post<LeadStage>('/lead-stages', { name, color: '#6B7280' });
-      setStages((s) => [...s, data]);
+      const data = await createStage('lead_stages', { name, color: '#6B7280' });
+      setStages((s) => [...s, data as LeadStage]);
       toast.success(`Added stage "${name}"`);
     } catch (e: any) {
-      toast.error(e.response?.data?.message ?? 'Could not add stage');
+      toast.error(e.message ?? 'Could not add stage');
     } finally {
       setNewStageName('');
       setAddingStage(false);
@@ -117,7 +118,7 @@ export function LeadsKanban() {
               stage={stage}
               count={col.items.length}
               editable={canManageStages}
-              apiBase="/lead-stages"
+              table="lead_stages"
               allStageIds={stageIds}
               myIndex={stageIds.indexOf(stage.id)}
               onChanged={(updated) => setStages((s) => s.map((st) => (st.id === updated.id ? updated : st)))}

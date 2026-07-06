@@ -1,9 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { api } from '../api/client';
 import type {
-  Account, DealStage, Lead, Opportunity, Paginated, User,
+  Account, DealStage, Lead, Opportunity, User,
 } from '../api/types';
+import {
+  getDeal, updateDeal, createDeal, deleteDeal,
+} from '../api/deals';
+import { listStages } from '../api/stages';
+import { listUsers } from '../api/users';
+import { listAccounts } from '../api/accounts';
+import { listLeads } from '../api/leads';
 import { NotesSection } from '../components/NotesSection';
 import { TasksWidget } from '../components/TasksWidget';
 import { ActivityTimeline } from '../components/ActivityTimeline';
@@ -84,17 +90,18 @@ export function DealDetail() {
   const moreRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    api.get<Opportunity>(`/deals/${id}`).then(({ data }) => setDeal(data)).catch(() => {});
+    if (!id) return;
+    getDeal(id).then(setDeal).catch(() => {});
     Promise.all([
-      api.get<User[]>('/users'),
-      api.get<DealStage[]>('/deal-stages'),
-      api.get<Paginated<Account>>('/accounts', { params: { pageSize: 100 } }),
-      api.get<Paginated<Lead>>('/leads', { params: { pageSize: 100 } }),
+      listUsers(),
+      listStages('deal_stages'),
+      listAccounts({ pageSize: 100 }),
+      listLeads({ pageSize: 100 }),
     ]).then(([userRes, stageRes, accountRes, leadRes]) => {
-      setUsers(userRes.data);
-      setStages(stageRes.data);
-      setAccounts(accountRes.data.data);
-      setLeads(leadRes.data.data);
+      setUsers(userRes);
+      setStages(stageRes as DealStage[]);
+      setAccounts(accountRes.data);
+      setLeads(leadRes.data);
     });
   }, [id]);
 
@@ -110,13 +117,13 @@ export function DealDetail() {
 
   async function saveField(data: Record<string, any>) {
     try {
-      const { data: updated } = await api.patch<Opportunity>(`/deals/${deal!.id}`, data);
+      const updated = await updateDeal(deal!.id, data);
       setDeal(updated);
       setEditingField(null);
       setActivityKey((k) => k + 1);
       toast.success('Deal updated');
     } catch (e: any) {
-      toast.error(e.response?.data?.message ?? 'Could not update deal');
+      toast.error(e.message ?? 'Could not update deal');
     }
   }
 
@@ -135,11 +142,11 @@ export function DealDetail() {
         leadId: deal!.lead?.id,
       };
       const cleaned = Object.fromEntries(Object.entries(payload).filter(([, v]) => v !== undefined && v !== ''));
-      const { data } = await api.post<Opportunity>('/deals', cleaned);
+      const data = await createDeal(cleaned);
       toast.success('Deal duplicated');
       navigate(`/deals/${data.id}`);
     } catch (e: any) {
-      toast.error(e.response?.data?.message ?? 'Could not duplicate deal');
+      toast.error(e.message ?? 'Could not duplicate deal');
     }
   }
 
@@ -147,11 +154,11 @@ export function DealDetail() {
     const ok = await confirm(`Delete "${deal!.name}"? This cannot be undone.`, { title: 'Delete deal' });
     if (!ok) return;
     try {
-      await api.delete(`/deals/${deal!.id}`);
+      await deleteDeal(deal!.id);
       toast.success('Deal deleted');
       navigate('/deals');
     } catch (e: any) {
-      toast.error(e.response?.data?.message ?? 'Could not delete deal');
+      toast.error(e.message ?? 'Could not delete deal');
     }
   }
 

@@ -12,9 +12,10 @@
 
 create function handle_new_auth_user() returns trigger as $$
 begin
-  insert into public.profiles (id, full_name, role)
+  insert into public.profiles (id, email, full_name, role)
   values (
     new.id,
+    new.email,
     coalesce(new.raw_user_meta_data->>'full_name', new.email),
     coalesce((new.raw_user_meta_data->>'role')::role, 'SALES_REP')
   );

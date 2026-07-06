@@ -64,6 +64,7 @@ $$ language plpgsql;
 
 create table profiles (
   id uuid primary key references auth.users(id) on delete cascade,
+  email varchar(255) not null unique,
   full_name varchar(200) not null,
   role role not null default 'SALES_REP',
   is_active boolean not null default true,

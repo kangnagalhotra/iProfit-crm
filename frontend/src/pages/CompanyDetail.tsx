@@ -1,9 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { api } from '../api/client';
 import type {
-  Account, AccountStage, Lead, Paginated, User,
+  Account, AccountStage, Lead, User,
 } from '../api/types';
+import {
+  getAccount, updateAccount, createAccount, deleteAccount,
+} from '../api/accounts';
+import { listStages } from '../api/stages';
+import { listUsers } from '../api/users';
+import { listLeads } from '../api/leads';
 import { NotesSection } from '../components/NotesSection';
 import { TasksWidget } from '../components/TasksWidget';
 import { ActivityTimeline } from '../components/ActivityTimeline';
@@ -84,14 +89,14 @@ export function CompanyDetail() {
 
   function loadAssociatedLeads() {
     if (!id) return;
-    api.get<Paginated<Lead>>('/leads', { params: { accountId: id, pageSize: 100 } })
-      .then(({ data }) => setAssociatedLeads(data.data));
+    listLeads({ accountId: id, pageSize: 100 }).then((data) => setAssociatedLeads(data.data));
   }
 
   useEffect(() => {
-    api.get<Account>(`/accounts/${id}`).then(({ data }) => setAccount(data)).catch(() => {});
-    Promise.all([api.get<User[]>('/users'), api.get<AccountStage[]>('/account-stages')])
-      .then(([userRes, stageRes]) => { setUsers(userRes.data); setStages(stageRes.data); });
+    if (!id) return;
+    getAccount(id).then(setAccount).catch(() => {});
+    Promise.all([listUsers(), listStages('account_stages')])
+      .then(([userRes, stageRes]) => { setUsers(userRes); setStages(stageRes as AccountStage[]); });
     loadAssociatedLeads();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
@@ -108,13 +113,13 @@ export function CompanyDetail() {
 
   async function saveField(data: Record<string, any>) {
     try {
-      const { data: updated } = await api.patch<Account>(`/accounts/${account!.id}`, data);
+      const updated = await updateAccount(account!.id, data);
       setAccount(updated);
       setEditingField(null);
       setActivityKey((k) => k + 1);
       toast.success('Company updated');
     } catch (e: any) {
-      toast.error(e.response?.data?.message ?? 'Could not update company');
+      toast.error(e.message ?? 'Could not update company');
     }
   }
 
@@ -138,11 +143,11 @@ export function CompanyDetail() {
         stageId: account!.stage.id,
       };
       const cleaned = Object.fromEntries(Object.entries(payload).filter(([, v]) => v !== undefined && v !== ''));
-      const { data } = await api.post<Account>('/accounts', cleaned);
+      const data = await createAccount(cleaned);
       toast.success('Company duplicated');
       navigate(`/companies/${data.id}`);
     } catch (e: any) {
-      toast.error(e.response?.data?.message ?? 'Could not duplicate company');
+      toast.error(e.message ?? 'Could not duplicate company');
     }
   }
 
@@ -150,11 +155,11 @@ export function CompanyDetail() {
     const ok = await confirm(`Delete "${account!.name}"? This cannot be undone.`, { title: 'Delete company' });
     if (!ok) return;
     try {
-      await api.delete(`/accounts/${account!.id}`);
+      await deleteAccount(account!.id);
       toast.success('Company deleted');
       navigate('/companies');
     } catch (e: any) {
-      toast.error(e.response?.data?.message ?? 'Could not delete company');
+      toast.error(e.message ?? 'Could not delete company');
     }
   }
 
