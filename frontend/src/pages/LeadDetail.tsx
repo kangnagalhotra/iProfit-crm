@@ -12,6 +12,7 @@ import { ActivityTimeline } from '../components/ActivityTimeline';
 import { EditableRow } from '../components/EditableRow';
 import { SearchSelect } from '../components/SearchSelect';
 import { LeadForm } from '../components/LeadForm';
+import { AddActivityModal } from '../components/AddActivityModal';
 import { Icon } from '../components/Icon';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
@@ -75,6 +76,7 @@ export function LeadDetail() {
   const [stages, setStages] = useState<LeadStage[]>([]);
   const [editingField, setEditingField] = useState<string | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showAddActivity, setShowAddActivity] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [activityKey, setActivityKey] = useState(0);
   const moreRef = useRef<HTMLDivElement>(null);
@@ -203,6 +205,7 @@ export function LeadDetail() {
                   <button onClick={() => { setMoreOpen(false); setEditingField('stage'); scrollToKeyInfo(); }}>Change Status</button>
                   <button onClick={() => { setMoreOpen(false); scrollToNotes(); }}>Add Note</button>
                   <button onClick={() => { setMoreOpen(false); scrollToTasks(); }}>Add Task</button>
+                  <button onClick={() => { setMoreOpen(false); setShowAddActivity(true); }}>Add Activity</button>
                   <button disabled title="Coming soon — Meeting scheduling not built yet">Schedule Meeting</button>
                   <button onClick={() => { setMoreOpen(false); duplicateRecord(); }}>Duplicate Record</button>
                   <button disabled title="Coming soon — Archiving not built yet">Archive Record</button>
@@ -347,6 +350,14 @@ export function LeadDetail() {
           onSaved={(updated) => {
             setLead(updated); setShowEditModal(false); setActivityKey((k) => k + 1); toast.success('Lead updated');
           }}
+        />
+      )}
+
+      {showAddActivity && (
+        <AddActivityModal
+          leadId={lead.id}
+          onClose={() => setShowAddActivity(false)}
+          onSaved={() => { setShowAddActivity(false); setActivityKey((k) => k + 1); toast.success('Activity added'); }}
         />
       )}
     </div>
