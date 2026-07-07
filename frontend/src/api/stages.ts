@@ -14,6 +14,9 @@ function mapStage(row: any): LeadStage | AccountStage | DealStage {
     ...(row.win_probability !== undefined && row.win_probability !== null
       ? { winProbability: row.win_probability, isClosedWon: row.is_closed_won, isClosedLost: row.is_closed_lost }
       : {}),
+    ...(row.is_customer_stage !== undefined && row.is_customer_stage !== null
+      ? { isCustomerStage: row.is_customer_stage }
+      : {}),
   } as any;
 }
 

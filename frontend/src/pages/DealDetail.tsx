@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import type {
-  Account, DealStage, Lead, Opportunity, User,
+  Account, Contact, DealStage, Opportunity, User,
 } from '../api/types';
 import {
   getDeal, updateDeal, createDeal, deleteDeal,
@@ -9,7 +9,7 @@ import {
 import { listStages } from '../api/stages';
 import { listUsers } from '../api/users';
 import { listAccounts } from '../api/accounts';
-import { listLeads } from '../api/leads';
+import { listContacts } from '../api/contacts';
 import { NotesSection } from '../components/NotesSection';
 import { TasksWidget } from '../components/TasksWidget';
 import { ActivityTimeline } from '../components/ActivityTimeline';
@@ -59,8 +59,8 @@ function formatValue(value?: string) {
 }
 
 function contactName(deal: Opportunity) {
-  if (!deal.lead) return undefined;
-  return [deal.lead.firstName, deal.lead.lastName].filter(Boolean).join(' ') || deal.lead.email;
+  if (!deal.contact) return undefined;
+  return [deal.contact.firstName, deal.contact.lastName].filter(Boolean).join(' ') || deal.contact.email;
 }
 
 function scrollToNotes() {
@@ -84,7 +84,7 @@ export function DealDetail() {
   const [users, setUsers] = useState<User[]>([]);
   const [stages, setStages] = useState<DealStage[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [leads, setLeads] = useState<Lead[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
   const [editingField, setEditingField] = useState<string | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showAddActivity, setShowAddActivity] = useState(false);
@@ -99,12 +99,12 @@ export function DealDetail() {
       listUsers(),
       listStages('deal_stages'),
       listAccounts({ pageSize: 100 }),
-      listLeads({ pageSize: 100 }),
-    ]).then(([userRes, stageRes, accountRes, leadRes]) => {
+      listContacts({ pageSize: 100 }),
+    ]).then(([userRes, stageRes, accountRes, contactRes]) => {
       setUsers(userRes);
       setStages(stageRes as DealStage[]);
       setAccounts(accountRes.data);
-      setLeads(leadRes.data);
+      setContacts(contactRes.data);
     });
   }, [id]);
 
@@ -143,6 +143,7 @@ export function DealDetail() {
         ownerId: deal!.owner?.id,
         accountId: deal!.account?.id,
         leadId: deal!.lead?.id,
+        contactId: deal!.contact?.id,
       };
       const cleaned = Object.fromEntries(Object.entries(payload).filter(([, v]) => v !== undefined && v !== ''));
       const data = await createDeal(cleaned);
@@ -259,16 +260,16 @@ export function DealDetail() {
           </EditableRow>
           <EditableRow
             label="Contact"
-            value={deal.lead ? <Link to={`/leads/${deal.lead.id}`}>{contactName(deal)}</Link> : undefined}
+            value={contactName(deal)}
             editing={editingField === 'contact'}
             onStartEdit={() => setEditingField('contact')}
           >
             <SearchSelect
-              options={leads.map((l) => ({
-                value: l.id, label: l.leadName || [l.firstName, l.lastName].filter(Boolean).join(' ') || l.email || 'Untitled lead',
+              options={contacts.map((c) => ({
+                value: c.id, label: [c.firstName, c.lastName].filter(Boolean).join(' ') || c.email || 'Untitled contact',
               }))}
-              value={deal.lead?.id ?? ''}
-              onChange={(v) => saveField({ leadId: v })}
+              value={deal.contact?.id ?? ''}
+              onChange={(v) => saveField({ contactId: v })}
               placeholder="Search contact…"
             />
           </EditableRow>
@@ -325,7 +326,7 @@ export function DealDetail() {
 
       <div className="detail-main">
       <ActivityTimeline key={activityKey} opportunityId={deal.id} />
-      <TasksWidget opportunityId={deal.id} />
+      <TasksWidget key={activityKey} opportunityId={deal.id} />
       <NotesSection opportunityId={deal.id} />
       </div>
       </div>

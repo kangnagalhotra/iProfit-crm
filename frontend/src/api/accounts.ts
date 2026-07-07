@@ -25,6 +25,7 @@ function mapAccount(row: any): Account {
     annualRevenue: row.annual_revenue !== null && row.annual_revenue !== undefined ? String(row.annual_revenue) : undefined,
     stage: {
       id: row.stage.id, name: row.stage.name, order: row.stage.order, color: row.stage.color, isDefault: row.stage.is_default,
+      isCustomerStage: row.stage.is_customer_stage,
     },
     owner: row.owner ? { id: row.owner.id, fullName: row.owner.full_name } : undefined,
     createdAt: row.created_at,

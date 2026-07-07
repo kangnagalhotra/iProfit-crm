@@ -121,6 +121,25 @@ create policy "accounts_delete" on accounts for delete to authenticated
   using (is_manager_or_admin());
 
 -- ---------------------------------------------------------------------------
+-- CONTACTS (person records) — identical shape to leads.
+-- ---------------------------------------------------------------------------
+
+alter table contacts enable row level security;
+
+create policy "contacts_select" on contacts for select to authenticated
+  using (is_manager_or_admin() or owner_id = auth.uid());
+
+create policy "contacts_insert" on contacts for insert to authenticated
+  with check (true);
+
+create policy "contacts_update" on contacts for update to authenticated
+  using (is_manager_or_admin() or owner_id = auth.uid())
+  with check (is_manager_or_admin() or owner_id = auth.uid());
+
+create policy "contacts_delete" on contacts for delete to authenticated
+  using (is_manager_or_admin());
+
+-- ---------------------------------------------------------------------------
 -- OPPORTUNITIES (deals) — identical shape; owner_id is NOT NULL here.
 -- ---------------------------------------------------------------------------
 

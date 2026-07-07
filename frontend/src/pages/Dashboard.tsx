@@ -5,10 +5,11 @@ import {
 } from 'recharts';
 import { useAuth } from '../context/AuthContext';
 import type {
-  Lead, Opportunity, DealStage, User,
+  Account, Lead, Opportunity, DealStage, User,
 } from '../api/types';
 import { listLeads } from '../api/leads';
 import { listDeals } from '../api/deals';
+import { listAccounts } from '../api/accounts';
 import { listStages } from '../api/stages';
 import { listUsers } from '../api/users';
 import { countByDay, countBy } from '../utils/aggregate';
@@ -48,6 +49,18 @@ async function fetchAllDeals(params: Record<string, any>): Promise<Opportunity[]
   return all;
 }
 
+async function fetchAllAccounts(params: Record<string, any>): Promise<Account[]> {
+  let page = 1;
+  let all: Account[] = [];
+  for (;;) {
+    const data = await listAccounts({ ...params, page, pageSize: 100 });
+    all = all.concat(data.data);
+    if (all.length >= data.total || data.data.length === 0) break;
+    page += 1;
+  }
+  return all;
+}
+
 function formatAxisDate(iso: string) {
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
@@ -64,6 +77,15 @@ export function Dashboard() {
   const [deals, setDeals] = useState<Opportunity[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Overall current-state snapshot for the Lead/Deal/Company overview
+  // sections below — unlike the charts above, these aren't windowed by the
+  // date-range dropdown (Total Leads / Open Pipeline / Customers are meant
+  // to read as "right now", not "created in the last N days").
+  const [allLeads, setAllLeads] = useState<Lead[]>([]);
+  const [allDeals, setAllDeals] = useState<Opportunity[]>([]);
+  const [allAccounts, setAllAccounts] = useState<Account[]>([]);
+  const [overviewLoading, setOverviewLoading] = useState(true);
+
   useEffect(() => {
     if (canFilterByOwner) listUsers().then(setUsers);
   }, [canFilterByOwner]);
@@ -71,6 +93,20 @@ export function Dashboard() {
   useEffect(() => {
     listStages('deal_stages').then((data) => setDealStages(data as DealStage[]));
   }, []);
+
+  useEffect(() => {
+    setOverviewLoading(true);
+    const ownerParams = { ownerId: ownerId || undefined };
+    Promise.all([
+      fetchAllLeads(ownerParams),
+      fetchAllDeals(ownerParams),
+      fetchAllAccounts(ownerParams),
+    ]).then(([l, d, a]) => {
+      setAllLeads(l);
+      setAllDeals(d);
+      setAllAccounts(a);
+    }).finally(() => setOverviewLoading(false));
+  }, [ownerId]);
 
   useEffect(() => {
     setLoading(true);
@@ -111,6 +147,31 @@ export function Dashboard() {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
 
+  // Leads overview
+  const qualifiedLeads = allLeads.filter((l) => l.stage.isWon);
+  const conversionRate = allLeads.length ? (qualifiedLeads.length / allLeads.length) * 100 : 0;
+  const leadsByStage = countBy(allLeads, (l) => l.stage.name);
+
+  // Deals overview
+  const openDeals = allDeals.filter((d) => !d.stage.isClosedWon && !d.stage.isClosedLost);
+  const wonDeals = allDeals.filter((d) => d.stage.isClosedWon);
+  const lostDeals = allDeals.filter((d) => d.stage.isClosedLost);
+  const openPipelineValue = openDeals.reduce((sum, d) => sum + (d.amount ? parseFloat(d.amount) : 0), 0);
+  const totalPipelineValue = allDeals.reduce((sum, d) => sum + (d.amount ? parseFloat(d.amount) : 0), 0);
+  const wonRevenue = wonDeals.reduce((sum, d) => sum + (d.amount ? parseFloat(d.amount) : 0), 0);
+
+  // Companies overview
+  const customerAccounts = allAccounts.filter((a) => a.stage.isCustomerStage);
+  const prospectAccounts = allAccounts.filter((a) => !a.stage.isCustomerStage);
+  const customerAccountIds = new Set(customerAccounts.map((a) => a.id));
+  const customerRevenue = wonDeals
+    .filter((d) => d.account && customerAccountIds.has(d.account.id))
+    .reduce((sum, d) => sum + (d.amount ? parseFloat(d.amount) : 0), 0);
+
+  function formatMoney(n: number) {
+    return n.toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+  }
+
   return (
     <div>
       <h2 style={{ marginTop: 0 }}>{greeting}, {user?.fullName?.split(' ')[0]}</h2>
@@ -130,7 +191,7 @@ export function Dashboard() {
       {loading ? <p>Loading…</p> : (
         <div className="dashboard-grid">
           <div className="card">
-            <div className="label">New Contacts Created</div>
+            <div className="label">New Leads Created</div>
             <div className="value">{leads.length}</div>
             <div style={{ fontSize: 13, color: delta >= 0 ? '#16A34A' : '#DC2626', marginTop: 6 }}>
               {delta >= 0 ? '▲' : '▼'} {Math.abs(delta)} vs previous {range} days ({prevLeadsCount})
@@ -138,27 +199,27 @@ export function Dashboard() {
           </div>
 
           <div className="card">
-            <h3 style={{ marginTop: 0 }}>Contact Sources</h3>
+            <h3 style={{ marginTop: 0 }}>Lead Sources</h3>
             <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
               <BarChart data={sourceData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="key" tickFormatter={(k) => k.replace('_', ' ')} tick={{ fontSize: 12 }} />
                 <YAxis allowDecimals={false} />
                 <Tooltip labelFormatter={(k) => String(k).replace('_', ' ')} />
-                <Bar dataKey="count" name="Contacts" fill={BLUE} radius={[4, 4, 0, 0]} />
+                <Bar dataKey="count" name="Leads" fill={BLUE} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
 
           <div className="card">
-            <h3 style={{ marginTop: 0 }}>Contacts Added Over Time</h3>
+            <h3 style={{ marginTop: 0 }}>Leads Added Over Time</h3>
             <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
               <AreaChart data={contactsOverTime}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" tickFormatter={formatAxisDate} tick={{ fontSize: 12 }} />
                 <YAxis allowDecimals={false} />
                 <Tooltip labelFormatter={(d) => new Date(d).toLocaleDateString()} />
-                <Area type="monotone" dataKey="count" name="Contacts" stroke={BLUE} fill={`${BLUE}33`} />
+                <Area type="monotone" dataKey="count" name="Leads" stroke={BLUE} fill={`${BLUE}33`} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -191,6 +252,41 @@ export function Dashboard() {
             </ResponsiveContainer>
           </div>
         </div>
+      )}
+
+      {overviewLoading ? <p>Loading overview…</p> : (
+        <>
+          <h3 style={{ marginTop: 28 }}>Leads Overview</h3>
+          <div className="dashboard-grid">
+            <div className="card"><div className="label">Total Leads</div><div className="value">{allLeads.length}</div></div>
+            <div className="card"><div className="label">Qualified Leads</div><div className="value">{qualifiedLeads.length}</div></div>
+            <div className="card"><div className="label">Conversion Rate</div><div className="value">{conversionRate.toFixed(1)}%</div></div>
+            <div className="card">
+              <div className="label" style={{ marginBottom: 8 }}>Leads by Stage</div>
+              {leadsByStage.map((s) => (
+                <div key={s.key} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '3px 0' }}>
+                  <span>{s.key}</span><span style={{ fontWeight: 600 }}>{s.count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <h3 style={{ marginTop: 28 }}>Deals Overview</h3>
+          <div className="dashboard-grid">
+            <div className="card"><div className="label">Open Pipeline</div><div className="value">{formatMoney(openPipelineValue)}</div></div>
+            <div className="card"><div className="label">Won Deals</div><div className="value">{wonDeals.length}</div></div>
+            <div className="card"><div className="label">Won Revenue</div><div className="value">{formatMoney(wonRevenue)}</div></div>
+            <div className="card"><div className="label">Lost Deals</div><div className="value">{lostDeals.length}</div></div>
+            <div className="card"><div className="label">Pipeline Value</div><div className="value">{formatMoney(totalPipelineValue)}</div></div>
+          </div>
+
+          <h3 style={{ marginTop: 28 }}>Companies Overview</h3>
+          <div className="dashboard-grid">
+            <div className="card"><div className="label">Prospects</div><div className="value">{prospectAccounts.length}</div></div>
+            <div className="card"><div className="label">Customers</div><div className="value">{customerAccounts.length}</div></div>
+            <div className="card"><div className="label">Customer Revenue</div><div className="value">{formatMoney(customerRevenue)}</div></div>
+          </div>
+        </>
       )}
     </div>
   );

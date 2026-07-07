@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import type {
-  Account, AccountStage, Lead, User,
+  Account, AccountStage, Lead, Opportunity, User,
 } from '../api/types';
 import {
   getAccount, updateAccount, createAccount, deleteAccount,
@@ -9,6 +9,7 @@ import {
 import { listStages } from '../api/stages';
 import { listUsers } from '../api/users';
 import { listLeads } from '../api/leads';
+import { listDeals } from '../api/deals';
 import { NotesSection } from '../components/NotesSection';
 import { TasksWidget } from '../components/TasksWidget';
 import { ActivityTimeline } from '../components/ActivityTimeline';
@@ -62,6 +63,10 @@ function formatRevenue(value?: string) {
   return n.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
 }
 
+function formatMoney(n: number) {
+  return n.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
+}
+
 function scrollToNotes() {
   document.getElementById('notes-section')?.scrollIntoView({ behavior: 'smooth' });
 }
@@ -83,6 +88,7 @@ export function CompanyDetail() {
   const [users, setUsers] = useState<User[]>([]);
   const [stages, setStages] = useState<AccountStage[]>([]);
   const [associatedLeads, setAssociatedLeads] = useState<Lead[]>([]);
+  const [associatedDeals, setAssociatedDeals] = useState<Opportunity[]>([]);
   const [editingField, setEditingField] = useState<string | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showAddActivity, setShowAddActivity] = useState(false);
@@ -95,14 +101,28 @@ export function CompanyDetail() {
     listLeads({ accountId: id, pageSize: 100 }).then((data) => setAssociatedLeads(data.data));
   }
 
+  function loadAssociatedDeals() {
+    if (!id) return;
+    listDeals({ accountId: id, pageSize: 100 }).then((data) => setAssociatedDeals(data.data));
+  }
+
   useEffect(() => {
     if (!id) return;
     getAccount(id).then(setAccount).catch(() => {});
     Promise.all([listUsers(), listStages('account_stages')])
       .then(([userRes, stageRes]) => { setUsers(userRes); setStages(stageRes as AccountStage[]); });
     loadAssociatedLeads();
+    loadAssociatedDeals();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  const totalDealValue = associatedDeals.reduce((sum, d) => sum + (d.amount ? parseFloat(d.amount) : 0), 0);
+  const closedWonDeals = associatedDeals.filter((d) => d.stage.isClosedWon);
+  const activeDeals = associatedDeals.filter((d) => !d.stage.isClosedWon && !d.stage.isClosedLost);
+  const customerSince = closedWonDeals
+    .map((d) => d.closedAt)
+    .filter((d): d is string => !!d)
+    .sort()[0];
 
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
@@ -185,6 +205,9 @@ export function CompanyDetail() {
               <div className="detail-meta-row">
                 <span className="record-type-badge">Company</span>
                 <span className="chip" style={{ background: account.stage.color + '22', color: account.stage.color }}>{account.stage.name}</span>
+                {account.stage.isCustomerStage && (
+                  <span className="chip" style={{ background: '#16A34A22', color: '#16A34A' }}>Customer</span>
+                )}
                 {account.owner && (
                   <span className="owner-chip">
                     <span className="avatar avatar-sm">{initials(account.owner.fullName)}</span>
@@ -317,6 +340,13 @@ export function CompanyDetail() {
             onEmptyClick={() => setShowEditModal(true)}
           />
           <Row label="Associated Leads" value={associatedLeads.length} />
+          <Row label="Associated Deals" value={associatedDeals.length} />
+          {account.stage.isCustomerStage && (
+            <Row label="Customer Since" value={customerSince ? new Date(customerSince).toLocaleDateString() : undefined} />
+          )}
+          <Row label="Total Deal Value" value={associatedDeals.length ? formatMoney(totalDealValue) : undefined} />
+          <Row label="Active Deals" value={associatedDeals.length ? activeDeals.length : undefined} />
+          <Row label="Closed Won Deals" value={associatedDeals.length ? closedWonDeals.length : undefined} />
         </div>
         {account.description && (
           <div style={{ marginTop: 18, paddingTop: 18, borderTop: '1px solid var(--line)' }}>
@@ -368,8 +398,48 @@ export function CompanyDetail() {
         )}
       </div>
 
-      <ActivityTimeline key={activityKey} accountId={account.id} />
-      <TasksWidget accountId={account.id} />
+      <div className="card">
+        <h3 style={{ marginTop: 0 }}>Associated Deals ({associatedDeals.length})</h3>
+        {associatedDeals.length === 0 ? (
+          <div className="empty-state">
+            <span className="icon"><Icon name="check" size={18} /></span>
+            <p>No deals linked to this company yet.</p>
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+          <table>
+            <thead>
+              <tr>
+                <th>Deal Name</th>
+                <th>Owner</th>
+                <th>Stage</th>
+                <th>Amount</th>
+                <th>Close Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {associatedDeals.map((d) => (
+                <tr key={d.id} className="clickable-row" onClick={() => navigate(`/deals/${d.id}`)}>
+                  <td><Link to={`/deals/${d.id}`} onClick={(e) => e.stopPropagation()}>{d.name}</Link></td>
+                  <td>{d.owner?.fullName ?? '—'}</td>
+                  <td><span className="chip" style={{ background: d.stage.color + '22', color: d.stage.color }}>{d.stage.name}</span></td>
+                  <td>{d.amount ? formatMoney(parseFloat(d.amount)) : '—'}</td>
+                  <td>{d.closeDate ? new Date(d.closeDate).toLocaleDateString() : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          </div>
+        )}
+      </div>
+
+      <ActivityTimeline
+        key={activityKey}
+        accountId={account.id}
+        relatedLeadIds={associatedLeads.map((l) => l.id)}
+        relatedOpportunityIds={associatedDeals.map((d) => d.id)}
+      />
+      <TasksWidget key={activityKey} accountId={account.id} />
       <NotesSection accountId={account.id} />
       </div>
       </div>

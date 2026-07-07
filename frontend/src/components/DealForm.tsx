@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import type {
-  Account, DealStage, DealType, Lead, Opportunity, User,
+  Account, Contact, DealStage, DealType, Opportunity, User,
 } from '../api/types';
 import { createDeal, updateDeal } from '../api/deals';
 import { listStages } from '../api/stages';
 import { listUsers } from '../api/users';
 import { listAccounts } from '../api/accounts';
-import { listLeads } from '../api/leads';
+import { listContacts } from '../api/contacts';
 
 const DEAL_TYPES: DealType[] = ['NEW_BUSINESS', 'EXISTING_BUSINESS', 'RENEWAL'];
 
@@ -29,12 +29,12 @@ export function DealForm({
     stageId: deal?.stage.id ?? defaultStageId ?? '',
     ownerId: deal?.owner?.id ?? '',
     accountId: deal?.account?.id ?? '',
-    leadId: deal?.lead?.id ?? '',
+    contactId: deal?.contact?.id ?? '',
   });
   const [stages, setStages] = useState<DealStage[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [leads, setLeads] = useState<Lead[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -43,13 +43,13 @@ export function DealForm({
       listStages('deal_stages'),
       listUsers(),
       listAccounts({ pageSize: 100 }),
-      listLeads({ pageSize: 100 }),
-    ]).then(([stageRes, userRes, accountRes, leadRes]) => {
+      listContacts({ pageSize: 100 }),
+    ]).then(([stageRes, userRes, accountRes, contactRes]) => {
       const stagesTyped = stageRes as DealStage[];
       setStages(stagesTyped);
       setUsers(userRes);
       setAccounts(accountRes.data);
-      setLeads(leadRes.data);
+      setContacts(contactRes.data);
       if (!isEdit && !defaultStageId) {
         const defaultStage = stagesTyped.find((s) => s.isDefault) ?? stagesTyped[0];
         if (defaultStage) set('stageId', defaultStage.id);
@@ -99,12 +99,12 @@ export function DealForm({
             {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
           </select>
         </div>
-        <div className="field"><label>Contact</label>
-          <select value={form.leadId} onChange={(e) => set('leadId', e.target.value)}>
+        <div className="field"><label>Primary Contact</label>
+          <select value={form.contactId} onChange={(e) => set('contactId', e.target.value)}>
             <option value="">—</option>
-            {leads.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.leadName || [l.firstName, l.lastName].filter(Boolean).join(' ') || l.email}
+            {contacts.map((c) => (
+              <option key={c.id} value={c.id}>
+                {[c.firstName, c.lastName].filter(Boolean).join(' ') || c.email || 'Untitled contact'}
               </option>
             ))}
           </select>

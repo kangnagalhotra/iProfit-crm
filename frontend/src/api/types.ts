@@ -43,6 +43,27 @@ export interface Lead {
   owner?: { id: string; fullName: string };
   account?: { id: string; name: string };
   lastActivityAt?: string;
+  // BANT qualification (0-10 each); qualificationNotes is free text.
+  budgetScore?: number;
+  authorityScore?: number;
+  needScore?: number;
+  timelineScore?: number;
+  qualificationNotes?: string;
+  convertedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Contact {
+  id: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+  jobTitle?: string;
+  account?: { id: string; name: string };
+  lead?: { id: string };
+  owner?: { id: string; fullName: string };
   createdAt: string;
   updatedAt: string;
 }
@@ -56,7 +77,9 @@ export interface ImportLeadsResult {
   summary: { total: number; createdCount: number; errorCount: number };
 }
 
-export interface AccountStage extends Stage {}
+export interface AccountStage extends Stage {
+  isCustomerStage: boolean;
+}
 
 export interface Account {
   id: string;
@@ -99,6 +122,7 @@ export interface Opportunity {
   name: string;
   amount?: string;
   closeDate?: string;
+  closedAt?: string;
   dealType: DealType;
   description?: string;
   source?: string;
@@ -107,6 +131,7 @@ export interface Opportunity {
   owner?: { id: string; fullName: string };
   account?: { id: string; name: string };
   lead?: { id: string; firstName?: string; lastName?: string; email?: string };
+  contact?: { id: string; firstName?: string; lastName?: string; email?: string };
   createdAt: string;
   updatedAt: string;
 }
@@ -148,7 +173,7 @@ export interface TaskSummary {
   dueToday: number;
 }
 
-export type NotificationType = 'RECORD_ASSIGNED' | 'TASK_DUE' | 'STAGE_CHANGED' | 'MENTION' | 'LEAD_INACTIVE';
+export type NotificationType = 'RECORD_ASSIGNED' | 'TASK_DUE' | 'STAGE_CHANGED' | 'MENTION' | 'LEAD_INACTIVE' | 'DEAL_INACTIVE';
 
 export interface Notification {
   id: string;

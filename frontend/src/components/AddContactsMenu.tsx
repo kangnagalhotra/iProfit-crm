@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 export function AddContactsMenu({
-  onCreateNew, onImport, label = 'Add contacts',
+  onCreateNew, onImport, label = 'Add leads',
 }: { onCreateNew: () => void; onImport: () => void; label?: string }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);

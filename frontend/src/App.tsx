@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
+import { useTheme } from './context/ThemeContext';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { LeadsList } from './pages/LeadsList';
@@ -8,6 +9,7 @@ import { CompaniesList } from './pages/CompaniesList';
 import { CompanyDetail } from './pages/CompanyDetail';
 import { DealsList } from './pages/DealsList';
 import { DealDetail } from './pages/DealDetail';
+import { PipelineBoard } from './pages/PipelineBoard';
 import { TasksPage } from './pages/TasksPage';
 import { TaskDetail } from './pages/TaskDetail';
 import { NotificationBell } from './components/NotificationBell';
@@ -15,6 +17,7 @@ import type { ReactNode } from 'react';
 
 function Shell({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const nav = useNavigate();
   return (
     <div className="layout">
@@ -25,6 +28,7 @@ function Shell({ children }: { children: ReactNode }) {
           <NavLink to="/leads">Leads</NavLink>
           <NavLink to="/companies">Companies</NavLink>
           <NavLink to="/deals">Deals</NavLink>
+          <NavLink to="/pipeline">Pipeline</NavLink>
           <NavLink to="/tasks">Tasks</NavLink>
         </nav>
       </aside>
@@ -32,6 +36,13 @@ function Shell({ children }: { children: ReactNode }) {
         <div className="topbar">
           <div />
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button
+              className="btn secondary"
+              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              onClick={toggleTheme}
+            >
+              {theme === 'dark' ? '☀️' : '🌙'}
+            </button>
             <NotificationBell />
             <span style={{ fontSize: 14 }}>{user?.fullName} ({user?.role})</span>
             <button className="btn secondary" onClick={() => { logout(); nav('/login'); }}>Sign out</button>
@@ -60,6 +71,7 @@ export function App() {
       <Route path="/companies/:id" element={<Protected><CompanyDetail /></Protected>} />
       <Route path="/deals" element={<Protected><DealsList /></Protected>} />
       <Route path="/deals/:id" element={<Protected><DealDetail /></Protected>} />
+      <Route path="/pipeline" element={<Protected><PipelineBoard /></Protected>} />
       <Route path="/tasks" element={<Protected><TasksPage /></Protected>} />
       <Route path="/tasks/:id" element={<Protected><TaskDetail /></Protected>} />
       <Route path="*" element={<Navigate to="/" replace />} />

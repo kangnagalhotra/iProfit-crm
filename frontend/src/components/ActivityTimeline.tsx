@@ -19,22 +19,25 @@ function creatorInitials(name: string) {
 }
 
 export function ActivityTimeline({
-  leadId, accountId, opportunityId, taskId, showNotes = false,
+  leadId, accountId, opportunityId, taskId, relatedLeadIds, relatedOpportunityIds, showNotes = false,
 }: {
-  leadId?: string; accountId?: string; opportunityId?: string; taskId?: string; showNotes?: boolean;
+  leadId?: string; accountId?: string; opportunityId?: string; taskId?: string;
+  relatedLeadIds?: string[]; relatedOpportunityIds?: string[]; showNotes?: boolean;
 }) {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
+  const relatedLeadKey = relatedLeadIds?.join(',');
+  const relatedOpportunityKey = relatedOpportunityIds?.join(',');
 
   useEffect(() => {
     setLoading(true);
     listActivities({
-      leadId, accountId, opportunityId, taskId,
+      leadId, accountId, opportunityId, taskId, relatedLeadIds, relatedOpportunityIds,
     })
       .then((data) => setActivities(showNotes ? data : data.filter((a) => a.type !== 'NOTE')))
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leadId, accountId, opportunityId, taskId]);
+  }, [leadId, accountId, opportunityId, taskId, relatedLeadKey, relatedOpportunityKey]);
 
   return (
     <div className="card">

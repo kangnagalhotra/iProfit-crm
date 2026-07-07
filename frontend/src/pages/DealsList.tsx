@@ -28,10 +28,10 @@ function formatValue(value?: string) {
 }
 
 function contactName(deal: Opportunity) {
-  if (!deal.lead) return '';
-  return deal.lead.firstName || deal.lead.lastName
-    ? [deal.lead.firstName, deal.lead.lastName].filter(Boolean).join(' ')
-    : (deal.lead.email ?? '');
+  if (!deal.contact) return '';
+  return deal.contact.firstName || deal.contact.lastName
+    ? [deal.contact.firstName, deal.contact.lastName].filter(Boolean).join(' ')
+    : (deal.contact.email ?? '');
 }
 
 const EXPORT_COLUMNS: ExportColumn<Opportunity>[] = [

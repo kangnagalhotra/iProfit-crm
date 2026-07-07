@@ -49,7 +49,7 @@ export function StageColumnHeader<T extends Stage>({
     if (!trimmed || trimmed === stage.name) { setName(stage.name); return; }
     try {
       const data = await updateStage(stageTable, stage.id, { name: trimmed });
-      onChanged(data as T);
+      onChanged(data as unknown as T);
     } catch (e: any) {
       setName(stage.name);
       toast.error(e.message ?? 'Could not rename stage');
@@ -59,7 +59,7 @@ export function StageColumnHeader<T extends Stage>({
   async function saveColor(color: string) {
     try {
       const data = await updateStage(stageTable, stage.id, { color });
-      onChanged(data as T);
+      onChanged(data as unknown as T);
     } catch (e: any) {
       toast.error(e.message ?? 'Could not update color');
     }
@@ -86,7 +86,7 @@ export function StageColumnHeader<T extends Stage>({
     [reordered[myIndex], reordered[newIndex]] = [reordered[newIndex], reordered[myIndex]];
     try {
       const data = await reorderStages(stageTable, reordered);
-      onReordered(data as T[]);
+      onReordered(data as unknown as T[]);
     } catch (e: any) {
       toast.error(e.message ?? 'Could not reorder stages');
     }

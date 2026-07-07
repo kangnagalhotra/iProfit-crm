@@ -13,11 +13,22 @@ function mapActivity(row: any): Activity {
   };
 }
 
-export interface ActivityParent { leadId?: string; accountId?: string; opportunityId?: string; taskId?: string }
+export interface ActivityParent {
+  leadId?: string; accountId?: string; opportunityId?: string; taskId?: string;
+  // Company-only: roll up activity from this account's associated leads/deals
+  // too, so the account timeline shows the full customer history, not just
+  // activities logged directly against the account itself.
+  relatedLeadIds?: string[]; relatedOpportunityIds?: string[];
+}
 
 export async function listActivities(parent: ActivityParent): Promise<Activity[]> {
   let query = supabase.from('activities').select(SELECT).order('occurred_at', { ascending: false });
-  if (parent.leadId) query = query.eq('lead_id', parent.leadId);
+  if (parent.accountId && (parent.relatedLeadIds?.length || parent.relatedOpportunityIds?.length)) {
+    const clauses = [`account_id.eq.${parent.accountId}`];
+    if (parent.relatedLeadIds?.length) clauses.push(`lead_id.in.(${parent.relatedLeadIds.join(',')})`);
+    if (parent.relatedOpportunityIds?.length) clauses.push(`opportunity_id.in.(${parent.relatedOpportunityIds.join(',')})`);
+    query = query.or(clauses.join(','));
+  } else if (parent.leadId) query = query.eq('lead_id', parent.leadId);
   else if (parent.accountId) query = query.eq('account_id', parent.accountId);
   else if (parent.opportunityId) query = query.eq('opportunity_id', parent.opportunityId);
   else if (parent.taskId) query = query.eq('task_id', parent.taskId);

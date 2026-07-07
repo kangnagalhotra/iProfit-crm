@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import type { Lead, LeadStage, User } from '../api/types';
 import {
-  getLead, updateLead, createLead, deleteLead,
+  getLead, updateLead, createLead, deleteLead, getConvertedDeal, convertLeadToDeal,
 } from '../api/leads';
 import { listStages } from '../api/stages';
 import { listUsers } from '../api/users';
@@ -13,6 +13,7 @@ import { EditableRow } from '../components/EditableRow';
 import { SearchSelect } from '../components/SearchSelect';
 import { LeadForm } from '../components/LeadForm';
 import { AddActivityModal } from '../components/AddActivityModal';
+import { LeadQualificationCard } from '../components/LeadQualificationCard';
 import { Icon } from '../components/Icon';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
@@ -77,6 +78,8 @@ export function LeadDetail() {
   const [editingField, setEditingField] = useState<string | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showAddActivity, setShowAddActivity] = useState(false);
+  const [showConvertModal, setShowConvertModal] = useState(false);
+  const [convertedDeal, setConvertedDeal] = useState<{ id: string; name: string } | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
   const [activityKey, setActivityKey] = useState(0);
   const moreRef = useRef<HTMLDivElement>(null);
@@ -84,6 +87,7 @@ export function LeadDetail() {
   function load() {
     if (!id) return;
     getLead(id).then(setLead).catch(() => {});
+    getConvertedDeal(id).then(setConvertedDeal).catch(() => {});
   }
 
   useEffect(() => {
@@ -194,6 +198,11 @@ export function LeadDetail() {
           </div>
           <div className="detail-header-actions">
             <button className="btn btn-icon" onClick={() => setShowEditModal(true)}><Icon name="edit" size={14} /> Edit Details</button>
+            {lead.stage.isWon && !lead.convertedAt && (
+              <button className="btn btn-icon" style={{ background: '#16A34A' }} onClick={() => setShowConvertModal(true)}>
+                <Icon name="check" size={14} /> Convert to Deal
+              </button>
+            )}
             <button className="btn secondary btn-icon" onClick={scrollToTasks}><Icon name="check" size={14} /> Add Task</button>
             <button className="btn secondary btn-icon" disabled title="Coming soon — Meeting scheduling not built yet"><Icon name="calendar" size={14} /> Schedule Meeting</button>
             <div className="dropdown-wrap" ref={moreRef}>
@@ -252,7 +261,7 @@ export function LeadDetail() {
         <h3 style={{ marginTop: 0 }}>Key information</h3>
         <div className="key-info">
           <EditableRow
-            label="Contact owner"
+            label="Lead owner"
             value={lead.owner?.fullName}
             editing={editingField === 'owner'}
             onStartEdit={() => setEditingField('owner')}
@@ -326,6 +335,9 @@ export function LeadDetail() {
               }}
             />
           </EditableRow>
+          {convertedDeal && (
+            <Row label="Converted to Deal" value={<Link to={`/deals/${convertedDeal.id}`}>{convertedDeal.name}</Link>} />
+          )}
         </div>
         {lead.notes && (
           <div style={{ marginTop: 18, paddingTop: 18, borderTop: '1px solid var(--line)' }}>
@@ -334,11 +346,12 @@ export function LeadDetail() {
           </div>
         )}
       </div>
+      <LeadQualificationCard lead={lead} onSaved={setLead} />
       </div>
 
       <div className="detail-main">
       <ActivityTimeline key={activityKey} leadId={lead.id} />
-      <TasksWidget leadId={lead.id} />
+      <TasksWidget key={activityKey} leadId={lead.id} />
       <NotesSection leadId={lead.id} />
       </div>
       </div>
@@ -360,6 +373,61 @@ export function LeadDetail() {
           onSaved={() => { setShowAddActivity(false); setActivityKey((k) => k + 1); toast.success('Activity added'); }}
         />
       )}
+
+      {showConvertModal && (
+        <ConvertToDealModal
+          lead={lead}
+          onClose={() => setShowConvertModal(false)}
+          onConverted={(deal) => {
+            setShowConvertModal(false);
+            toast.success('Converted to Deal');
+            navigate(`/deals/${deal.id}`);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function ConvertToDealModal({
+  lead, onClose, onConverted,
+}: { lead: Lead; onClose: () => void; onConverted: (deal: { id: string }) => void }) {
+  const defaultName = `${lead.leadName || [lead.firstName, lead.lastName].filter(Boolean).join(' ')} - Deal`;
+  const [name, setName] = useState(defaultName);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  async function submit() {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setSaving(true); setError('');
+    try {
+      const deal = await convertLeadToDeal(lead, trimmed);
+      onConverted(deal);
+    } catch (e: any) {
+      setError(e.message ?? 'Could not convert lead');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <h3 style={{ marginTop: 0 }}>Convert to Deal</h3>
+        <p className="helper-text" style={{ marginTop: 0 }}>
+          Creates a new Deal linked to this lead, carrying over the company, owner, value, notes, and activity history.
+        </p>
+        <div className="field">
+          <label>Deal name</label>
+          <input autoFocus value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        {error && <div className="error">{error}</div>}
+        <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+          <button className="btn" onClick={submit} disabled={saving || !name.trim()}>{saving ? 'Converting…' : 'Convert'}</button>
+          <button className="btn secondary" onClick={onClose}>Cancel</button>
+        </div>
+      </div>
     </div>
   );
 }

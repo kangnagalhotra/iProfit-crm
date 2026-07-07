@@ -16,6 +16,7 @@
 -- there's no application layer left to enforce it.
 
 create extension if not exists pgcrypto;
+create extension if not exists pg_cron;
 
 -- ---------------------------------------------------------------------------
 -- ENUMS
@@ -39,7 +40,7 @@ create type task_priority as enum ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL');
 create type deal_type as enum ('NEW_BUSINESS', 'EXISTING_BUSINESS', 'RENEWAL');
 
 create type notification_type as enum (
-  'RECORD_ASSIGNED', 'TASK_DUE', 'STAGE_CHANGED', 'MENTION', 'LEAD_INACTIVE'
+  'RECORD_ASSIGNED', 'TASK_DUE', 'STAGE_CHANGED', 'MENTION', 'LEAD_INACTIVE', 'DEAL_INACTIVE'
 );
 
 -- Shared allowlist for all three stage tables' `color` column (see CRM
@@ -87,6 +88,7 @@ create table account_stages (
   "order" int not null,
   color stage_color not null,
   is_default boolean not null default false,
+  is_customer_stage boolean not null default false,
   created_at timestamptz not null default now()
 );
 create index account_stages_order_idx on account_stages("order");
@@ -150,6 +152,17 @@ create table leads (
   owner_id uuid references profiles(id) on delete set null,
   account_id uuid references accounts(id) on delete set null,
   last_activity_at timestamptz,
+  -- BANT qualification (Budget/Authority/Need/Timeline), each 0-10; shown as
+  -- a summed score out of 40 on the Lead Qualification card.
+  budget_score smallint check (budget_score is null or budget_score between 0 and 10),
+  authority_score smallint check (authority_score is null or authority_score between 0 and 10),
+  need_score smallint check (need_score is null or need_score between 0 and 10),
+  timeline_score smallint check (timeline_score is null or timeline_score between 0 and 10),
+  qualification_notes text,
+  -- Set once, on conversion — the authoritative "is this lead converted"
+  -- flag, orthogonal to stage (mirrors Salesforce's IsConverted, not a status
+  -- value) so a converted lead keeps showing "Qualified" as its stage.
+  converted_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -157,6 +170,28 @@ create index leads_owner_id_idx on leads(owner_id);
 create index leads_stage_id_idx on leads(stage_id);
 create index leads_last_activity_at_idx on leads(last_activity_at);
 create trigger leads_set_updated_at before update on leads
+  for each row execute function set_updated_at();
+
+-- ---------------------------------------------------------------------------
+-- CONTACTS (person records, distinct from Lead — created on Lead conversion)
+-- ---------------------------------------------------------------------------
+
+create table contacts (
+  id uuid primary key default gen_random_uuid(),
+  first_name varchar(100),
+  last_name varchar(100),
+  email varchar(255) check (email is null or email ~* '^[^@\s]+@[^@\s]+\.[^@\s]+$'),
+  phone varchar(40) check (phone is null or phone ~ '^\+?[0-9]{10}$'),
+  job_title varchar(150),
+  account_id uuid references accounts(id) on delete set null,
+  lead_id uuid references leads(id) on delete set null, -- lineage: which Lead this was converted from, if any
+  owner_id uuid references profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index contacts_account_id_idx on contacts(account_id);
+create index contacts_owner_id_idx on contacts(owner_id);
+create trigger contacts_set_updated_at before update on contacts
   for each row execute function set_updated_at();
 
 -- ---------------------------------------------------------------------------
@@ -196,8 +231,10 @@ create table opportunities (
   owner_id uuid not null references profiles(id) on delete restrict,
   account_id uuid references accounts(id) on delete set null,
   lead_id uuid references leads(id) on delete set null,
+  contact_id uuid references contacts(id) on delete set null,
   loss_reason varchar(255),
   closed_at timestamptz,
+  last_inactivity_alert_at timestamptz, -- last time the 7-day-inactive alert fired; null until the first one
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

@@ -249,3 +249,145 @@ end;
 $$ language plpgsql security definer set search_path = public;
 create trigger tasks_log_changes after update on tasks
   for each row execute function log_task_changes();
+
+-- ---------------------------------------------------------------------------
+-- DEAL WON -> promote the linked company to "Active Customer" (never
+-- downgrades a company already further along, e.g. "Strategic Account").
+-- ---------------------------------------------------------------------------
+
+create function promote_account_to_customer() returns trigger as $$
+declare
+  won boolean;
+  target_id uuid;
+  target_order int;
+  current_order int;
+begin
+  if new.account_id is null then
+    return new;
+  end if;
+
+  select is_closed_won into won from deal_stages where id = new.stage_id;
+  if not coalesce(won, false) then
+    return new;
+  end if;
+
+  select id, "order" into target_id, target_order from account_stages where name = 'Active Customer';
+  if target_id is null then
+    return new;
+  end if;
+
+  select acs."order" into current_order
+  from accounts a join account_stages acs on acs.id = a.stage_id
+  where a.id = new.account_id;
+
+  if current_order is null or current_order < target_order then
+    update accounts set stage_id = target_id where id = new.account_id;
+  end if;
+
+  return new;
+end;
+$$ language plpgsql security definer set search_path = public;
+
+create trigger opportunities_promote_account_to_customer_ins
+  after insert on opportunities
+  for each row execute function promote_account_to_customer();
+
+create trigger opportunities_promote_account_to_customer_upd
+  after update on opportunities
+  for each row
+  when (old.stage_id is distinct from new.stage_id or old.account_id is distinct from new.account_id)
+  execute function promote_account_to_customer();
+
+-- Auto-set closed_at when a deal's stage becomes closed (won or lost),
+-- mirroring real CRM behavior — needed for Company "Customer Since" to be
+-- meaningful for deals closed through the normal UI, not just seeded data.
+create function set_deal_closed_at() returns trigger as $$
+declare
+  closed boolean;
+begin
+  select (is_closed_won or is_closed_lost) into closed from deal_stages where id = new.stage_id;
+  if coalesce(closed, false) and new.closed_at is null then
+    new.closed_at = now();
+  end if;
+  return new;
+end;
+$$ language plpgsql security definer set search_path = public;
+
+create trigger opportunities_set_closed_at
+  before insert or update on opportunities
+  for each row execute function set_deal_closed_at();
+
+-- ---------------------------------------------------------------------------
+-- AUTOMATION RULES (CRM workflow rebuild)
+-- ---------------------------------------------------------------------------
+
+-- 1. Notify the lead owner the moment a lead becomes Qualified.
+create function notify_lead_qualified() returns trigger as $$
+declare
+  won boolean;
+  was_won boolean;
+begin
+  select is_won into won from lead_stages where id = new.stage_id;
+  select is_won into was_won from lead_stages where id = old.stage_id;
+  if coalesce(won, false) and not coalesce(was_won, false) and new.owner_id is not null then
+    insert into notifications (user_id, type, message, link_url)
+    values (
+      new.owner_id, 'STAGE_CHANGED',
+      'Lead "' || coalesce(new.lead_name, trim(coalesce(new.first_name, '') || ' ' || coalesce(new.last_name, ''))) || '" is now Qualified',
+      '/leads/' || new.id
+    );
+  end if;
+  return new;
+end;
+$$ language plpgsql security definer set search_path = public;
+
+create trigger leads_notify_qualified
+  after update on leads
+  for each row
+  when (old.stage_id is distinct from new.stage_id)
+  execute function notify_lead_qualified();
+
+-- 2. Auto-create a follow-up task 2 days after any MEETING activity is logged.
+create function create_followup_task_after_meeting() returns trigger as $$
+begin
+  if new.type = 'MEETING' then
+    insert into tasks (title, type, status, priority, due_at, assignee_id, lead_id, account_id, opportunity_id)
+    values (
+      'Follow up after meeting', 'FOLLOW_UP', 'NOT_STARTED', 'MEDIUM',
+      new.occurred_at + interval '2 days', new.creator_id,
+      new.lead_id, new.account_id, new.opportunity_id
+    );
+  end if;
+  return new;
+end;
+$$ language plpgsql security definer set search_path = public;
+
+create trigger activities_create_followup_task
+  after insert on activities
+  for each row execute function create_followup_task_after_meeting();
+
+-- 3. Alert a deal's owner when it's been inactive (no update) for 7+ days.
+-- Fires once per inactive streak, not daily — last_inactivity_alert_at is
+-- only re-armed once the deal is touched again (updated_at moves forward).
+create function check_inactive_deals() returns void as $$
+begin
+  insert into notifications (user_id, type, message, link_url)
+  select o.owner_id, 'DEAL_INACTIVE',
+    'Deal "' || o.name || '" has had no activity for 7+ days',
+    '/deals/' || o.id
+  from opportunities o
+  join deal_stages ds on ds.id = o.stage_id
+  where not ds.is_closed_won and not ds.is_closed_lost
+    and o.updated_at < now() - interval '7 days'
+    and (o.last_inactivity_alert_at is null or o.last_inactivity_alert_at < o.updated_at);
+
+  update opportunities o set last_inactivity_alert_at = now()
+  from deal_stages ds
+  where ds.id = o.stage_id
+    and not ds.is_closed_won and not ds.is_closed_lost
+    and o.updated_at < now() - interval '7 days'
+    and (o.last_inactivity_alert_at is null or o.last_inactivity_alert_at < o.updated_at);
+end;
+$$ language plpgsql security definer set search_path = public;
+
+select cron.schedule('check-inactive-deals', '0 9 * * *', 'select check_inactive_deals();');

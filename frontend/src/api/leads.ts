@@ -1,5 +1,7 @@
 import { supabase } from '../lib/supabase';
-import type { Lead, Paginated } from './types';
+import type { Lead, Opportunity, Paginated } from './types';
+import { createDeal } from './deals';
+import { createContact } from './contacts';
 
 const SELECT = '*, stage:lead_stages(*), owner:profiles(id, full_name), account:accounts(id, name)';
 
@@ -28,6 +30,12 @@ function mapLead(row: any): Lead {
     owner: row.owner ? { id: row.owner.id, fullName: row.owner.full_name } : undefined,
     account: row.account ? { id: row.account.id, name: row.account.name } : undefined,
     lastActivityAt: row.last_activity_at ?? undefined,
+    budgetScore: row.budget_score ?? undefined,
+    authorityScore: row.authority_score ?? undefined,
+    needScore: row.need_score ?? undefined,
+    timelineScore: row.timeline_score ?? undefined,
+    qualificationNotes: row.qualification_notes ?? undefined,
+    convertedAt: row.converted_at ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -132,6 +140,8 @@ export async function updateLead(id: string, input: Record<string, any>): Promis
     first_name: rest.firstName, last_name: rest.lastName, email: rest.email, phone: rest.phone,
     job_title: rest.jobTitle, city: rest.city, value: rest.value, notes: rest.notes,
     source: rest.source, owner_id: rest.ownerId, stage_id: rest.stageId, score: rest.score, account_id: accountId,
+    budget_score: rest.budgetScore, authority_score: rest.authorityScore, need_score: rest.needScore,
+    timeline_score: rest.timelineScore, qualification_notes: rest.qualificationNotes,
   };
   Object.keys(row).forEach((k) => { if (row[k] === undefined) delete row[k]; });
 
@@ -170,4 +180,53 @@ export async function bulkUpdateLeadOwner(ids: string[], ownerId: string) {
   const { error, count } = await supabase.from('leads').update({ owner_id: ownerId }, { count: 'exact' }).in('id', ids);
   if (error) return { succeeded: 0, failed: ids.length, total: ids.length };
   return { succeeded: count ?? 0, failed: ids.length - (count ?? 0), total: ids.length };
+}
+
+// A Lead can have at most one converted Deal in practice, but this returns
+// whatever is linked via opportunities.lead_id (no schema change needed —
+// that FK already existed).
+export async function getConvertedDeal(leadId: string): Promise<{ id: string; name: string } | null> {
+  const { data, error } = await supabase.from('opportunities').select('id, name').eq('lead_id', leadId).limit(1).maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+export async function convertLeadToDeal(lead: Lead, dealName: string): Promise<Opportunity> {
+  // Auto-create the Contact (person record) — the account itself is already
+  // resolved on the lead (set at creation), so conversion just carries it
+  // forward rather than re-resolving it.
+  const contact = await createContact({
+    firstName: lead.firstName,
+    lastName: lead.lastName,
+    email: lead.email,
+    phone: lead.phone,
+    jobTitle: lead.jobTitle,
+    accountId: lead.account?.id,
+    leadId: lead.id,
+    ownerId: lead.owner?.id,
+  });
+
+  const deal = await createDeal({
+    name: dealName,
+    amount: lead.value,
+    accountId: lead.account?.id,
+    ownerId: lead.owner?.id,
+    leadId: lead.id,
+    contactId: contact.id,
+    description: lead.notes,
+  });
+
+  // Carry the lead's existing activity history onto the new deal too — both
+  // FK columns on `activities` are independently nullable, so this is purely
+  // additive: the activities still show on the lead's own timeline as well.
+  await supabase.from('activities').update({ opportunity_id: deal.id }).eq('lead_id', lead.id);
+
+  const currentUser = (await supabase.auth.getUser()).data.user;
+  await supabase.from('activities').insert({
+    type: 'FIELD_UPDATE', body: `Converted to Deal: ${deal.name}`, creator_id: currentUser?.id, lead_id: lead.id,
+  });
+
+  await supabase.from('leads').update({ converted_at: new Date().toISOString() }).eq('id', lead.id);
+
+  return deal;
 }

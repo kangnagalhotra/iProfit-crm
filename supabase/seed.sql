@@ -30,14 +30,13 @@ insert into deal_stages (pipeline_id, name, "order", color, is_default, win_prob
 select p.id, s.name, s.ord, s.color, s.is_default, s.win_prob, s.won, s.lost
 from pipelines p,
   (values
-    ('Lead',          1, '#025ADF', true,  10, false, false),
-    ('Discovery',     2, '#6B7280', false, 20, false, false),
-    ('Qualified',     3, '#8B5CF6', false, 35, false, false),
-    ('Proposal',      4, '#F97316', false, 55, false, false),
-    ('Negotiation',   5, '#F97316', false, 70, false, false),
-    ('Verbal Commit', 6, '#F97316', false, 90, false, false),
-    ('Won',           7, '#16A34A', false, 100, true, false),
-    ('Lost',          8, '#DC2626', false, 0,  false, true)
+    ('Discovery',      1, '#025ADF', true,  20, false, false),
+    ('Needs Analysis', 2, '#6B7280', false, 30, false, false),
+    ('Product Demo',   3, '#8B5CF6', false, 45, false, false),
+    ('Proposal Sent',  4, '#F97316', false, 55, false, false),
+    ('Negotiation',    5, '#F97316', false, 70, false, false),
+    ('Closed Won',     6, '#16A34A', false, 100, true, false),
+    ('Closed Lost',    7, '#DC2626', false, 0,  false, true)
   ) as s(name, ord, color, is_default, win_prob, won, lost)
 where p.name = 'Sales Pipeline'
   and not exists (select 1 from deal_stages ds where ds.pipeline_id = p.id);
@@ -46,15 +45,15 @@ where p.name = 'Sales Pipeline'
 -- Default account stages
 -- ---------------------------------------------------------------------------
 
-insert into account_stages (name, "order", color, is_default)
+insert into account_stages (name, "order", color, is_default, is_customer_stage)
 select * from (values
-  ('Prospect',          1, '#025ADF'::stage_color, true),
-  ('Qualified',         2, '#8B5CF6'::stage_color, false),
-  ('Active Customer',   3, '#16A34A'::stage_color, false),
-  ('Strategic Account', 4, '#F97316'::stage_color, false),
-  ('On Hold',           5, '#6B7280'::stage_color, false),
-  ('Inactive',          6, '#DC2626'::stage_color, false)
-) as s(name, "order", color, is_default)
+  ('Prospect',          1, '#025ADF'::stage_color, true,  false),
+  ('Qualified',         2, '#8B5CF6'::stage_color, false, false),
+  ('Active Customer',   3, '#16A34A'::stage_color, false, true),
+  ('Strategic Account', 4, '#F97316'::stage_color, false, true),
+  ('On Hold',           5, '#6B7280'::stage_color, false, false),
+  ('Inactive',          6, '#DC2626'::stage_color, false, false)
+) as s(name, "order", color, is_default, is_customer_stage)
 where not exists (select 1 from account_stages);
 
 -- ---------------------------------------------------------------------------
@@ -63,13 +62,12 @@ where not exists (select 1 from account_stages);
 
 insert into lead_stages (name, "order", color, is_default, is_won, is_lost)
 select * from (values
-  ('New',           1, '#025ADF'::stage_color, true,  false, false),
-  ('Contacted',     2, '#6B7280'::stage_color, false, false, false),
-  ('Qualified',     3, '#8B5CF6'::stage_color, false, false, false),
-  ('Proposal Sent', 4, '#F97316'::stage_color, false, false, false),
-  ('Negotiation',   5, '#F97316'::stage_color, false, false, false),
-  ('Won',           6, '#16A34A'::stage_color, false, true,  false),
-  ('Lost',          7, '#DC2626'::stage_color, false, false, true)
+  ('New',                1, '#025ADF'::stage_color, true,  false, false),
+  ('Contacted',          2, '#6B7280'::stage_color, false, false, false),
+  ('Attempted Contact',  3, '#6B7280'::stage_color, false, false, false),
+  ('Qualified',          4, '#16A34A'::stage_color, false, true,  false),
+  ('Disqualified',       5, '#DC2626'::stage_color, false, false, true),
+  ('Nurturing',          6, '#F97316'::stage_color, false, false, false)
 ) as s(name, "order", color, is_default, is_won, is_lost)
 where not exists (select 1 from lead_stages);
 
