@@ -1,9 +1,9 @@
 import { supabase } from '../lib/supabase';
-import type { AccountStage, DealStage, LeadStage } from './types';
+import type { AccountStage, CustomerStage, DealStage, LeadStage } from './types';
 
-export type StageTable = 'lead_stages' | 'account_stages' | 'deal_stages';
+export type StageTable = 'lead_stages' | 'account_stages' | 'deal_stages' | 'customer_stages';
 
-function mapStage(row: any): LeadStage | AccountStage | DealStage {
+function mapStage(row: any): LeadStage | AccountStage | DealStage | CustomerStage {
   return {
     id: row.id,
     name: row.name,
@@ -15,7 +15,10 @@ function mapStage(row: any): LeadStage | AccountStage | DealStage {
       ? { winProbability: row.win_probability, isClosedWon: row.is_closed_won, isClosedLost: row.is_closed_lost }
       : {}),
     ...(row.is_customer_stage !== undefined && row.is_customer_stage !== null
-      ? { isCustomerStage: row.is_customer_stage }
+      ? { isCustomerStage: row.is_customer_stage, isInactiveStage: row.is_inactive_stage }
+      : {}),
+    ...(row.is_renewed_stage !== undefined && row.is_renewed_stage !== null
+      ? { isRenewedStage: row.is_renewed_stage }
       : {}),
   } as any;
 }
@@ -58,6 +61,9 @@ export async function updateStage(table: StageTable, id: string, patch: Record<s
   if (patch.isDefault !== undefined) dbPatch.is_default = patch.isDefault;
   if (patch.isClosedWon !== undefined) dbPatch.is_closed_won = patch.isClosedWon;
   if (patch.isClosedLost !== undefined) dbPatch.is_closed_lost = patch.isClosedLost;
+  if (patch.isCustomerStage !== undefined) dbPatch.is_customer_stage = patch.isCustomerStage;
+  if (patch.isInactiveStage !== undefined) dbPatch.is_inactive_stage = patch.isInactiveStage;
+  if (patch.isRenewedStage !== undefined) dbPatch.is_renewed_stage = patch.isRenewedStage;
 
   const { data, error } = await supabase.from(table).update(dbPatch).eq('id', id).select().single();
   if (error) throw error;

@@ -2,7 +2,7 @@ import { supabase } from '../lib/supabase';
 import type { Opportunity, Paginated } from './types';
 
 const SELECT = `*, pipeline:pipelines(id, name), stage:deal_stages(*), owner:profiles(id, full_name),
-  account:accounts(id, name), lead:leads(id, first_name, last_name, email),
+  account:accounts(id, name, stage:account_stages(name, color)), lead:leads(id, first_name, last_name, email),
   contact:contacts(id, first_name, last_name, email)`;
 
 const SORT_COLUMN: Record<string, string> = {
@@ -26,13 +26,17 @@ function mapDeal(row: any): Opportunity {
       isClosedWon: row.stage.is_closed_won, isClosedLost: row.stage.is_closed_lost,
     },
     owner: row.owner ? { id: row.owner.id, fullName: row.owner.full_name } : undefined,
-    account: row.account ? { id: row.account.id, name: row.account.name } : undefined,
+    account: row.account ? {
+      id: row.account.id, name: row.account.name,
+      stage: row.account.stage ? { name: row.account.stage.name, color: row.account.stage.color } : undefined,
+    } : undefined,
     lead: row.lead ? {
       id: row.lead.id, firstName: row.lead.first_name ?? undefined, lastName: row.lead.last_name ?? undefined, email: row.lead.email ?? undefined,
     } : undefined,
     contact: row.contact ? {
       id: row.contact.id, firstName: row.contact.first_name ?? undefined, lastName: row.contact.last_name ?? undefined, email: row.contact.email ?? undefined,
     } : undefined,
+    archivedAt: row.archived_at ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -40,7 +44,8 @@ function mapDeal(row: any): Opportunity {
 
 export interface ListDealsParams {
   page?: number; pageSize?: number; sortBy?: string; sortDir?: 'asc' | 'desc';
-  search?: string; stageId?: string; ownerId?: string; accountId?: string; createdAfter?: string;
+  search?: string; stageId?: string; ownerId?: string; accountId?: string; contactId?: string; createdAfter?: string;
+  includeArchived?: boolean;
 }
 
 export async function listDeals(params: ListDealsParams = {}): Promise<Paginated<Opportunity>> {
@@ -48,6 +53,8 @@ export async function listDeals(params: ListDealsParams = {}): Promise<Paginated
   const pageSize = Math.min(100, params.pageSize ?? 25);
   let query = supabase.from('opportunities').select(SELECT, { count: 'exact' });
 
+  if (!params.includeArchived) query = query.is('archived_at', null);
+  if (params.contactId) query = query.eq('contact_id', params.contactId);
   if (params.stageId) query = query.eq('stage_id', params.stageId);
   if (params.ownerId) query = query.eq('owner_id', params.ownerId);
   if (params.accountId) query = query.eq('account_id', params.accountId);
@@ -98,7 +105,7 @@ function toRow(input: Record<string, any>) {
   const row: Record<string, any> = {
     name: input.name, amount: input.amount, deal_type: input.dealType, description: input.description,
     source: input.source, owner_id: input.ownerId, stage_id: input.stageId, account_id: input.accountId, lead_id: input.leadId,
-    contact_id: input.contactId, close_date: input.closeDate,
+    contact_id: input.contactId, close_date: input.closeDate, archived_at: input.archivedAt,
   };
   Object.keys(row).forEach((k) => { if (row[k] === undefined) delete row[k]; });
   return row;

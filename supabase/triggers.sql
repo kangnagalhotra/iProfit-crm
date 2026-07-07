@@ -69,6 +69,19 @@ $$ language plpgsql;
 create trigger deal_stages_guard_delete before delete on deal_stages
   for each row execute function guard_deal_stage_delete();
 
+create function guard_customer_stage_delete() returns trigger as $$
+declare cnt int;
+begin
+  select count(*) into cnt from accounts where customer_stage_id = old.id;
+  if cnt > 0 then
+    raise exception '%', format('Cannot delete "%s" — %s account(s) still in this stage. Move them first.', old.name, cnt);
+  end if;
+  return old;
+end;
+$$ language plpgsql;
+create trigger customer_stages_guard_delete before delete on customer_stages
+  for each row execute function guard_customer_stage_delete();
+
 -- ---------------------------------------------------------------------------
 -- LEADS — "created" + field-change activity logging
 -- ---------------------------------------------------------------------------
@@ -261,6 +274,7 @@ declare
   target_id uuid;
   target_order int;
   current_order int;
+  existing_lifecycle_id uuid;
 begin
   if new.account_id is null then
     return new;
@@ -271,17 +285,25 @@ begin
     return new;
   end if;
 
-  select id, "order" into target_id, target_order from account_stages where name = 'Active Customer';
+  select id, "order" into target_id, target_order from account_stages where name = 'Customer';
   if target_id is null then
     return new;
   end if;
 
-  select acs."order" into current_order
+  select acs."order", a.customer_stage_id into current_order, existing_lifecycle_id
   from accounts a join account_stages acs on acs.id = a.stage_id
   where a.id = new.account_id;
 
   if current_order is null or current_order < target_order then
     update accounts set stage_id = target_id where id = new.account_id;
+  end if;
+
+  -- Seed the Customer Success lifecycle stage the first time an account
+  -- becomes a customer — guarded so a later RENEWAL deal closing won on an
+  -- account already at "Renewed" never bounces it back to "Onboarding".
+  if existing_lifecycle_id is null then
+    update accounts set customer_stage_id = (select id from customer_stages where is_default limit 1)
+    where id = new.account_id;
   end if;
 
   return new;
@@ -304,10 +326,16 @@ create trigger opportunities_promote_account_to_customer_upd
 create function set_deal_closed_at() returns trigger as $$
 declare
   closed boolean;
+  lost boolean;
 begin
-  select (is_closed_won or is_closed_lost) into closed from deal_stages where id = new.stage_id;
-  if coalesce(closed, false) and new.closed_at is null then
+  select is_closed_won, is_closed_lost into closed, lost from deal_stages where id = new.stage_id;
+  if coalesce(closed or lost, false) and new.closed_at is null then
     new.closed_at = now();
+  end if;
+  -- Closed Lost deals archive themselves automatically — matches the
+  -- "Closed Lost -> Deal Archived" step in the CRM lifecycle diagram.
+  if coalesce(lost, false) and new.archived_at is null then
+    new.archived_at = now();
   end if;
   return new;
 end;
@@ -366,6 +394,23 @@ create trigger activities_create_followup_task
   after insert on activities
   for each row execute function create_followup_task_after_meeting();
 
+-- Auto-set/clear resolved_at when a support ticket's status crosses into or
+-- out of the resolved states, mirroring set_deal_closed_at's timestamp idiom.
+create function set_ticket_resolved_at() returns trigger as $$
+begin
+  if new.status in ('RESOLVED', 'CLOSED') and old.status not in ('RESOLVED', 'CLOSED') then
+    new.resolved_at = now();
+  elsif new.status not in ('RESOLVED', 'CLOSED') and old.status in ('RESOLVED', 'CLOSED') then
+    new.resolved_at = null;
+  end if;
+  return new;
+end;
+$$ language plpgsql security definer set search_path = public;
+
+create trigger support_tickets_set_resolved_at
+  before update on support_tickets
+  for each row execute function set_ticket_resolved_at();
+
 -- 3. Alert a deal's owner when it's been inactive (no update) for 7+ days.
 -- Fires once per inactive streak, not daily — last_inactivity_alert_at is
 -- only re-armed once the deal is touched again (updated_at moves forward).
@@ -391,3 +436,57 @@ end;
 $$ language plpgsql security definer set search_path = public;
 
 select cron.schedule('check-inactive-deals', '0 9 * * *', 'select check_inactive_deals();');
+
+-- 4. Recommend "Inactive" for a customer account with no engagement (own
+-- record updates, deal updates, or logged activities across its leads/deals)
+-- for 180+ days. This is a RECOMMENDATION only — it notifies the account
+-- owner and lets the frontend show an approve-to-change banner; it never
+-- flips accounts.stage_id itself. Fires once per inactive streak, same
+-- re-arm-on-new-activity guard as check_inactive_deals().
+create function check_inactive_accounts() returns void as $$
+begin
+  with last_engagement as (
+    select a.id as account_id,
+      greatest(
+        a.updated_at,
+        coalesce((select max(o.updated_at) from opportunities o where o.account_id = a.id), a.created_at),
+        coalesce((select max(act.occurred_at) from activities act
+          where act.account_id = a.id
+             or act.lead_id in (select id from leads where account_id = a.id)
+             or act.opportunity_id in (select id from opportunities where account_id = a.id)), a.created_at)
+      ) as last_touch
+    from accounts a
+  )
+  insert into notifications (user_id, type, message, link_url)
+  select a.owner_id, 'ACCOUNT_INACTIVE',
+    'Company "' || a.name || '" has been inactive for 180+ days',
+    '/companies/' || a.id
+  from accounts a
+  join account_stages ast on ast.id = a.stage_id
+  join last_engagement le on le.account_id = a.id
+  where ast.is_customer_stage and not ast.is_inactive_stage
+    and le.last_touch < now() - interval '180 days'
+    and (a.last_inactivity_alert_at is null or a.last_inactivity_alert_at < le.last_touch);
+
+  with last_engagement as (
+    select a.id as account_id,
+      greatest(
+        a.updated_at,
+        coalesce((select max(o.updated_at) from opportunities o where o.account_id = a.id), a.created_at),
+        coalesce((select max(act.occurred_at) from activities act
+          where act.account_id = a.id
+             or act.lead_id in (select id from leads where account_id = a.id)
+             or act.opportunity_id in (select id from opportunities where account_id = a.id)), a.created_at)
+      ) as last_touch
+    from accounts a
+  )
+  update accounts a set last_inactivity_alert_at = now()
+  from account_stages ast, last_engagement le
+  where ast.id = a.stage_id and le.account_id = a.id
+    and ast.is_customer_stage and not ast.is_inactive_stage
+    and le.last_touch < now() - interval '180 days'
+    and (a.last_inactivity_alert_at is null or a.last_inactivity_alert_at < le.last_touch);
+end;
+$$ language plpgsql security definer set search_path = public;
+
+select cron.schedule('check-inactive-accounts', '0 9 * * *', 'select check_inactive_accounts();');

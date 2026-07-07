@@ -40,8 +40,15 @@ create type task_priority as enum ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL');
 create type deal_type as enum ('NEW_BUSINESS', 'EXISTING_BUSINESS', 'RENEWAL');
 
 create type notification_type as enum (
-  'RECORD_ASSIGNED', 'TASK_DUE', 'STAGE_CHANGED', 'MENTION', 'LEAD_INACTIVE', 'DEAL_INACTIVE'
+  'RECORD_ASSIGNED', 'TASK_DUE', 'STAGE_CHANGED', 'MENTION', 'LEAD_INACTIVE', 'DEAL_INACTIVE', 'ACCOUNT_INACTIVE'
 );
+
+create type ticket_status as enum ('OPEN', 'IN_PROGRESS', 'WAITING_ON_CUSTOMER', 'RESOLVED', 'CLOSED');
+
+-- Deliberately not a reuse of task_priority: ticket SLA semantics are expected
+-- to diverge from task semantics over time, and splitting a shared enum later
+-- is far more disruptive than keeping two small enums in sync today.
+create type ticket_priority as enum ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL');
 
 -- Shared allowlist for all three stage tables' `color` column (see CRM
 -- Enhancements work: Blue/Green/Purple/Orange/Red/Gray only, going forward).
@@ -89,9 +96,21 @@ create table account_stages (
   color stage_color not null,
   is_default boolean not null default false,
   is_customer_stage boolean not null default false,
+  is_inactive_stage boolean not null default false,
   created_at timestamptz not null default now()
 );
 create index account_stages_order_idx on account_stages("order");
+
+create table customer_stages (
+  id uuid primary key default gen_random_uuid(),
+  name varchar(100) not null,
+  "order" int not null,
+  color stage_color not null,
+  is_default boolean not null default false,
+  is_renewed_stage boolean not null default false,
+  created_at timestamptz not null default now()
+);
+create index customer_stages_order_idx on customer_stages("order");
 
 create table accounts (
   id uuid primary key default gen_random_uuid(),
@@ -110,12 +129,16 @@ create table accounts (
   description text,
   stage_id uuid not null references account_stages(id) on delete restrict,
   owner_id uuid references profiles(id) on delete set null,
+  customer_stage_id uuid references customer_stages(id) on delete set null,
+  last_inactivity_alert_at timestamptz, -- last time the 180-day-inactive alert fired; null until the first one
+  archived_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 create index accounts_domain_idx on accounts(domain);
 create index accounts_owner_id_idx on accounts(owner_id);
 create index accounts_stage_id_idx on accounts(stage_id);
+create index accounts_customer_stage_id_idx on accounts(customer_stage_id);
 create trigger accounts_set_updated_at before update on accounts
   for each row execute function set_updated_at();
 
@@ -163,6 +186,7 @@ create table leads (
   -- flag, orthogonal to stage (mirrors Salesforce's IsConverted, not a status
   -- value) so a converted lead keeps showing "Qualified" as its stage.
   converted_at timestamptz,
+  archived_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -192,6 +216,30 @@ create table contacts (
 create index contacts_account_id_idx on contacts(account_id);
 create index contacts_owner_id_idx on contacts(owner_id);
 create trigger contacts_set_updated_at before update on contacts
+  for each row execute function set_updated_at();
+
+-- ---------------------------------------------------------------------------
+-- SUPPORT TICKETS
+-- ---------------------------------------------------------------------------
+
+create table support_tickets (
+  id uuid primary key default gen_random_uuid(),
+  subject varchar(250) not null,
+  description text,
+  status ticket_status not null default 'OPEN',
+  priority ticket_priority not null default 'MEDIUM',
+  account_id uuid not null references accounts(id) on delete cascade,
+  contact_id uuid references contacts(id) on delete set null,
+  assignee_id uuid references profiles(id) on delete set null,
+  due_at timestamptz,
+  resolved_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index support_tickets_account_id_idx on support_tickets(account_id);
+create index support_tickets_assignee_id_idx on support_tickets(assignee_id);
+create index support_tickets_status_idx on support_tickets(status);
+create trigger support_tickets_set_updated_at before update on support_tickets
   for each row execute function set_updated_at();
 
 -- ---------------------------------------------------------------------------
@@ -235,6 +283,7 @@ create table opportunities (
   loss_reason varchar(255),
   closed_at timestamptz,
   last_inactivity_alert_at timestamptz, -- last time the 7-day-inactive alert fired; null until the first one
+  archived_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

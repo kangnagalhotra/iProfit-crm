@@ -55,6 +55,7 @@ export function CompaniesList() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState('');
+  const [includeArchived, setIncludeArchived] = useState(false);
   const [view, setView] = useState<ListView>('board');
   const [showForm, setShowForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -77,14 +78,14 @@ export function CompaniesList() {
   const load = useCallback(() => {
     setLoading(true);
     listAccounts({
-      search: search || undefined, page, pageSize, sortBy, sortDir,
+      search: search || undefined, includeArchived, page, pageSize, sortBy, sortDir,
     })
       .then((data) => { setAccounts(data.data); setTotal(data.total); setSelected(new Set()); })
       .finally(() => setLoading(false));
-  }, [search, page, pageSize, sortBy, sortDir]);
+  }, [search, includeArchived, page, pageSize, sortBy, sortDir]);
 
   useEffect(() => { if (view === 'board') load(); }, [load, view]);
-  useEffect(() => { setPage(1); }, [search]);
+  useEffect(() => { setPage(1); }, [search, includeArchived]);
 
   function toggleSort(field: SortBy) {
     if (sortBy === field) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
@@ -154,6 +155,17 @@ export function CompaniesList() {
           <button className="btn secondary" onClick={() => setShowImport(true)}>Import</button>
         </div>
       </div>
+
+      {view === 'board' && (
+        <div className="quick-filter-chips">
+          <button
+            className={`chip-filter${includeArchived ? ' active' : ''}`}
+            onClick={() => setIncludeArchived((v) => !v)}
+          >
+            Show archived
+          </button>
+        </div>
+      )}
 
       {view === 'board' ? (
         loading ? <p>Loading…</p> : accounts.length === 0 ? (

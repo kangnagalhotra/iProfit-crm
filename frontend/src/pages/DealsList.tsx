@@ -66,6 +66,7 @@ export function DealsList() {
   const [deals, setDeals] = useState<Opportunity[]>([]);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState('');
+  const [includeArchived, setIncludeArchived] = useState(false);
   const [view, setView] = useState<ListView>('board');
   const [showForm, setShowForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -88,14 +89,14 @@ export function DealsList() {
   const load = useCallback(() => {
     setLoading(true);
     listDeals({
-      search: search || undefined, page, pageSize, sortBy, sortDir,
+      search: search || undefined, includeArchived, page, pageSize, sortBy, sortDir,
     })
       .then((data) => { setDeals(data.data); setTotal(data.total); setSelected(new Set()); })
       .finally(() => setLoading(false));
-  }, [search, page, pageSize, sortBy, sortDir]);
+  }, [search, includeArchived, page, pageSize, sortBy, sortDir]);
 
   useEffect(() => { if (view === 'board') load(); }, [load, view]);
-  useEffect(() => { setPage(1); }, [search]);
+  useEffect(() => { setPage(1); }, [search, includeArchived]);
 
   function toggleSort(field: SortBy) {
     if (sortBy === field) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
@@ -163,6 +164,17 @@ export function DealsList() {
           <AddContactsMenu label="Add deal" onCreateNew={() => setShowForm(true)} onImport={() => setShowImport(true)} />
         </div>
       </div>
+
+      {view === 'board' && (
+        <div className="quick-filter-chips">
+          <button
+            className={`chip-filter${includeArchived ? ' active' : ''}`}
+            onClick={() => setIncludeArchived((v) => !v)}
+          >
+            Show archived
+          </button>
+        </div>
+      )}
 
       {view === 'board' ? (
         loading ? <p>Loading…</p> : deals.length === 0 ? (

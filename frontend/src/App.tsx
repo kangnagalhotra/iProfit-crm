@@ -10,6 +10,9 @@ import { CompanyDetail } from './pages/CompanyDetail';
 import { DealsList } from './pages/DealsList';
 import { DealDetail } from './pages/DealDetail';
 import { PipelineBoard } from './pages/PipelineBoard';
+import { CustomerSuccessBoard } from './pages/CustomerSuccessBoard';
+import { SupportTicketsList } from './pages/SupportTicketsList';
+import { SupportTicketDetail } from './pages/SupportTicketDetail';
 import { TasksPage } from './pages/TasksPage';
 import { TaskDetail } from './pages/TaskDetail';
 import { NotificationBell } from './components/NotificationBell';
@@ -29,6 +32,8 @@ function Shell({ children }: { children: ReactNode }) {
           <NavLink to="/companies">Companies</NavLink>
           <NavLink to="/deals">Deals</NavLink>
           <NavLink to="/pipeline">Pipeline</NavLink>
+          <NavLink to="/customer-success">Customer Success</NavLink>
+          <NavLink to="/support-tickets">Support Tickets</NavLink>
           <NavLink to="/tasks">Tasks</NavLink>
         </nav>
       </aside>
@@ -72,6 +77,9 @@ export function App() {
       <Route path="/deals" element={<Protected><DealsList /></Protected>} />
       <Route path="/deals/:id" element={<Protected><DealDetail /></Protected>} />
       <Route path="/pipeline" element={<Protected><PipelineBoard /></Protected>} />
+      <Route path="/customer-success" element={<Protected><CustomerSuccessBoard /></Protected>} />
+      <Route path="/support-tickets" element={<Protected><SupportTicketsList /></Protected>} />
+      <Route path="/support-tickets/:id" element={<Protected><SupportTicketDetail /></Protected>} />
       <Route path="/tasks" element={<Protected><TasksPage /></Protected>} />
       <Route path="/tasks/:id" element={<Protected><TaskDetail /></Protected>} />
       <Route path="*" element={<Navigate to="/" replace />} />

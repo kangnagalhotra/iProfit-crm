@@ -6,6 +6,7 @@ import { listStages } from '../api/stages';
 import { listUsers } from '../api/users';
 import { LeadForm } from '../components/LeadForm';
 import { LeadImport } from '../components/LeadImport';
+import { ConvertToDealModal } from '../components/ConvertToDealModal';
 import { AddContactsMenu } from '../components/AddContactsMenu';
 import { LeadsKanban } from '../components/LeadsKanban';
 import { ViewToggle } from '../components/ViewToggle';
@@ -57,6 +58,7 @@ export function LeadsList() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState('');
+  const [includeArchived, setIncludeArchived] = useState(false);
   const [view, setView] = useState<ListView>('board');
   const [showForm, setShowForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -70,6 +72,7 @@ export function LeadsList() {
   const [stages, setStages] = useState<LeadStage[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [editingCell, setEditingCell] = useState<{ id: string; field: 'stage' | 'owner' } | null>(null);
+  const [convertingLead, setConvertingLead] = useState<Lead | null>(null);
 
   useEffect(() => {
     Promise.all([listStages('lead_stages'), listUsers()])
@@ -79,14 +82,14 @@ export function LeadsList() {
   const load = useCallback(() => {
     setLoading(true);
     listLeads({
-      search: search || undefined, page, pageSize, sortBy, sortDir,
+      search: search || undefined, includeArchived, page, pageSize, sortBy, sortDir,
     })
       .then((data) => { setLeads(data.data); setTotal(data.total); setSelected(new Set()); })
       .finally(() => setLoading(false));
-  }, [search, page, pageSize, sortBy, sortDir]);
+  }, [search, includeArchived, page, pageSize, sortBy, sortDir]);
 
   useEffect(() => { if (view === 'board') load(); }, [load, view]);
-  useEffect(() => { setPage(1); }, [search]);
+  useEffect(() => { setPage(1); }, [search, includeArchived]);
 
   function toggleSort(field: SortBy) {
     if (sortBy === field) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
@@ -155,6 +158,17 @@ export function LeadsList() {
         </div>
       </div>
 
+      {view === 'board' && (
+        <div className="quick-filter-chips">
+          <button
+            className={`chip-filter${includeArchived ? ' active' : ''}`}
+            onClick={() => setIncludeArchived((v) => !v)}
+          >
+            Show archived
+          </button>
+        </div>
+      )}
+
       {view === 'board' ? (
         loading ? <p>Loading…</p> : leads.length === 0 ? (
           <p style={{ color: 'var(--muted)' }}>No leads yet. Create your first one.</p>
@@ -180,6 +194,7 @@ export function LeadsList() {
                   <th className="sortable" onClick={() => toggleSort('value')}>Value{sortArrow('value')}</th>
                   <th className="sortable" onClick={() => toggleSort('updatedAt')}>Last Activity{sortArrow('updatedAt')}</th>
                   <th className="sortable" onClick={() => toggleSort('createdAt')}>Created{sortArrow('createdAt')}</th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
@@ -224,6 +239,11 @@ export function LeadsList() {
                     <td>{formatValue(l.value)}</td>
                     <td>{l.lastActivityAt ? new Date(l.lastActivityAt).toLocaleDateString() : '—'}</td>
                     <td>{new Date(l.createdAt).toLocaleDateString()}</td>
+                    <td>
+                      {l.stage.isWon && !l.convertedAt && (
+                        <button className="btn secondary" onClick={() => setConvertingLead(l)}>Convert to Deal</button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -254,6 +274,17 @@ export function LeadsList() {
           onImported={() => {
             setShowImport(false);
             if (view === 'board') load(); else setKanbanKey((k) => k + 1);
+          }}
+        />
+      )}
+      {convertingLead && (
+        <ConvertToDealModal
+          lead={convertingLead}
+          onClose={() => setConvertingLead(null)}
+          onConverted={(deal) => {
+            setConvertingLead(null);
+            toast.success('Converted to Deal');
+            navigate(`/deals/${deal.id}`);
           }}
         />
       )}

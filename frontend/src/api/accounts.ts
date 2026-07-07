@@ -1,7 +1,7 @@
 import { supabase } from '../lib/supabase';
 import type { Account, Paginated } from './types';
 
-const SELECT = '*, stage:account_stages(*), owner:profiles(id, full_name)';
+const SELECT = '*, stage:account_stages(*), customerStage:customer_stages(*), owner:profiles(id, full_name)';
 
 const SORT_COLUMN: Record<string, string> = {
   name: 'name', annualRevenue: 'annual_revenue', updatedAt: 'updated_at', createdAt: 'created_at',
@@ -25,9 +25,15 @@ function mapAccount(row: any): Account {
     annualRevenue: row.annual_revenue !== null && row.annual_revenue !== undefined ? String(row.annual_revenue) : undefined,
     stage: {
       id: row.stage.id, name: row.stage.name, order: row.stage.order, color: row.stage.color, isDefault: row.stage.is_default,
-      isCustomerStage: row.stage.is_customer_stage,
+      isCustomerStage: row.stage.is_customer_stage, isInactiveStage: row.stage.is_inactive_stage,
     },
+    customerStage: row.customerStage ? {
+      id: row.customerStage.id, name: row.customerStage.name, order: row.customerStage.order, color: row.customerStage.color,
+      isDefault: row.customerStage.is_default, isRenewedStage: row.customerStage.is_renewed_stage,
+    } : undefined,
     owner: row.owner ? { id: row.owner.id, fullName: row.owner.full_name } : undefined,
+    lastInactivityAlertAt: row.last_inactivity_alert_at ?? undefined,
+    archivedAt: row.archived_at ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -35,7 +41,7 @@ function mapAccount(row: any): Account {
 
 export interface ListAccountsParams {
   page?: number; pageSize?: number; sortBy?: string; sortDir?: 'asc' | 'desc';
-  search?: string; stageId?: string; ownerId?: string;
+  search?: string; stageId?: string; ownerId?: string; includeArchived?: boolean;
 }
 
 export async function listAccounts(params: ListAccountsParams = {}): Promise<Paginated<Account>> {
@@ -43,6 +49,7 @@ export async function listAccounts(params: ListAccountsParams = {}): Promise<Pag
   const pageSize = Math.min(100, params.pageSize ?? 25);
   let query = supabase.from('accounts').select(SELECT, { count: 'exact' });
 
+  if (!params.includeArchived) query = query.is('archived_at', null);
   if (params.stageId) query = query.eq('stage_id', params.stageId);
   if (params.ownerId) query = query.eq('owner_id', params.ownerId);
   if (params.search) {
@@ -84,6 +91,7 @@ function toRow(input: Record<string, any>) {
     annual_revenue: input.annualRevenue, city: input.city, state: input.state, country: input.country,
     company_type: input.companyType, email: input.email, phone: input.phone, address: input.address,
     description: input.description, owner_id: input.ownerId, stage_id: input.stageId,
+    customer_stage_id: input.customerStageId, archived_at: input.archivedAt,
   };
   Object.keys(row).forEach((k) => { if (row[k] === undefined) delete row[k]; });
   return row;

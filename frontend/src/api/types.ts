@@ -50,6 +50,7 @@ export interface Lead {
   timelineScore?: number;
   qualificationNotes?: string;
   convertedAt?: string;
+  archivedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -61,7 +62,7 @@ export interface Contact {
   email?: string;
   phone?: string;
   jobTitle?: string;
-  account?: { id: string; name: string };
+  account?: { id: string; name: string; stage?: { name: string; color: string } };
   lead?: { id: string };
   owner?: { id: string; fullName: string };
   createdAt: string;
@@ -79,6 +80,11 @@ export interface ImportLeadsResult {
 
 export interface AccountStage extends Stage {
   isCustomerStage: boolean;
+  isInactiveStage: boolean;
+}
+
+export interface CustomerStage extends Stage {
+  isRenewedStage: boolean;
 }
 
 export interface Account {
@@ -97,7 +103,10 @@ export interface Account {
   description?: string;
   annualRevenue?: string;
   stage: AccountStage;
+  customerStage?: CustomerStage;
   owner?: { id: string; fullName: string };
+  lastInactivityAlertAt?: string;
+  archivedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -129,9 +138,10 @@ export interface Opportunity {
   pipeline: { id: string; name: string };
   stage: DealStage;
   owner?: { id: string; fullName: string };
-  account?: { id: string; name: string };
+  account?: { id: string; name: string; stage?: { name: string; color: string } };
   lead?: { id: string; firstName?: string; lastName?: string; email?: string };
   contact?: { id: string; firstName?: string; lastName?: string; email?: string };
+  archivedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -173,7 +183,7 @@ export interface TaskSummary {
   dueToday: number;
 }
 
-export type NotificationType = 'RECORD_ASSIGNED' | 'TASK_DUE' | 'STAGE_CHANGED' | 'MENTION' | 'LEAD_INACTIVE' | 'DEAL_INACTIVE';
+export type NotificationType = 'RECORD_ASSIGNED' | 'TASK_DUE' | 'STAGE_CHANGED' | 'MENTION' | 'LEAD_INACTIVE' | 'DEAL_INACTIVE' | 'ACCOUNT_INACTIVE';
 
 export interface Notification {
   id: string;
@@ -182,4 +192,28 @@ export interface Notification {
   linkUrl?: string;
   isRead: boolean;
   createdAt: string;
+}
+
+export type TicketStatus = 'OPEN' | 'IN_PROGRESS' | 'WAITING_ON_CUSTOMER' | 'RESOLVED' | 'CLOSED';
+export type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+
+export interface SupportTicket {
+  id: string;
+  subject: string;
+  description?: string;
+  status: TicketStatus;
+  priority: TicketPriority;
+  account: { id: string; name: string };
+  contact?: { id: string; firstName?: string; lastName?: string; email?: string };
+  assignee?: { id: string; fullName: string };
+  dueAt?: string;
+  resolvedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TicketSummary {
+  total: number;
+  open: number;
+  critical: number;
 }

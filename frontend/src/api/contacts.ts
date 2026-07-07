@@ -1,7 +1,8 @@
 import { supabase } from '../lib/supabase';
 import type { Contact, Paginated } from './types';
 
-const SELECT = '*, account:accounts(id, name), lead:leads(id), owner:profiles(id, full_name)';
+const SELECT = `*, account:accounts(id, name, stage:account_stages(name, color)),
+  lead:leads(id), owner:profiles(id, full_name)`;
 
 const SORT_COLUMN: Record<string, string> = {
   firstName: 'first_name', lastName: 'last_name', updatedAt: 'updated_at', createdAt: 'created_at',
@@ -15,7 +16,10 @@ function mapContact(row: any): Contact {
     email: row.email ?? undefined,
     phone: row.phone ?? undefined,
     jobTitle: row.job_title ?? undefined,
-    account: row.account ? { id: row.account.id, name: row.account.name } : undefined,
+    account: row.account ? {
+      id: row.account.id, name: row.account.name,
+      stage: row.account.stage ? { name: row.account.stage.name, color: row.account.stage.color } : undefined,
+    } : undefined,
     lead: row.lead ? { id: row.lead.id } : undefined,
     owner: row.owner ? { id: row.owner.id, fullName: row.owner.full_name } : undefined,
     createdAt: row.created_at,

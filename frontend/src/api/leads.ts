@@ -36,6 +36,7 @@ function mapLead(row: any): Lead {
     timelineScore: row.timeline_score ?? undefined,
     qualificationNotes: row.qualification_notes ?? undefined,
     convertedAt: row.converted_at ?? undefined,
+    archivedAt: row.archived_at ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -44,6 +45,7 @@ function mapLead(row: any): Lead {
 export interface ListLeadsParams {
   page?: number; pageSize?: number; sortBy?: string; sortDir?: 'asc' | 'desc';
   search?: string; stageId?: string; ownerId?: string; accountId?: string; createdAfter?: string;
+  includeArchived?: boolean;
 }
 
 export async function listLeads(params: ListLeadsParams = {}): Promise<Paginated<Lead>> {
@@ -51,6 +53,7 @@ export async function listLeads(params: ListLeadsParams = {}): Promise<Paginated
   const pageSize = Math.min(100, params.pageSize ?? 25);
   let query = supabase.from('leads').select(SELECT, { count: 'exact' });
 
+  if (!params.includeArchived) query = query.is('archived_at', null);
   if (params.stageId) query = query.eq('stage_id', params.stageId);
   if (params.ownerId) query = query.eq('owner_id', params.ownerId);
   if (params.accountId) query = query.eq('account_id', params.accountId);
@@ -142,6 +145,7 @@ export async function updateLead(id: string, input: Record<string, any>): Promis
     source: rest.source, owner_id: rest.ownerId, stage_id: rest.stageId, score: rest.score, account_id: accountId,
     budget_score: rest.budgetScore, authority_score: rest.authorityScore, need_score: rest.needScore,
     timeline_score: rest.timelineScore, qualification_notes: rest.qualificationNotes,
+    archived_at: rest.archivedAt,
   };
   Object.keys(row).forEach((k) => { if (row[k] === undefined) delete row[k]; });
 

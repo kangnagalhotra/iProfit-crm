@@ -207,7 +207,9 @@ export function DealDetail() {
                   <button onClick={() => { setMoreOpen(false); setShowAddActivity(true); }}>Add Activity</button>
                   <button disabled title="Coming soon — Meeting scheduling not built yet">Schedule Meeting</button>
                   <button onClick={() => { setMoreOpen(false); duplicateRecord(); }}>Duplicate Record</button>
-                  <button disabled title="Coming soon — Archiving not built yet">Archive Record</button>
+                  <button onClick={() => { setMoreOpen(false); saveField({ archivedAt: deal.archivedAt ? null : new Date().toISOString() }); }}>
+                    {deal.archivedAt ? 'Unarchive Record' : 'Archive Record'}
+                  </button>
                   <button style={{ color: '#DC2626' }} onClick={() => { setMoreOpen(false); deleteRecord(); }}>Delete Record</button>
                 </div>
               )}
@@ -247,7 +249,16 @@ export function DealDetail() {
           </EditableRow>
           <EditableRow
             label="Company"
-            value={deal.account ? <Link to={`/companies/${deal.account.id}`}>{deal.account.name}</Link> : undefined}
+            value={deal.account ? (
+              <>
+                <Link to={`/companies/${deal.account.id}`}>{deal.account.name}</Link>
+                {deal.account.stage && (
+                  <span className="chip" style={{ background: deal.account.stage.color + '22', color: deal.account.stage.color, marginLeft: 6 }}>
+                    {deal.account.stage.name}
+                  </span>
+                )}
+              </>
+            ) : undefined}
             editing={editingField === 'company'}
             onStartEdit={() => setEditingField('company')}
           >

@@ -45,16 +45,28 @@ where p.name = 'Sales Pipeline'
 -- Default account stages
 -- ---------------------------------------------------------------------------
 
-insert into account_stages (name, "order", color, is_default, is_customer_stage)
+insert into account_stages (name, "order", color, is_default, is_customer_stage, is_inactive_stage)
 select * from (values
-  ('Prospect',          1, '#025ADF'::stage_color, true,  false),
-  ('Qualified',         2, '#8B5CF6'::stage_color, false, false),
-  ('Active Customer',   3, '#16A34A'::stage_color, false, true),
-  ('Strategic Account', 4, '#F97316'::stage_color, false, true),
-  ('On Hold',           5, '#6B7280'::stage_color, false, false),
-  ('Inactive',          6, '#DC2626'::stage_color, false, false)
-) as s(name, "order", color, is_default, is_customer_stage)
+  ('Prospect',          1, '#025ADF'::stage_color, true,  false, false),
+  ('Customer',          2, '#16A34A'::stage_color, false, true,  false),
+  ('Strategic Account', 3, '#8B5CF6'::stage_color, false, true,  false),
+  ('On Hold',           4, '#F97316'::stage_color, false, false, false),
+  ('Inactive',          5, '#6B7280'::stage_color, false, false, true)
+) as s(name, "order", color, is_default, is_customer_stage, is_inactive_stage)
 where not exists (select 1 from account_stages);
+
+-- ---------------------------------------------------------------------------
+-- Default customer (post-sale) lifecycle stages
+-- ---------------------------------------------------------------------------
+
+insert into customer_stages (name, "order", color, is_default, is_renewed_stage)
+select * from (values
+  ('Onboarding',  1, '#025ADF'::stage_color, true,  false),
+  ('Active',      2, '#16A34A'::stage_color, false, false),
+  ('Renewal Due', 3, '#F97316'::stage_color, false, false),
+  ('Renewed',     4, '#8B5CF6'::stage_color, false, true)
+) as s(name, "order", color, is_default, is_renewed_stage)
+where not exists (select 1 from customer_stages);
 
 -- ---------------------------------------------------------------------------
 -- Default lead stages

@@ -9,6 +9,7 @@ import { listAccounts } from '../api/accounts';
 import { SearchSelect } from './SearchSelect';
 import type { SearchSelectOption } from './SearchSelect';
 import { CreateUserModal } from './CreateUserModal';
+import { CompanyForm } from './CompanyForm';
 import { useAuth } from '../context/AuthContext';
 import {
   stripPhoneDigits, formatPhoneDisplay, isValidPhone, PHONE_ERROR_MESSAGE,
@@ -48,6 +49,7 @@ export function LeadForm({
   const [emailError, setEmailError] = useState('');
   const [saving, setSaving] = useState(false);
   const [showCreateUser, setShowCreateUser] = useState(false);
+  const [showCreateCompany, setShowCreateCompany] = useState(false);
 
   const canAddOwner = currentUser?.role === 'ADMIN' || currentUser?.role === 'SALES_MANAGER';
   const leadNamePreview = [form.firstName, form.lastName].filter(Boolean).join(' ');
@@ -168,6 +170,8 @@ export function LeadForm({
               onChange={setCompany}
               allowCustom
               placeholder="Search or type a new company…"
+              onCreateNew={() => setShowCreateCompany(true)}
+              createNewLabel="+ Add new company"
             />
           </div>
           <div className="field"><label>Job title</label>
@@ -219,6 +223,17 @@ export function LeadForm({
             setUsers((us) => [...us, newUser].sort((a, b) => a.fullName.localeCompare(b.fullName)));
             set('ownerId', newUser.id);
             setShowCreateUser(false);
+          }}
+        />
+      )}
+
+      {showCreateCompany && (
+        <CompanyForm
+          onClose={() => setShowCreateCompany(false)}
+          onSaved={(newAccount) => {
+            setAccounts((as) => [...as, newAccount].sort((a, b) => a.name.localeCompare(b.name)));
+            setCompany(newAccount.id);
+            setShowCreateCompany(false);
           }}
         />
       )}

@@ -7,6 +7,7 @@ import { Kanban } from './kanban/Kanban';
 import type { KanbanColumn } from './kanban/Kanban';
 import { StageColumnHeader } from './kanban/StageColumnHeader';
 import { LeadForm } from './LeadForm';
+import { ConvertToDealModal } from './ConvertToDealModal';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
@@ -50,6 +51,7 @@ export function LeadsKanban() {
   const [addingStage, setAddingStage] = useState(false);
   const [newStageName, setNewStageName] = useState('');
   const [formState, setFormState] = useState<{ lead?: Lead; defaultStageId?: string } | null>(null);
+  const [convertingLead, setConvertingLead] = useState<Lead | null>(null);
 
   useEffect(() => {
     Promise.all([loadAllLeads(), listStages('lead_stages')])
@@ -169,6 +171,13 @@ export function LeadsKanban() {
                 </div>
               </Link>
               <div className="kanban-card-actions">
+                {lead.stage.isWon && !lead.convertedAt && (
+                  <button
+                    title="Convert to Deal"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setConvertingLead(lead); }}
+                  >✔</button>
+                )}
                 <button
                   title="View"
                   onPointerDown={(e) => e.stopPropagation()}
@@ -200,6 +209,18 @@ export function LeadsKanban() {
             setFormState(null);
             setLeads((ls) => (ls.some((l) => l.id === saved.id) ? ls.map((l) => (l.id === saved.id ? saved : l)) : [...ls, saved]));
             toast.success(formState.lead ? 'Lead updated' : 'Lead created');
+          }}
+        />
+      )}
+
+      {convertingLead && (
+        <ConvertToDealModal
+          lead={convertingLead}
+          onClose={() => setConvertingLead(null)}
+          onConverted={(deal) => {
+            setConvertingLead(null);
+            toast.success('Converted to Deal');
+            navigate(`/deals/${deal.id}`);
           }}
         />
       )}

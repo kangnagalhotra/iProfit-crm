@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import type {
-  Account, AccountStage, Lead, Opportunity, User,
+  Account, AccountStage, Contact, Lead, Opportunity, User,
 } from '../api/types';
 import {
   getAccount, updateAccount, createAccount, deleteAccount,
@@ -10,14 +10,18 @@ import { listStages } from '../api/stages';
 import { listUsers } from '../api/users';
 import { listLeads } from '../api/leads';
 import { listDeals } from '../api/deals';
+import { listContacts } from '../api/contacts';
 import { NotesSection } from '../components/NotesSection';
 import { TasksWidget } from '../components/TasksWidget';
+import { SupportTicketsWidget } from '../components/SupportTicketsWidget';
 import { ActivityTimeline } from '../components/ActivityTimeline';
 import { EditableRow } from '../components/EditableRow';
 import { SearchSelect } from '../components/SearchSelect';
 import { CompanyForm } from '../components/CompanyForm';
+import { ContactForm } from '../components/ContactForm';
 import { AddActivityModal } from '../components/AddActivityModal';
 import { Icon } from '../components/Icon';
+import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 import { timeAgo } from '../utils/timeAgo';
@@ -82,16 +86,20 @@ function scrollToKeyInfo() {
 export function CompanyDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const toast = useToast();
   const confirm = useConfirm();
+  const canManageStatus = user?.role === 'ADMIN' || user?.role === 'SALES_MANAGER';
   const [account, setAccount] = useState<Account | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [stages, setStages] = useState<AccountStage[]>([]);
   const [associatedLeads, setAssociatedLeads] = useState<Lead[]>([]);
   const [associatedDeals, setAssociatedDeals] = useState<Opportunity[]>([]);
+  const [associatedContacts, setAssociatedContacts] = useState<Contact[]>([]);
   const [editingField, setEditingField] = useState<string | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showAddActivity, setShowAddActivity] = useState(false);
+  const [showContactForm, setShowContactForm] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [activityKey, setActivityKey] = useState(0);
   const moreRef = useRef<HTMLDivElement>(null);
@@ -106,6 +114,11 @@ export function CompanyDetail() {
     listDeals({ accountId: id, pageSize: 100 }).then((data) => setAssociatedDeals(data.data));
   }
 
+  function loadAssociatedContacts() {
+    if (!id) return;
+    listContacts({ accountId: id, pageSize: 100 }).then((data) => setAssociatedContacts(data.data));
+  }
+
   useEffect(() => {
     if (!id) return;
     getAccount(id).then(setAccount).catch(() => {});
@@ -113,6 +126,7 @@ export function CompanyDetail() {
       .then(([userRes, stageRes]) => { setUsers(userRes); setStages(stageRes as AccountStage[]); });
     loadAssociatedLeads();
     loadAssociatedDeals();
+    loadAssociatedContacts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -144,6 +158,18 @@ export function CompanyDetail() {
     } catch (e: any) {
       toast.error(e.message ?? 'Could not update company');
     }
+  }
+
+  async function markStrategicAccount() {
+    const target = stages.find((s) => s.name === 'Strategic Account');
+    if (!target) { toast.error('Strategic Account stage not found'); return; }
+    await saveField({ stageId: target.id });
+  }
+
+  async function markInactive() {
+    const target = stages.find((s) => s.isInactiveStage);
+    if (!target) { toast.error('Inactive stage not found'); return; }
+    await saveField({ stageId: target.id });
   }
 
   async function duplicateRecord() {
@@ -205,7 +231,7 @@ export function CompanyDetail() {
               <div className="detail-meta-row">
                 <span className="record-type-badge">Company</span>
                 <span className="chip" style={{ background: account.stage.color + '22', color: account.stage.color }}>{account.stage.name}</span>
-                {account.stage.isCustomerStage && (
+                {account.stage.isCustomerStage && account.stage.name !== 'Customer' && (
                   <span className="chip" style={{ background: '#16A34A22', color: '#16A34A' }}>Customer</span>
                 )}
                 {account.owner && (
@@ -229,12 +255,17 @@ export function CompanyDetail() {
                   <button onClick={() => { setMoreOpen(false); setShowEditModal(true); }}>Edit Details</button>
                   <button onClick={() => { setMoreOpen(false); setEditingField('owner'); scrollToKeyInfo(); }}>Change Owner</button>
                   <button onClick={() => { setMoreOpen(false); setEditingField('stage'); scrollToKeyInfo(); }}>Change Status</button>
+                  {canManageStatus && account.stage.name === 'Customer' && (
+                    <button onClick={() => { setMoreOpen(false); markStrategicAccount(); }}>Mark Strategic Account</button>
+                  )}
                   <button onClick={() => { setMoreOpen(false); scrollToNotes(); }}>Add Note</button>
                   <button onClick={() => { setMoreOpen(false); scrollToTasks(); }}>Add Task</button>
                   <button onClick={() => { setMoreOpen(false); setShowAddActivity(true); }}>Add Activity</button>
                   <button disabled title="Coming soon — Meeting scheduling not built yet">Schedule Meeting</button>
                   <button onClick={() => { setMoreOpen(false); duplicateRecord(); }}>Duplicate Record</button>
-                  <button disabled title="Coming soon — Archiving not built yet">Archive Record</button>
+                  <button onClick={() => { setMoreOpen(false); saveField({ archivedAt: account.archivedAt ? null : new Date().toISOString() }); }}>
+                    {account.archivedAt ? 'Unarchive Record' : 'Archive Record'}
+                  </button>
                   <button style={{ color: '#DC2626' }} onClick={() => { setMoreOpen(false); deleteRecord(); }}>Delete Record</button>
                 </div>
               )}
@@ -272,6 +303,15 @@ export function CompanyDetail() {
           </button>
         </div>
       </div>
+
+      {account.lastInactivityAlertAt && !account.stage.isInactiveStage && (
+        <div className="card" style={{ background: '#FEF3C7', border: '1px solid #F59E0B' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+            <span>⚠ This company has been inactive for 180+ days. Recommended status: <strong>Inactive</strong>.</span>
+            <button className="btn secondary" onClick={markInactive}>Mark as Inactive</button>
+          </div>
+        </div>
+      )}
 
       <div className="detail-sidebar">
       <div className="card">
@@ -341,6 +381,7 @@ export function CompanyDetail() {
           />
           <Row label="Associated Leads" value={associatedLeads.length} />
           <Row label="Associated Deals" value={associatedDeals.length} />
+          <Row label="Active Contacts" value={associatedContacts.length} />
           {account.stage.isCustomerStage && (
             <Row label="Customer Since" value={customerSince ? new Date(customerSince).toLocaleDateString() : undefined} />
           )}
@@ -433,6 +474,40 @@ export function CompanyDetail() {
         )}
       </div>
 
+      <div className="card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3 style={{ marginTop: 0 }}>Contacts ({associatedContacts.length})</h3>
+          <button className="btn secondary" onClick={() => setShowContactForm(true)}>+ Add Contact</button>
+        </div>
+        {associatedContacts.length === 0 ? (
+          <div className="empty-state">
+            <span className="icon"><Icon name="note" size={18} /></span>
+            <p>No contacts linked to this company yet.</p>
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Job Title</th>
+              </tr>
+            </thead>
+            <tbody>
+              {associatedContacts.map((c) => (
+                <tr key={c.id}>
+                  <td>{[c.firstName, c.lastName].filter(Boolean).join(' ') || c.email || 'Untitled contact'}</td>
+                  <td>{c.email ?? '—'}</td>
+                  <td>{c.jobTitle ?? '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          </div>
+        )}
+      </div>
+
       <ActivityTimeline
         key={activityKey}
         accountId={account.id}
@@ -440,6 +515,7 @@ export function CompanyDetail() {
         relatedOpportunityIds={associatedDeals.map((d) => d.id)}
       />
       <TasksWidget key={activityKey} accountId={account.id} />
+      <SupportTicketsWidget key={activityKey} accountId={account.id} />
       <NotesSection accountId={account.id} />
       </div>
       </div>
@@ -459,6 +535,14 @@ export function CompanyDetail() {
           accountId={account.id}
           onClose={() => setShowAddActivity(false)}
           onSaved={() => { setShowAddActivity(false); setActivityKey((k) => k + 1); toast.success('Activity added'); }}
+        />
+      )}
+
+      {showContactForm && (
+        <ContactForm
+          accountId={account.id}
+          onClose={() => setShowContactForm(false)}
+          onSaved={() => { setShowContactForm(false); loadAssociatedContacts(); toast.success('Contact added'); }}
         />
       )}
     </div>

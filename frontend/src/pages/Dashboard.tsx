@@ -5,11 +5,12 @@ import {
 } from 'recharts';
 import { useAuth } from '../context/AuthContext';
 import type {
-  Account, Lead, Opportunity, DealStage, User,
+  Account, Lead, Opportunity, DealStage, TicketSummary, User,
 } from '../api/types';
 import { listLeads } from '../api/leads';
 import { listDeals } from '../api/deals';
 import { listAccounts } from '../api/accounts';
+import { getTicketSummary } from '../api/supportTickets';
 import { listStages } from '../api/stages';
 import { listUsers } from '../api/users';
 import { countByDay, countBy } from '../utils/aggregate';
@@ -84,6 +85,7 @@ export function Dashboard() {
   const [allLeads, setAllLeads] = useState<Lead[]>([]);
   const [allDeals, setAllDeals] = useState<Opportunity[]>([]);
   const [allAccounts, setAllAccounts] = useState<Account[]>([]);
+  const [ticketSummary, setTicketSummary] = useState<TicketSummary | null>(null);
   const [overviewLoading, setOverviewLoading] = useState(true);
 
   useEffect(() => {
@@ -101,10 +103,12 @@ export function Dashboard() {
       fetchAllLeads(ownerParams),
       fetchAllDeals(ownerParams),
       fetchAllAccounts(ownerParams),
-    ]).then(([l, d, a]) => {
+      getTicketSummary(),
+    ]).then(([l, d, a, t]) => {
       setAllLeads(l);
       setAllDeals(d);
       setAllAccounts(a);
+      setTicketSummary(t);
     }).finally(() => setOverviewLoading(false));
   }, [ownerId]);
 
@@ -285,6 +289,12 @@ export function Dashboard() {
             <div className="card"><div className="label">Prospects</div><div className="value">{prospectAccounts.length}</div></div>
             <div className="card"><div className="label">Customers</div><div className="value">{customerAccounts.length}</div></div>
             <div className="card"><div className="label">Customer Revenue</div><div className="value">{formatMoney(customerRevenue)}</div></div>
+          </div>
+
+          <h3 style={{ marginTop: 28 }}>Support Overview</h3>
+          <div className="dashboard-grid">
+            <div className="card"><div className="label">Open Tickets</div><div className="value">{ticketSummary?.open ?? 0}</div></div>
+            <div className="card"><div className="label">Critical Tickets</div><div className="value">{ticketSummary?.critical ?? 0}</div></div>
           </div>
         </>
       )}

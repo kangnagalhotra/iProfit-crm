@@ -71,6 +71,11 @@ create policy "deal_stages_select_all" on deal_stages for select to authenticate
 create policy "deal_stages_write_managers" on deal_stages for all to authenticated
   using (is_manager_or_admin()) with check (is_manager_or_admin());
 
+alter table customer_stages enable row level security;
+create policy "customer_stages_select_all" on customer_stages for select to authenticated using (true);
+create policy "customer_stages_write_managers" on customer_stages for all to authenticated
+  using (is_manager_or_admin()) with check (is_manager_or_admin());
+
 create policy "pipelines_select_all" on pipelines for select to authenticated using (true);
 create policy "pipelines_write_admin" on pipelines for all to authenticated
   using (get_my_role() = 'ADMIN') with check (get_my_role() = 'ADMIN');
@@ -137,6 +142,41 @@ create policy "contacts_update" on contacts for update to authenticated
   with check (is_manager_or_admin() or owner_id = auth.uid());
 
 create policy "contacts_delete" on contacts for delete to authenticated
+  using (is_manager_or_admin());
+
+-- ---------------------------------------------------------------------------
+-- SUPPORT TICKETS — assignee_id is nullable (unassigned-inbox pattern), so
+-- visibility also extends to the linked account's owner: an AM should see
+-- tickets on their own customer even when a different support rep is
+-- assigned. Anyone can INSERT (filing a ticket for someone else's account is
+-- a normal support-desk workflow, matches leads/accounts/opportunities/tasks).
+-- ---------------------------------------------------------------------------
+
+alter table support_tickets enable row level security;
+
+create policy "support_tickets_select" on support_tickets for select to authenticated
+  using (
+    is_manager_or_admin()
+    or assignee_id = auth.uid()
+    or exists (select 1 from accounts a where a.id = support_tickets.account_id and a.owner_id = auth.uid())
+  );
+
+create policy "support_tickets_insert" on support_tickets for insert to authenticated
+  with check (true);
+
+create policy "support_tickets_update" on support_tickets for update to authenticated
+  using (
+    is_manager_or_admin()
+    or assignee_id = auth.uid()
+    or exists (select 1 from accounts a where a.id = support_tickets.account_id and a.owner_id = auth.uid())
+  )
+  with check (
+    is_manager_or_admin()
+    or assignee_id = auth.uid()
+    or exists (select 1 from accounts a where a.id = support_tickets.account_id and a.owner_id = auth.uid())
+  );
+
+create policy "support_tickets_delete" on support_tickets for delete to authenticated
   using (is_manager_or_admin());
 
 -- ---------------------------------------------------------------------------
