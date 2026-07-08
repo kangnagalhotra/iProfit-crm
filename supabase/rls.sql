@@ -198,9 +198,140 @@ create policy "opportunities_update" on opportunities for update to authenticate
 create policy "opportunities_delete" on opportunities for delete to authenticated
   using (is_manager_or_admin());
 
--- stage_history: written by the Edge Function / trigger layer (Phase D/E)
--- using the service role; no direct client access needed.
+-- ---------------------------------------------------------------------------
+-- DEAL_CONTACTS / DEAL_LINE_ITEMS — child rows of opportunities; visibility
+-- and write access inherit from the parent deal (identical shape to
+-- ACTIVITIES below).
+-- ---------------------------------------------------------------------------
+
+alter table deal_contacts enable row level security;
+
+create policy "deal_contacts_select" on deal_contacts for select to authenticated
+  using (exists (
+    select 1 from opportunities o where o.id = deal_contacts.opportunity_id
+      and (is_manager_or_admin() or o.owner_id = auth.uid())
+  ));
+
+create policy "deal_contacts_insert" on deal_contacts for insert to authenticated
+  with check (exists (
+    select 1 from opportunities o where o.id = deal_contacts.opportunity_id
+      and (is_manager_or_admin() or o.owner_id = auth.uid())
+  ));
+
+create policy "deal_contacts_update" on deal_contacts for update to authenticated
+  using (exists (
+    select 1 from opportunities o where o.id = deal_contacts.opportunity_id
+      and (is_manager_or_admin() or o.owner_id = auth.uid())
+  ))
+  with check (exists (
+    select 1 from opportunities o where o.id = deal_contacts.opportunity_id
+      and (is_manager_or_admin() or o.owner_id = auth.uid())
+  ));
+
+create policy "deal_contacts_delete" on deal_contacts for delete to authenticated
+  using (exists (
+    select 1 from opportunities o where o.id = deal_contacts.opportunity_id
+      and (is_manager_or_admin() or o.owner_id = auth.uid())
+  ));
+
+alter table deal_line_items enable row level security;
+
+create policy "deal_line_items_select" on deal_line_items for select to authenticated
+  using (exists (
+    select 1 from opportunities o where o.id = deal_line_items.opportunity_id
+      and (is_manager_or_admin() or o.owner_id = auth.uid())
+  ));
+
+create policy "deal_line_items_insert" on deal_line_items for insert to authenticated
+  with check (exists (
+    select 1 from opportunities o where o.id = deal_line_items.opportunity_id
+      and (is_manager_or_admin() or o.owner_id = auth.uid())
+  ));
+
+create policy "deal_line_items_update" on deal_line_items for update to authenticated
+  using (exists (
+    select 1 from opportunities o where o.id = deal_line_items.opportunity_id
+      and (is_manager_or_admin() or o.owner_id = auth.uid())
+  ))
+  with check (exists (
+    select 1 from opportunities o where o.id = deal_line_items.opportunity_id
+      and (is_manager_or_admin() or o.owner_id = auth.uid())
+  ));
+
+create policy "deal_line_items_delete" on deal_line_items for delete to authenticated
+  using (exists (
+    select 1 from opportunities o where o.id = deal_line_items.opportunity_id
+      and (is_manager_or_admin() or o.owner_id = auth.uid())
+  ));
+
+-- ---------------------------------------------------------------------------
+-- DEAL_ATTACHMENTS — file metadata; ownership inherits from the parent deal.
+-- The matching Supabase Storage bucket ('deal-attachments') has its own
+-- path-prefix-scoped policies on storage.objects (see phase-c patch).
+-- ---------------------------------------------------------------------------
+
+alter table deal_attachments enable row level security;
+
+create policy "deal_attachments_select" on deal_attachments for select to authenticated
+  using (
+    is_manager_or_admin()
+    or exists (select 1 from opportunities o where o.id = deal_attachments.opportunity_id and o.owner_id = auth.uid())
+  );
+
+create policy "deal_attachments_insert" on deal_attachments for insert to authenticated
+  with check (
+    uploaded_by = auth.uid()
+    and (
+      is_manager_or_admin()
+      or exists (select 1 from opportunities o where o.id = deal_attachments.opportunity_id and o.owner_id = auth.uid())
+    )
+  );
+
+create policy "deal_attachments_delete" on deal_attachments for delete to authenticated
+  using (
+    is_manager_or_admin()
+    or uploaded_by = auth.uid()
+    or exists (select 1 from opportunities o where o.id = deal_attachments.opportunity_id and o.owner_id = auth.uid())
+  );
+
+-- ---------------------------------------------------------------------------
+-- LEAD ATTACHMENTS — structural mirror of deal_attachments above, scoped via
+-- leads.owner_id instead of opportunities.owner_id.
+-- ---------------------------------------------------------------------------
+
+alter table lead_attachments enable row level security;
+
+create policy "lead_attachments_select" on lead_attachments for select to authenticated
+  using (
+    is_manager_or_admin()
+    or exists (select 1 from leads l where l.id = lead_attachments.lead_id and l.owner_id = auth.uid())
+  );
+
+create policy "lead_attachments_insert" on lead_attachments for insert to authenticated
+  with check (
+    uploaded_by = auth.uid()
+    and (
+      is_manager_or_admin()
+      or exists (select 1 from leads l where l.id = lead_attachments.lead_id and l.owner_id = auth.uid())
+    )
+  );
+
+create policy "lead_attachments_delete" on lead_attachments for delete to authenticated
+  using (
+    is_manager_or_admin()
+    or uploaded_by = auth.uid()
+    or exists (select 1 from leads l where l.id = lead_attachments.lead_id and l.owner_id = auth.uid())
+  );
+
+-- stage_history: activated (see triggers.sql's log_stage_history()) —
+-- system-authored only, no insert/update/delete policy for clients.
 alter table stage_history enable row level security;
+
+create policy "stage_history_select" on stage_history for select to authenticated
+  using (
+    is_manager_or_admin()
+    or exists (select 1 from opportunities o where o.id = stage_history.opportunity_id and o.owner_id = auth.uid())
+  );
 
 -- ---------------------------------------------------------------------------
 -- TASKS
@@ -279,4 +410,77 @@ create policy "notifications_update_own" on notifications for update to authenti
 
 -- assignment_state: no client policies at all — only the round-robin Edge
 -- Function (service role) reads/writes this.
+
+-- ---------------------------------------------------------------------------
+-- STORAGE — deal-attachments bucket. Path convention is
+-- {opportunity_id}/{uuid}-{filename}; storage.foldername(storage.objects.name)[1] extracts
+-- the first path segment, which doubles as the authorization key against
+-- the parent opportunity's visibility.
+-- ---------------------------------------------------------------------------
+
+create policy "deal_attachments_storage_select" on storage.objects for select to authenticated
+  using (
+    bucket_id = 'deal-attachments'
+    and exists (
+      select 1 from opportunities o
+      where o.id::text = (storage.foldername(storage.objects.name))[1]
+        and (is_manager_or_admin() or o.owner_id = auth.uid())
+    )
+  );
+
+create policy "deal_attachments_storage_insert" on storage.objects for insert to authenticated
+  with check (
+    bucket_id = 'deal-attachments'
+    and exists (
+      select 1 from opportunities o
+      where o.id::text = (storage.foldername(storage.objects.name))[1]
+        and (is_manager_or_admin() or o.owner_id = auth.uid())
+    )
+  );
+
+create policy "deal_attachments_storage_delete" on storage.objects for delete to authenticated
+  using (
+    bucket_id = 'deal-attachments'
+    and exists (
+      select 1 from opportunities o
+      where o.id::text = (storage.foldername(storage.objects.name))[1]
+        and (is_manager_or_admin() or o.owner_id = auth.uid())
+    )
+  );
+
+-- ---------------------------------------------------------------------------
+-- STORAGE — lead-attachments bucket. Same {lead_id}/{uuid}-{filename} path
+-- convention, scoped against leads instead of opportunities.
+-- ---------------------------------------------------------------------------
+
+create policy "lead_attachments_storage_select" on storage.objects for select to authenticated
+  using (
+    bucket_id = 'lead-attachments'
+    and exists (
+      select 1 from leads l
+      where l.id::text = (storage.foldername(storage.objects.name))[1]
+        and (is_manager_or_admin() or l.owner_id = auth.uid())
+    )
+  );
+
+create policy "lead_attachments_storage_insert" on storage.objects for insert to authenticated
+  with check (
+    bucket_id = 'lead-attachments'
+    and exists (
+      select 1 from leads l
+      where l.id::text = (storage.foldername(storage.objects.name))[1]
+        and (is_manager_or_admin() or l.owner_id = auth.uid())
+    )
+  );
+
+create policy "lead_attachments_storage_delete" on storage.objects for delete to authenticated
+  using (
+    bucket_id = 'lead-attachments'
+    and exists (
+      select 1 from leads l
+      where l.id::text = (storage.foldername(storage.objects.name))[1]
+        and (is_manager_or_admin() or l.owner_id = auth.uid())
+    )
+  );
+
 alter table assignment_state enable row level security;

@@ -1,9 +1,11 @@
 import { supabase } from '../lib/supabase';
 import type { DealPriority, Opportunity, Paginated } from './types';
+import { listStageHistory } from './dealStageHistory';
 
 const SELECT = `*, pipeline:pipelines(id, name), stage:deal_stages(*), owner:profiles(id, full_name),
-  account:accounts(id, name, stage:account_stages(name, color)), lead:leads(id, first_name, last_name, email),
-  contact:contacts(id, first_name, last_name, email)`;
+  account:accounts!opportunities_account_id_fkey(id, name, stage:account_stages(name, color)), lead:leads(id, first_name, last_name, email),
+  contact:contacts(id, first_name, last_name, email),
+  partner_account:accounts!opportunities_partner_account_id_fkey(id, name)`;
 
 const SORT_COLUMN: Record<string, string> = {
   name: 'name', amount: 'amount', closeDate: 'close_date', updatedAt: 'updated_at', createdAt: 'created_at',
@@ -21,6 +23,16 @@ function mapDeal(row: any): Opportunity {
     lossReason: row.loss_reason ?? undefined,
     description: row.description ?? undefined,
     source: row.source ?? undefined,
+    currency: row.currency,
+    probabilityOverride: row.probability_override ?? undefined,
+    nextStep: row.next_step ?? undefined,
+    nextActivityDate: row.next_activity_date ?? undefined,
+    competitor: row.competitor ?? undefined,
+    budgetConfirmed: row.budget_confirmed ?? undefined,
+    decisionTimeframe: row.decision_timeframe ?? undefined,
+    painPoint: row.pain_point ?? undefined,
+    tags: row.tags ?? [],
+    partnerAccount: row.partner_account ? { id: row.partner_account.id, name: row.partner_account.name } : undefined,
     pipeline: { id: row.pipeline.id, name: row.pipeline.name },
     stage: {
       id: row.stage.id, name: row.stage.name, order: row.stage.order, color: row.stage.color,
@@ -83,7 +95,17 @@ export async function listDeals(params: ListDealsParams = {}): Promise<Paginated
 export async function getDeal(id: string): Promise<Opportunity> {
   const { data, error } = await supabase.from('opportunities').select(SELECT).eq('id', id).single();
   if (error) throw error;
-  return mapDeal(data);
+  const deal = mapDeal(data);
+
+  const [lastActivity, history] = await Promise.all([
+    supabase.from('activities').select('created_at').eq('opportunity_id', id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+    listStageHistory(id),
+  ]);
+  deal.lastActivityAt = lastActivity.data?.created_at ?? undefined;
+  if (history.length > 0) {
+    deal.daysInCurrentStage = Math.floor((Date.now() - new Date(history[0].changedAt).getTime()) / 86400000);
+  }
+  return deal;
 }
 
 async function resolveCompany(companyName: string, ownerId?: string): Promise<string> {
@@ -109,6 +131,10 @@ function toRow(input: Record<string, any>) {
     name: input.name, amount: input.amount, deal_type: input.dealType, priority: input.priority, description: input.description,
     source: input.source, owner_id: input.ownerId, stage_id: input.stageId, account_id: input.accountId, lead_id: input.leadId,
     contact_id: input.contactId, close_date: input.closeDate, archived_at: input.archivedAt, loss_reason: input.lossReason,
+    currency: input.currency, probability_override: input.probabilityOverride, next_step: input.nextStep,
+    next_activity_date: input.nextActivityDate, competitor: input.competitor, budget_confirmed: input.budgetConfirmed,
+    decision_timeframe: input.decisionTimeframe, pain_point: input.painPoint, tags: input.tags,
+    partner_account_id: input.partnerAccountId,
   };
   Object.keys(row).forEach((k) => { if (row[k] === undefined) delete row[k]; });
   return row;

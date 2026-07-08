@@ -22,6 +22,7 @@ import { CollapsibleCard } from '../components/CollapsibleCard';
 import { AssociationsPanel } from '../components/AssociationsPanel';
 import type { AssociationGroup } from '../components/AssociationsPanel';
 import { SkeletonDetailPage } from '../components/Skeleton';
+import { StageHistoryCard } from '../components/StageHistoryCard';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 import { timeAgo } from '../utils/timeAgo';
@@ -365,6 +366,8 @@ export function DealDetail() {
             value={deal.closeDate ? new Date(deal.closeDate).toLocaleDateString() : undefined}
             onEmptyClick={() => setShowEditModal(true)}
           />
+          <Row label="Last activity date" value={deal.lastActivityAt ? new Date(deal.lastActivityAt).toLocaleDateString() : undefined} />
+          <Row label="Days in current stage" value={deal.daysInCurrentStage !== undefined ? String(deal.daysInCurrentStage) : undefined} />
         </div>
         {deal.description && (
           <div style={{ marginTop: 18, paddingTop: 18, borderTop: '1px solid var(--line)' }}>
@@ -412,6 +415,7 @@ export function DealDetail() {
           },
         ] as AssociationGroup[]}
       />
+      <StageHistoryCard opportunityId={deal.id} />
       <ActivityTimeline key={activityKey} opportunityId={deal.id} />
       <TasksWidget key={activityKey} opportunityId={deal.id} />
       <NotesSection opportunityId={deal.id} />

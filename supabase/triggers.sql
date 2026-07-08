@@ -219,6 +219,37 @@ $$ language plpgsql security definer set search_path = public;
 create trigger opportunities_log_changes after update on opportunities
   for each row execute function log_opportunity_changes();
 
+-- Structured, queryable twin of the stage-change line in log_opportunity_changes()
+-- above (that one writes a human-readable FIELD_UPDATE activity; this one
+-- writes a machine-readable row to stage_history for "days in stage" /
+-- "stage history log" on the Deal Detail page). Deliberately separate
+-- functions/triggers so neither's behavior is coupled to the other's.
+create function log_stage_history() returns trigger as $$
+begin
+  insert into stage_history (opportunity_id, from_stage_id, to_stage_id, changed_by_id, changed_at)
+  values (new.id, old.stage_id, new.stage_id, coalesce(auth.uid(), new.owner_id), now());
+  return new;
+end;
+$$ language plpgsql security definer set search_path = public;
+create trigger opportunities_log_stage_history
+  after update on opportunities
+  for each row
+  when (old.stage_id is distinct from new.stage_id)
+  execute function log_stage_history();
+
+-- Also seed the initial "entered stage" row on creation (not just later
+-- changes), so "days in current stage" resolves for brand-new deals too.
+create function log_stage_history_on_insert() returns trigger as $$
+begin
+  insert into stage_history (opportunity_id, from_stage_id, to_stage_id, changed_by_id, changed_at)
+  values (new.id, null, new.stage_id, coalesce(auth.uid(), new.owner_id), new.created_at);
+  return new;
+end;
+$$ language plpgsql security definer set search_path = public;
+create trigger opportunities_log_stage_history_insert
+  after insert on opportunities
+  for each row execute function log_stage_history_on_insert();
+
 -- ---------------------------------------------------------------------------
 -- TASKS — "created" + field-change activity logging
 -- ---------------------------------------------------------------------------

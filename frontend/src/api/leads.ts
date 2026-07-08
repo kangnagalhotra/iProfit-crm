@@ -5,7 +5,8 @@ import type {
 import { createDeal } from './deals';
 import { createContact } from './contacts';
 
-const SELECT = '*, stage:lead_stages(*), owner:profiles(id, full_name), account:accounts(id, name)';
+const SELECT = `*, stage:lead_stages(*), owner:profiles!leads_owner_id_fkey(id, full_name),
+  createdByProfile:profiles!leads_created_by_fkey(id, full_name), account:accounts(id, name)`;
 
 const SORT_COLUMN: Record<string, string> = {
   firstName: 'first_name', lastName: 'last_name', value: 'value', updatedAt: 'updated_at', createdAt: 'created_at',
@@ -15,11 +16,15 @@ function mapLead(row: any): Lead {
   return {
     id: row.id,
     leadName: row.lead_name ?? undefined,
+    salutation: row.salutation ?? undefined,
     firstName: row.first_name ?? undefined,
     lastName: row.last_name ?? undefined,
     email: row.email ?? undefined,
+    emailOptIn: row.email_opt_in ?? undefined,
     phone: row.phone ?? undefined,
+    mobile: row.mobile ?? undefined,
     jobTitle: row.job_title ?? undefined,
+    linkedinUrl: row.linkedin_url ?? undefined,
     city: row.city ?? undefined,
     value: row.value !== null && row.value !== undefined ? String(row.value) : undefined,
     notes: row.notes ?? undefined,
@@ -28,8 +33,13 @@ function mapLead(row: any): Lead {
       isDefault: row.stage.is_default, isWon: row.stage.is_won, isLost: row.stage.is_lost,
     },
     source: row.source ?? undefined,
+    sourceDetails: row.source_details ?? undefined,
     score: row.score,
+    rating: row.rating ?? undefined,
+    unqualifiedReason: row.unqualified_reason ?? undefined,
+    tags: row.tags ?? [],
     owner: row.owner ? { id: row.owner.id, fullName: row.owner.full_name } : undefined,
+    createdBy: row.createdByProfile ? { id: row.createdByProfile.id, fullName: row.createdByProfile.full_name } : undefined,
     account: row.account ? { id: row.account.id, name: row.account.name } : undefined,
     lastActivityAt: row.last_activity_at ?? undefined,
     budgetScore: row.budget_score ?? undefined,
@@ -113,17 +123,118 @@ function translateError(error: any): never {
   throw new Error(error.message ?? 'Something went wrong');
 }
 
+export interface AccountEnrichmentFields {
+  industry?: string;
+  sizeBucket?: string;
+  annualRevenue?: string;
+  currency?: string;
+  domain?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  country?: string;
+}
+
+const ENRICHMENT_COLUMNS: Record<keyof AccountEnrichmentFields, string> = {
+  industry: 'industry', sizeBucket: 'size_bucket', annualRevenue: 'annual_revenue', currency: 'currency',
+  domain: 'domain', address: 'address', city: 'city', state: 'state', postalCode: 'postal_code', country: 'country',
+};
+
+// Fills Company/Address fields on the shared Account only where they're
+// currently empty — never overwrites existing data. Best-effort: failures
+// are swallowed so enrichment can never block the lead itself from saving.
+export async function enrichAccountIfEmpty(accountId: string, fields: AccountEnrichmentFields): Promise<void> {
+  try {
+    const columns = Object.values(ENRICHMENT_COLUMNS);
+    const { data: current, error } = await supabase.from('accounts').select(columns.join(', ')).eq('id', accountId).single();
+    if (error || !current) return;
+
+    const patch: Record<string, any> = {};
+    (Object.keys(ENRICHMENT_COLUMNS) as (keyof AccountEnrichmentFields)[]).forEach((key) => {
+      const incoming = fields[key];
+      const column = ENRICHMENT_COLUMNS[key];
+      const existing = (current as any)[column];
+      if (incoming && (existing === null || existing === undefined || existing === '')) {
+        patch[column] = incoming;
+      }
+    });
+    if (Object.keys(patch).length === 0) return;
+    await supabase.from('accounts').update(patch).eq('id', accountId);
+  } catch {
+    // enrichment is a secondary side-effect — never throw from here
+  }
+}
+
+export interface DuplicateLeadMatch {
+  id: string;
+  name: string;
+  matchType: 'email' | 'name_company';
+}
+
+export async function checkDuplicateLead(params: {
+  email?: string; firstName?: string; lastName?: string; companyName?: string; excludeId?: string;
+}): Promise<DuplicateLeadMatch | null> {
+  const {
+    email, firstName, lastName, companyName, excludeId,
+  } = params;
+
+  if (email) {
+    let q = supabase.from('leads').select('id, lead_name, first_name, last_name').ilike('email', email).limit(1);
+    if (excludeId) q = q.neq('id', excludeId);
+    const { data } = await q.maybeSingle();
+    if (data) {
+      return {
+        id: data.id,
+        name: data.lead_name || [data.first_name, data.last_name].filter(Boolean).join(' ') || 'Untitled lead',
+        matchType: 'email',
+      };
+    }
+  }
+
+  if (firstName && lastName && companyName) {
+    let q = supabase
+      .from('leads')
+      .select('id, lead_name, first_name, last_name, account:accounts!inner(name)')
+      .ilike('first_name', firstName)
+      .ilike('last_name', lastName)
+      .ilike('account.name', companyName)
+      .limit(1);
+    if (excludeId) q = q.neq('id', excludeId);
+    const { data } = await q.maybeSingle();
+    if (data) {
+      const row = data as any;
+      return {
+        id: row.id,
+        name: row.lead_name || [row.first_name, row.last_name].filter(Boolean).join(' ') || 'Untitled lead',
+        matchType: 'name_company',
+      };
+    }
+  }
+
+  return null;
+}
+
 export async function createLead(input: Record<string, any>): Promise<Lead> {
-  const { companyName, accountId: inputAccountId, ...rest } = input;
+  const {
+    companyName, accountId: inputAccountId, companyEnrichment, ...rest
+  } = input;
   const currentUser = (await supabase.auth.getUser()).data.user;
   const ownerId = rest.ownerId ?? (await pickOwner()) ?? currentUser?.id;
   const accountId = inputAccountId ?? (companyName ? await resolveCompany(companyName, ownerId) : undefined);
   const stageId = rest.stageId ?? (await defaultLeadStageId());
 
+  if (accountId && companyEnrichment) {
+    await enrichAccountIfEmpty(accountId, companyEnrichment);
+  }
+
   const row: Record<string, any> = {
-    first_name: rest.firstName, last_name: rest.lastName, email: rest.email, phone: rest.phone,
-    job_title: rest.jobTitle, city: rest.city, value: rest.value, notes: rest.notes,
-    source: rest.source, owner_id: ownerId, account_id: accountId, stage_id: stageId,
+    salutation: rest.salutation, first_name: rest.firstName, last_name: rest.lastName,
+    email: rest.email, email_opt_in: rest.emailOptIn, phone: rest.phone, mobile: rest.mobile,
+    job_title: rest.jobTitle, linkedin_url: rest.linkedinUrl, city: rest.city, value: rest.value, notes: rest.notes,
+    source: rest.source, source_details: rest.sourceDetails, score: rest.score, rating: rest.rating,
+    unqualified_reason: rest.unqualifiedReason, tags: rest.tags,
+    owner_id: ownerId, created_by: currentUser?.id, account_id: accountId, stage_id: stageId,
     lead_name: [rest.firstName, rest.lastName].filter(Boolean).join(' ') || undefined,
     last_activity_at: new Date().toISOString(),
   };
@@ -135,17 +246,24 @@ export async function createLead(input: Record<string, any>): Promise<Lead> {
 }
 
 export async function updateLead(id: string, input: Record<string, any>): Promise<Lead> {
-  const { companyName, accountId: inputAccountId, ...rest } = input;
+  const { companyName, accountId: inputAccountId, companyEnrichment, ...rest } = input;
   let accountId = inputAccountId;
   if (accountId === undefined && companyName) {
     const { data: current } = await supabase.from('leads').select('owner_id').eq('id', id).single();
     accountId = await resolveCompany(companyName, current?.owner_id);
   }
 
+  if (accountId && companyEnrichment) {
+    await enrichAccountIfEmpty(accountId, companyEnrichment);
+  }
+
   const row: Record<string, any> = {
-    first_name: rest.firstName, last_name: rest.lastName, email: rest.email, phone: rest.phone,
-    job_title: rest.jobTitle, city: rest.city, value: rest.value, notes: rest.notes,
-    source: rest.source, owner_id: rest.ownerId, stage_id: rest.stageId, score: rest.score, account_id: accountId,
+    salutation: rest.salutation, first_name: rest.firstName, last_name: rest.lastName,
+    email: rest.email, email_opt_in: rest.emailOptIn, phone: rest.phone, mobile: rest.mobile,
+    job_title: rest.jobTitle, linkedin_url: rest.linkedinUrl, city: rest.city, value: rest.value, notes: rest.notes,
+    source: rest.source, source_details: rest.sourceDetails, owner_id: rest.ownerId, stage_id: rest.stageId,
+    score: rest.score, rating: rest.rating, unqualified_reason: rest.unqualifiedReason, tags: rest.tags,
+    account_id: accountId,
     budget_score: rest.budgetScore, authority_score: rest.authorityScore, need_score: rest.needScore,
     timeline_score: rest.timelineScore, qualification_notes: rest.qualificationNotes,
     archived_at: rest.archivedAt,
@@ -198,10 +316,15 @@ export async function getConvertedDeal(leadId: string): Promise<{ id: string; na
   return data;
 }
 
-export async function convertLeadToDeal(lead: Lead, dealName: string): Promise<Opportunity> {
+export async function convertLeadToDeal(
+  lead: Lead,
+  dealName: string,
+  opts: { value?: string; stageId?: string; closeDate?: string } = {},
+): Promise<Opportunity> {
   // Auto-create the Contact (person record) — the account itself is already
-  // resolved on the lead (set at creation), so conversion just carries it
-  // forward rather than re-resolving it.
+  // resolved on the lead (Company name is required on both lead forms, so
+  // lead.account is set by the time a lead exists), so conversion just
+  // carries it forward rather than re-resolving it.
   const contact = await createContact({
     firstName: lead.firstName,
     lastName: lead.lastName,
@@ -215,12 +338,14 @@ export async function convertLeadToDeal(lead: Lead, dealName: string): Promise<O
 
   const deal = await createDeal({
     name: dealName,
-    amount: lead.value,
+    amount: opts.value ?? lead.value,
     accountId: lead.account?.id,
     ownerId: lead.owner?.id,
     leadId: lead.id,
     contactId: contact.id,
     description: lead.notes,
+    stageId: opts.stageId,
+    closeDate: opts.closeDate,
   });
 
   // Carry the lead's existing activity history onto the new deal too — both

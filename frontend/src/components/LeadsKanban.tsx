@@ -54,6 +54,7 @@ export function LeadsKanban() {
   const [newStageName, setNewStageName] = useState('');
   const [formState, setFormState] = useState<{ lead?: Lead; defaultStageId?: string } | null>(null);
   const [convertingLead, setConvertingLead] = useState<Lead | null>(null);
+  const [qualifiedPromptLead, setQualifiedPromptLead] = useState<Lead | null>(null);
 
   useEffect(() => {
     Promise.all([loadAllLeads(), listStages('lead_stages')])
@@ -63,9 +64,14 @@ export function LeadsKanban() {
 
   const handleDrop = useCallback((leadId: string, _from: string, toStageId: string) => {
     const prev = leads;
-    setLeads((ls) => ls.map((l) => (l.id === leadId ? { ...l, stage: stages.find((s) => s.id === toStageId)! } : l)));
+    const prevLead = leads.find((l) => l.id === leadId);
+    const newStage = stages.find((s) => s.id === toStageId)!;
+    setLeads((ls) => ls.map((l) => (l.id === leadId ? { ...l, stage: newStage } : l)));
     setError('');
-    updateLead(leadId, { stageId: toStageId }).catch((e) => {
+    updateLead(leadId, { stageId: toStageId }).then((updated) => {
+      setLeads((ls) => ls.map((l) => (l.id === leadId ? updated : l)));
+      if (newStage.isWon && prevLead && !prevLead.stage.isWon) setQualifiedPromptLead(updated);
+    }).catch((e) => {
       setLeads(prev); // revert optimistic move
       setError(e.message ?? 'Could not update lead stage');
     });
@@ -225,6 +231,19 @@ export function LeadsKanban() {
             navigate(`/deals/${deal.id}`);
           }}
         />
+      )}
+
+      {qualifiedPromptLead && (
+        <div className="modal-overlay" onClick={() => setQualifiedPromptLead(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ marginTop: 0 }}>Lead qualified</h3>
+            <p>This lead is qualified — convert to a deal?</p>
+            <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+              <button className="btn" onClick={() => { setConvertingLead(qualifiedPromptLead); setQualifiedPromptLead(null); }}>Convert</button>
+              <button className="btn secondary" onClick={() => setQualifiedPromptLead(null)}>Not now</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

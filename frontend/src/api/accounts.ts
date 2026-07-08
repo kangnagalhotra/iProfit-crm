@@ -17,11 +17,13 @@ function mapAccount(row: any): Account {
     city: row.city ?? undefined,
     state: row.state ?? undefined,
     country: row.country ?? undefined,
+    postalCode: row.postal_code ?? undefined,
     email: row.email ?? undefined,
     phone: row.phone ?? undefined,
     address: row.address ?? undefined,
     description: row.description ?? undefined,
     annualRevenue: row.annual_revenue !== null && row.annual_revenue !== undefined ? String(row.annual_revenue) : undefined,
+    currency: row.currency ?? undefined,
     stage: {
       id: row.stage.id, name: row.stage.name, order: row.stage.order, color: row.stage.color, isDefault: row.stage.is_default,
       isCustomerStage: row.stage.is_customer_stage, isInactiveStage: row.stage.is_inactive_stage,
@@ -88,8 +90,8 @@ async function defaultAccountStageId(): Promise<string> {
 function toRow(input: Record<string, any>) {
   const row: Record<string, any> = {
     name: input.name, domain: input.domain, industry: input.industry, size_bucket: input.sizeBucket,
-    annual_revenue: input.annualRevenue, city: input.city, state: input.state, country: input.country,
-    email: input.email, phone: input.phone, address: input.address,
+    annual_revenue: input.annualRevenue, currency: input.currency, city: input.city, state: input.state, country: input.country,
+    postal_code: input.postalCode, email: input.email, phone: input.phone, address: input.address,
     description: input.description, owner_id: input.ownerId, stage_id: input.stageId,
     customer_stage_id: input.customerStageId, archived_at: input.archivedAt,
   };

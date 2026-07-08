@@ -22,7 +22,13 @@ import type { AssociationGroup } from '../components/AssociationsPanel';
 import { SkeletonDetailPage } from '../components/Skeleton';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
+import { useAuth } from '../context/AuthContext';
 import { timeAgo } from '../utils/timeAgo';
+
+const RATING_LABELS: Record<string, string> = { HOT: 'Hot', WARM: 'Warm', COLD: 'Cold' };
+const UNQUALIFIED_REASON_LABELS: Record<string, string> = {
+  NO_BUDGET: 'No Budget', NOT_A_FIT: 'Not a Fit', NO_RESPONSE: 'No Response', COMPETITOR: 'Competitor', BAD_DATA: 'Bad Data',
+};
 
 function initials(lead: Lead) {
   const parts = [lead.firstName, lead.lastName].filter(Boolean) as string[];
@@ -76,6 +82,7 @@ export function LeadDetail() {
   const navigate = useNavigate();
   const toast = useToast();
   const confirm = useConfirm();
+  const { user: currentUser } = useAuth();
   const [lead, setLead] = useState<Lead | null>(null);
   const [copied, setCopied] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
@@ -84,10 +91,13 @@ export function LeadDetail() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showAddActivity, setShowAddActivity] = useState(false);
   const [showConvertModal, setShowConvertModal] = useState(false);
+  const [showQualifiedPrompt, setShowQualifiedPrompt] = useState(false);
   const [convertedDeal, setConvertedDeal] = useState<{ id: string; name: string } | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
   const [activityKey, setActivityKey] = useState(0);
+  const [overrideEdit, setOverrideEdit] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
+  const canOverride = currentUser?.role === 'ADMIN' || currentUser?.role === 'SALES_MANAGER';
 
   function load() {
     if (!id) return;
@@ -113,6 +123,15 @@ export function LeadDetail() {
   if (!lead) return <SkeletonDetailPage />;
 
   const name = lead.leadName || [lead.firstName, lead.lastName].filter(Boolean).join(' ') || lead.email || 'Untitled lead';
+  const locked = !!lead.convertedAt;
+  const canEdit = !locked || overrideEdit;
+
+  async function onInlineStageChange(newStageId: string) {
+    const prevStage = lead!.stage;
+    const newStage = stages.find((s) => s.id === newStageId);
+    await saveField({ stageId: newStageId });
+    if (newStage?.isWon && !prevStage.isWon) setShowQualifiedPrompt(true);
+  }
 
   function copyEmail() {
     if (!lead!.email) return;
@@ -191,6 +210,7 @@ export function LeadDetail() {
               <div className="detail-meta-row">
                 <span className="record-type-badge">Lead</span>
                 <span className="chip" style={{ background: lead.stage.color + '22', color: lead.stage.color }}>{lead.stage.name}</span>
+                {locked && <span className="chip lead-locked-badge">Converted — locked</span>}
                 {lead.owner && (
                   <span className="owner-chip">
                     <span className="avatar avatar-sm">{ownerInitials(lead.owner.fullName)}</span>
@@ -199,10 +219,15 @@ export function LeadDetail() {
                 )}
                 <span className="detail-updated">Updated {timeAgo(lead.lastActivityAt ?? lead.updatedAt)}</span>
               </div>
+              {locked && canOverride && !overrideEdit && (
+                <button type="button" className="link-btn" onClick={() => setOverrideEdit(true)}>Edit anyway (admin)</button>
+              )}
             </div>
           </div>
           <div className="detail-header-actions">
-            <button className="btn btn-icon" onClick={() => setShowEditModal(true)}><Icon name="edit" size={14} /> Edit Details</button>
+            {canEdit && (
+              <button className="btn btn-icon" onClick={() => setShowEditModal(true)}><Icon name="edit" size={14} /> Edit Details</button>
+            )}
             {lead.stage.isWon && !lead.convertedAt && (
               <button className="btn btn-icon" style={{ background: '#16A34A' }} onClick={() => setShowConvertModal(true)}>
                 <Icon name="check" size={14} /> Convert to Deal
@@ -214,9 +239,9 @@ export function LeadDetail() {
               <button className="btn secondary btn-icon" onClick={() => setMoreOpen((o) => !o)}><Icon name="dots" size={14} /> More Actions</button>
               {moreOpen && (
                 <div className="dropdown-menu">
-                  <button onClick={() => { setMoreOpen(false); setShowEditModal(true); }}>Edit Details</button>
-                  <button onClick={() => { setMoreOpen(false); setEditingField('owner'); scrollToKeyInfo(); }}>Change Owner</button>
-                  <button onClick={() => { setMoreOpen(false); setEditingField('stage'); scrollToKeyInfo(); }}>Change Status</button>
+                  {canEdit && <button onClick={() => { setMoreOpen(false); setShowEditModal(true); }}>Edit Details</button>}
+                  {canEdit && <button onClick={() => { setMoreOpen(false); setEditingField('owner'); scrollToKeyInfo(); }}>Change Owner</button>}
+                  {canEdit && <button onClick={() => { setMoreOpen(false); setEditingField('stage'); scrollToKeyInfo(); }}>Change Status</button>}
                   <button onClick={() => { setMoreOpen(false); scrollToNotes(); }}>Add Note</button>
                   <button onClick={() => { setMoreOpen(false); scrollToTasks(); }}>Add Task</button>
                   <button onClick={() => { setMoreOpen(false); setShowAddActivity(true); }}>Add Activity</button>
@@ -271,6 +296,7 @@ export function LeadDetail() {
             value={lead.owner?.fullName}
             editing={editingField === 'owner'}
             onStartEdit={() => setEditingField('owner')}
+            editable={canEdit}
           >
             <SearchSelect
               options={users.map((u) => ({ value: u.id, label: u.fullName }))}
@@ -279,29 +305,34 @@ export function LeadDetail() {
               placeholder="Search owner…"
             />
           </EditableRow>
-          <Row label="Job Title" value={lead.jobTitle} onEmptyClick={() => setShowEditModal(true)} />
-          <Row label="Phone Number" value={lead.phone} onEmptyClick={() => setShowEditModal(true)} />
-          <Row label="Email" value={lead.email} onEmptyClick={() => setShowEditModal(true)} />
-          <Row label="City" value={lead.city} onEmptyClick={() => setShowEditModal(true)} />
+          <Row label="Job Title" value={lead.jobTitle} onEmptyClick={canEdit ? () => setShowEditModal(true) : undefined} />
+          <Row label="Phone Number" value={lead.phone} onEmptyClick={canEdit ? () => setShowEditModal(true) : undefined} />
+          <Row label="Email" value={lead.email} onEmptyClick={canEdit ? () => setShowEditModal(true) : undefined} />
           <EditableRow
             label="Stage"
             value={<span className="chip" style={{ background: lead.stage.color + '22', color: lead.stage.color }}>{lead.stage.name}</span>}
             editing={editingField === 'stage'}
             onStartEdit={() => setEditingField('stage')}
+            editable={canEdit}
           >
             <SearchSelect
               options={stages.map((s) => ({ value: s.id, label: s.name }))}
               value={lead.stage.id}
-              onChange={(v) => saveField({ stageId: v })}
+              onChange={(v) => v && onInlineStageChange(v)}
               placeholder="Search stage…"
             />
           </EditableRow>
-          <Row label="Lead Source" value={lead.source} onEmptyClick={() => setShowEditModal(true)} />
+          <Row label="Lead Source" value={lead.source} onEmptyClick={canEdit ? () => setShowEditModal(true) : undefined} />
+          <Row label="Rating" value={lead.rating ? RATING_LABELS[lead.rating] : undefined} onEmptyClick={canEdit ? () => setShowEditModal(true) : undefined} />
+          {lead.unqualifiedReason && (
+            <Row label="Unqualified Reason" value={UNQUALIFIED_REASON_LABELS[lead.unqualifiedReason]} />
+          )}
           <EditableRow
             label="Lead Value"
             value={lead.value ? parseFloat(lead.value).toLocaleString(undefined, { style: 'currency', currency: 'USD' }) : undefined}
             editing={editingField === 'value'}
             onStartEdit={() => setEditingField('value')}
+            editable={canEdit}
           >
             <input
               type="number"
@@ -325,6 +356,7 @@ export function LeadDetail() {
             value={lead.account ? <Link to={`/companies/${lead.account.id}`}>{lead.account.name}</Link> : undefined}
             editing={editingField === 'company'}
             onStartEdit={() => setEditingField('company')}
+            editable={canEdit}
           >
             <input
               type="text"
@@ -344,6 +376,8 @@ export function LeadDetail() {
           {convertedDeal && (
             <Row label="Converted to Deal" value={<Link to={`/deals/${convertedDeal.id}`}>{convertedDeal.name}</Link>} />
           )}
+          <Row label="Created By" value={lead.createdBy?.fullName} />
+          <Row label="Created" value={new Date(lead.createdAt).toLocaleDateString()} />
         </div>
         {lead.notes && (
           <div style={{ marginTop: 18, paddingTop: 18, borderTop: '1px solid var(--line)' }}>
@@ -416,6 +450,19 @@ export function LeadDetail() {
             navigate(`/deals/${deal.id}`);
           }}
         />
+      )}
+
+      {showQualifiedPrompt && (
+        <div className="modal-overlay" onClick={() => setShowQualifiedPrompt(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ marginTop: 0 }}>Lead qualified</h3>
+            <p>This lead is qualified — convert to a deal?</p>
+            <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+              <button className="btn" onClick={() => { setShowQualifiedPrompt(false); setShowConvertModal(true); }}>Convert</button>
+              <button className="btn secondary" onClick={() => setShowQualifiedPrompt(false)}>Not now</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -1,5 +1,8 @@
 export type Role = 'ADMIN' | 'SALES_MANAGER' | 'SALES_REP';
-export type LeadSource = 'IMPORT' | 'OUTREACH' | 'EMAIL' | 'CAMPAIGN' | 'REFERRAL' | 'WEBSITE' | 'SOCIAL_MEDIA' | 'EVENT' | 'PARTNER' | 'OTHER';
+export type LeadSource = 'IMPORT' | 'OUTREACH' | 'EMAIL' | 'CAMPAIGN' | 'REFERRAL' | 'WEBSITE' | 'SOCIAL_MEDIA' | 'EVENT' | 'PARTNER' | 'OTHER' | 'COLD_CALL' | 'ADVERTISEMENT';
+export type Salutation = 'MR' | 'MS' | 'MRS' | 'DR' | 'PROF';
+export type LeadRating = 'HOT' | 'WARM' | 'COLD';
+export type LeadUnqualifiedReason = 'NO_BUDGET' | 'NOT_A_FIT' | 'NO_RESPONSE' | 'COMPETITOR' | 'BAD_DATA';
 
 export interface User { id: string; fullName: string; email: string; role: Role; }
 
@@ -26,21 +29,40 @@ export interface Activity {
   creator: { id: string; fullName: string };
 }
 
+export interface LeadAttachment {
+  id: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  createdAt: string;
+}
+
 export interface Lead {
   id: string;
   leadName?: string;
+  salutation?: Salutation;
   firstName?: string;
   lastName?: string;
   email?: string;
+  emailOptIn?: boolean;
   phone?: string;
+  mobile?: string;
   jobTitle?: string;
+  linkedinUrl?: string;
   city?: string;
   value?: string;
   notes?: string;
   stage: LeadStage;
   source?: LeadSource;
+  sourceDetails?: string;
+  // 0-100 manual field, unrelated to the BANT budget/authority/need/timeline
+  // sum below (separate concept, separate scale).
   score: number;
+  rating?: LeadRating;
+  unqualifiedReason?: LeadUnqualifiedReason;
+  tags?: string[];
   owner?: { id: string; fullName: string };
+  createdBy?: { id: string; fullName: string };
   account?: { id: string; name: string };
   lastActivityAt?: string;
   // BANT qualification (0-10 each); qualificationNotes is free text.
@@ -96,11 +118,13 @@ export interface Account {
   city?: string;
   state?: string;
   country?: string;
+  postalCode?: string;
   email?: string;
   phone?: string;
   address?: string;
   description?: string;
   annualRevenue?: string;
+  currency?: Currency;
   stage: AccountStage;
   customerStage?: CustomerStage;
   owner?: { id: string; fullName: string };
@@ -117,13 +141,44 @@ export interface ImportAccountsResult {
   summary: { total: number; createdCount: number; errorCount: number };
 }
 
-export type DealType = 'NEW_BUSINESS' | 'EXISTING_BUSINESS' | 'RENEWAL';
+export type DealType = 'NEW_BUSINESS' | 'EXISTING_BUSINESS' | 'RENEWAL' | 'UPSELL';
 export type DealPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+export type Currency = 'USD' | 'EUR' | 'GBP' | 'INR';
+export type DealContactRole = 'CHAMPION' | 'DECISION_MAKER' | 'INFLUENCER' | 'BLOCKER';
+export type DecisionTimeframe = 'LESS_THAN_1_MONTH' | 'ONE_TO_3_MONTHS' | 'THREE_TO_6_MONTHS' | 'SIX_PLUS_MONTHS';
 
 export interface DealStage extends Stage {
   winProbability: number;
   isClosedWon: boolean;
   isClosedLost: boolean;
+}
+
+export interface LineItem {
+  id: string;
+  productName: string;
+  quantity: string;
+  unitPrice: string;
+}
+
+export interface DealContact {
+  contactId: string;
+  role: DealContactRole;
+  contact?: { id: string; firstName?: string; lastName?: string; email?: string };
+}
+
+export interface DealAttachment {
+  id: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  createdAt: string;
+}
+
+export interface StageHistoryEntry {
+  id: string;
+  stage: { id: string; name: string; color: string };
+  changedAt: string;
+  changedBy?: { id: string; fullName: string };
 }
 
 export interface Opportunity {
@@ -137,6 +192,16 @@ export interface Opportunity {
   lossReason?: string;
   description?: string;
   source?: string;
+  currency: Currency;
+  probabilityOverride?: number;
+  nextStep?: string;
+  nextActivityDate?: string;
+  competitor?: string;
+  budgetConfirmed?: boolean;
+  decisionTimeframe?: DecisionTimeframe;
+  painPoint?: string;
+  tags: string[];
+  partnerAccount?: { id: string; name: string };
   pipeline: { id: string; name: string };
   stage: DealStage;
   owner?: { id: string; fullName: string };
@@ -146,6 +211,9 @@ export interface Opportunity {
   archivedAt?: string;
   createdAt: string;
   updatedAt: string;
+  // Detail-view-only extras, populated by getDeal() but not listDeals().
+  lastActivityAt?: string;
+  daysInCurrentStage?: number;
 }
 
 export interface ImportOpportunityError { row: number; name?: string; message: string; }

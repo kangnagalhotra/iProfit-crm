@@ -1,27 +1,125 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import type {
-  Account, Lead, LeadSource, LeadStage, User,
+  Account, Currency, Lead, LeadRating, LeadSource, LeadStage, LeadUnqualifiedReason, Salutation, User,
 } from '../api/types';
-import { createLead, updateLead } from '../api/leads';
+import {
+  createLead, updateLead, checkDuplicateLead,
+} from '../api/leads';
+import type { DuplicateLeadMatch } from '../api/leads';
 import { listStages } from '../api/stages';
 import { listUsers } from '../api/users';
 import { listAccounts } from '../api/accounts';
+import { listAttachments, uploadAttachment, deleteAttachment } from '../api/leadAttachments';
 import { SearchSelect } from './SearchSelect';
 import type { SearchSelectOption } from './SearchSelect';
 import { CreateUserModal } from './CreateUserModal';
 import { CompanyForm } from './CompanyForm';
+import { FormSection } from './FormSection';
+import { TagsInput } from './TagsInput';
+import { FileUploadList } from './FileUploadList';
+import type { PendingOrUploadedFile } from './FileUploadList';
+import { ConvertToDealModal } from './ConvertToDealModal';
 import { useAuth } from '../context/AuthContext';
+import { COUNTRIES } from '../constants/countries';
+import { INDUSTRIES, COMPANY_SIZES } from '../constants/companyOptions';
 import {
   stripPhoneDigits, formatPhoneDisplay, isValidPhone, PHONE_ERROR_MESSAGE,
   stripEmailInput, isValidEmail, EMAIL_ERROR_MESSAGE,
 } from '../utils/validation';
 
-const SOURCES: LeadSource[] = ['OUTREACH', 'EMAIL', 'CAMPAIGN', 'REFERRAL', 'WEBSITE', 'SOCIAL_MEDIA', 'EVENT', 'PARTNER', 'OTHER'];
+const SOURCES: LeadSource[] = ['WEBSITE', 'REFERRAL', 'COLD_CALL', 'EVENT', 'SOCIAL_MEDIA', 'ADVERTISEMENT', 'PARTNER', 'OTHER'];
+const SALUTATIONS: Salutation[] = ['MR', 'MS', 'MRS', 'DR', 'PROF'];
+const SALUTATION_LABELS: Record<Salutation, string> = {
+  MR: 'Mr', MS: 'Ms', MRS: 'Mrs', DR: 'Dr', PROF: 'Prof',
+};
+const RATINGS: LeadRating[] = ['HOT', 'WARM', 'COLD'];
+const CURRENCIES: Currency[] = ['USD', 'EUR', 'GBP', 'INR'];
+const UNQUALIFIED_REASONS: { value: LeadUnqualifiedReason; label: string }[] = [
+  { value: 'NO_BUDGET', label: 'No Budget' },
+  { value: 'NOT_A_FIT', label: 'Not a Fit' },
+  { value: 'NO_RESPONSE', label: 'No Response' },
+  { value: 'COMPETITOR', label: 'Competitor' },
+  { value: 'BAD_DATA', label: 'Bad Data' },
+];
+const INDUSTRY_OPTIONS: SearchSelectOption[] = INDUSTRIES.map((v) => ({ value: v, label: v }));
+const SIZE_OPTIONS: SearchSelectOption[] = COMPANY_SIZES.map((v) => ({ value: v, label: v }));
+const LINKEDIN_RE = /^https?:\/\/([a-z]{2,3}\.)?linkedin\.com\/.+/i;
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return '?';
   return parts.slice(0, 2).map((p) => p[0].toUpperCase()).join('');
+}
+
+interface LeadFormState {
+  salutation: Salutation | '';
+  firstName: string;
+  lastName: string;
+  email: string;
+  emailOptIn: boolean;
+  phone: string;
+  mobile: string;
+  jobTitle: string;
+  linkedinUrl: string;
+  accountId: string;
+  companyName: string;
+  industry: string;
+  sizeBucket: string;
+  annualRevenue: string;
+  currency: Currency;
+  domain: string;
+  address: string;
+  addressCity: string;
+  state: string;
+  postalCode: string;
+  country: string;
+  source: LeadSource;
+  sourceDetails: string;
+  ownerId: string;
+  stageId: string;
+  score: string;
+  rating: LeadRating | '';
+  unqualifiedReason: LeadUnqualifiedReason | '';
+  tags: string[];
+  value: string;
+  notes: string;
+}
+
+function initialState(lead?: Lead, defaultStageId?: string): LeadFormState {
+  return {
+    salutation: lead?.salutation ?? '',
+    firstName: lead?.firstName ?? '',
+    lastName: lead?.lastName ?? '',
+    email: lead?.email ?? '',
+    emailOptIn: lead?.emailOptIn ?? true,
+    phone: stripPhoneDigits(lead?.phone ?? ''),
+    mobile: stripPhoneDigits(lead?.mobile ?? ''),
+    jobTitle: lead?.jobTitle ?? '',
+    linkedinUrl: lead?.linkedinUrl ?? '',
+    accountId: lead?.account?.id ?? '',
+    companyName: '',
+    industry: '',
+    sizeBucket: '',
+    annualRevenue: '',
+    currency: 'USD',
+    domain: '',
+    address: '',
+    addressCity: '',
+    state: '',
+    postalCode: '',
+    country: '',
+    source: (lead?.source ?? 'OTHER') as LeadSource,
+    sourceDetails: lead?.sourceDetails ?? '',
+    ownerId: lead?.owner?.id ?? '',
+    stageId: lead?.stage.id ?? defaultStageId ?? '',
+    score: lead?.score !== undefined && lead?.score !== null ? String(lead.score) : '',
+    rating: lead?.rating ?? '',
+    unqualifiedReason: lead?.unqualifiedReason ?? '',
+    tags: lead?.tags ?? [],
+    value: lead?.value ?? '',
+    notes: lead?.notes ?? '',
+  };
 }
 
 export function LeadForm({
@@ -34,25 +132,27 @@ export function LeadForm({
 }) {
   const { user: currentUser } = useAuth();
   const isEdit = !!lead;
-  const [form, setForm] = useState({
-    firstName: lead?.firstName ?? '', lastName: lead?.lastName ?? '', phone: stripPhoneDigits(lead?.phone ?? ''), email: lead?.email ?? '',
-    accountId: lead?.account?.id ?? '', companyName: '', jobTitle: lead?.jobTitle ?? '', city: lead?.city ?? '',
-    source: (lead?.source ?? 'OTHER') as LeadSource,
-    ownerId: lead?.owner?.id ?? '', stageId: lead?.stage.id ?? defaultStageId ?? '',
-    value: lead?.value ?? '', notes: lead?.notes ?? '',
-  });
+  const [form, setForm] = useState<LeadFormState>(() => initialState(lead, defaultStageId));
+  const [expanded, setExpanded] = useState(isEdit);
+  const [attachments, setAttachments] = useState<PendingOrUploadedFile[]>([]);
   const [stages, setStages] = useState<LeadStage[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [error, setError] = useState('');
   const [phoneError, setPhoneError] = useState('');
+  const [mobileError, setMobileError] = useState('');
   const [emailError, setEmailError] = useState('');
+  const [linkedinError, setLinkedinError] = useState('');
+  const [dupMatch, setDupMatch] = useState<DuplicateLeadMatch | null>(null);
   const [saving, setSaving] = useState(false);
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [showCreateCompany, setShowCreateCompany] = useState(false);
+  const [showQualifiedPrompt, setShowQualifiedPrompt] = useState(false);
+  const [convertingLead, setConvertingLead] = useState<Lead | null>(null);
 
   const canAddOwner = currentUser?.role === 'ADMIN' || currentUser?.role === 'SALES_MANAGER';
   const leadNamePreview = [form.firstName, form.lastName].filter(Boolean).join(' ');
+  const selectedStage = stages.find((s) => s.id === form.stageId);
 
   useEffect(() => {
     Promise.all([
@@ -69,10 +169,15 @@ export function LeadForm({
         if (defaultStage) set('stageId', defaultStage.id);
       }
     });
+    if (isEdit && lead) {
+      listAttachments(lead.id).then((files) => {
+        setAttachments(files.map((f) => ({ kind: 'uploaded', id: f.id, fileName: f.fileName, fileSize: f.fileSize })));
+      });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function set<K extends keyof typeof form>(k: K, v: (typeof form)[K]) {
+  function set<K extends keyof LeadFormState>(k: K, v: LeadFormState[K]) {
     setForm((f) => ({ ...f, [k]: v }));
   }
 
@@ -82,10 +187,38 @@ export function LeadForm({
     return true;
   }
 
+  function validateMobile(digits: string): boolean {
+    if (digits && !isValidPhone(digits)) { setMobileError(PHONE_ERROR_MESSAGE); return false; }
+    setMobileError('');
+    return true;
+  }
+
   function validateEmail(value: string): boolean {
     if (value && !isValidEmail(value)) { setEmailError(EMAIL_ERROR_MESSAGE); return false; }
     setEmailError('');
     return true;
+  }
+
+  function validateLinkedin(value: string): boolean {
+    if (value && !LINKEDIN_RE.test(value.trim())) { setLinkedinError('Enter a valid LinkedIn URL.'); return false; }
+    setLinkedinError('');
+    return true;
+  }
+
+  async function runDuplicateCheck() {
+    const companyName = form.companyName || accounts.find((a) => a.id === form.accountId)?.name;
+    try {
+      const result = await checkDuplicateLead({
+        email: form.email || undefined,
+        firstName: form.firstName || undefined,
+        lastName: form.lastName || undefined,
+        companyName,
+        excludeId: lead?.id,
+      });
+      setDupMatch(result);
+    } catch {
+      // duplicate check is advisory only — never block the form on failure
+    }
   }
 
   const ownerOptions: SearchSelectOption[] = [
@@ -98,25 +231,108 @@ export function LeadForm({
     if (accounts.some((a) => a.id === v)) { set('accountId', v); set('companyName', ''); } else { set('accountId', ''); set('companyName', v); }
   }
 
-  async function submit() {
-    setError('');
+  function onStageChange(newStageId: string) {
+    const prevStage = stages.find((s) => s.id === form.stageId);
+    const newStage = stages.find((s) => s.id === newStageId);
+    set('stageId', newStageId);
+    if (newStage?.isWon && !prevStage?.isWon) setShowQualifiedPrompt(true);
+  }
+
+  function validateForm(): boolean {
     const trimmedEmail = form.email.trim();
     if (trimmedEmail !== form.email) set('email', trimmedEmail);
-    if (!validatePhone(form.phone) || !validateEmail(trimmedEmail)) return;
-    if (form.value !== '' && Number(form.value) < 0) {
-      setError('Lead value cannot be negative.');
-      return;
+    if (!form.firstName.trim()) { setError('First name is required.'); return false; }
+    if (!form.lastName.trim()) { setError('Last name is required.'); return false; }
+    if (!form.accountId && !form.companyName.trim()) { setError('Company name is required.'); return false; }
+    if (!validatePhone(form.phone) || !validateMobile(form.mobile) || !validateEmail(trimmedEmail)) return false;
+    if (!trimmedEmail && !form.phone) { setError('Enter an email or a phone number.'); return false; }
+    if (form.linkedinUrl && !validateLinkedin(form.linkedinUrl)) { setExpanded(true); return false; }
+    if (selectedStage?.isLost && !form.unqualifiedReason) {
+      setExpanded(true);
+      setError('Unqualified reason is required for an unqualified lead.');
+      return false;
     }
+    if (form.value !== '' && Number(form.value) < 0) { setError('Lead value cannot be negative.'); return false; }
+    if (form.score !== '' && (Number(form.score) < 0 || Number(form.score) > 100)) {
+      setExpanded(true);
+      setError('Lead score must be between 0 and 100.');
+      return false;
+    }
+    setError('');
+    return true;
+  }
+
+  async function doSave(): Promise<Lead> {
+    const companyEnrichment = Object.fromEntries(
+      Object.entries({
+        industry: form.industry,
+        sizeBucket: form.sizeBucket,
+        annualRevenue: form.annualRevenue,
+        currency: form.currency,
+        domain: form.domain,
+        address: form.address,
+        city: form.addressCity,
+        state: form.state,
+        postalCode: form.postalCode,
+        country: form.country,
+      }).filter(([, v]) => v !== ''),
+    );
+
+    const payload: Record<string, any> = {
+      salutation: form.salutation || undefined,
+      firstName: form.firstName,
+      lastName: form.lastName,
+      email: form.email || undefined,
+      emailOptIn: form.emailOptIn,
+      phone: form.phone || undefined,
+      mobile: form.mobile || undefined,
+      jobTitle: form.jobTitle || undefined,
+      linkedinUrl: form.linkedinUrl || undefined,
+      accountId: form.accountId || undefined,
+      companyName: form.companyName || undefined,
+      companyEnrichment,
+      source: form.source,
+      sourceDetails: form.sourceDetails || undefined,
+      ownerId: form.ownerId || undefined,
+      stageId: form.stageId || undefined,
+      score: form.score !== '' ? Number(form.score) : undefined,
+      rating: form.rating || undefined,
+      unqualifiedReason: selectedStage?.isLost ? (form.unqualifiedReason || undefined) : undefined,
+      tags: form.tags,
+      value: form.value || undefined,
+      notes: form.notes || undefined,
+    };
+
+    const data = isEdit ? await updateLead(lead!.id, payload) : await createLead(payload);
+
+    const pendingFiles = attachments.filter((f) => f.kind === 'pending');
+    if (!isEdit && pendingFiles.length > 0) {
+      await Promise.allSettled(pendingFiles.map((f: any) => uploadAttachment(data.id, f.file)));
+    }
+
+    return data;
+  }
+
+  async function submit() {
+    if (!validateForm()) return;
     setSaving(true);
     try {
-      // strip empty strings so optional fields don't overwrite with blanks
-      const payload = Object.fromEntries(
-        Object.entries({ ...form, email: trimmedEmail }).filter(([, v]) => v !== ''),
-      );
-      const data = isEdit
-        ? await updateLead(lead!.id, payload)
-        : await createLead(payload);
+      const data = await doSave();
       onSaved(data);
+    } catch (e: any) {
+      setError(e.message ?? 'Could not save lead');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleConvertFromPrompt() {
+    setShowQualifiedPrompt(false);
+    if (!validateForm()) return;
+    setSaving(true);
+    try {
+      const data = await doSave();
+      setConvertingLead(data);
     } catch (e: any) {
       setError(e.message ?? 'Could not save lead');
     } finally {
@@ -127,84 +343,216 @@ export function LeadForm({
   return (
     <>
       <div className="modal-overlay" onClick={onClose}>
-        <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal modal-wide" onClick={(e) => e.stopPropagation()}>
           <h3 style={{ marginTop: 0 }}>{isEdit ? 'Edit lead' : 'Create lead'}</h3>
-          <div className="field"><label>First name</label>
-            <input value={form.firstName} onChange={(e) => set('firstName', e.target.value)} /></div>
-          <div className="field"><label>Last name</label>
-            <input value={form.lastName} onChange={(e) => set('lastName', e.target.value)} /></div>
-          <div className="field"><label>Phone</label>
-            <input
-              value={formatPhoneDisplay(form.phone)}
-              onChange={(e) => set('phone', stripPhoneDigits(e.target.value))}
-              onBlur={() => validatePhone(form.phone)}
-              placeholder="98765-43210"
-              inputMode="numeric"
-            />
-            {phoneError && <div className="error" style={{ margin: '4px 0 0' }}>{phoneError}</div>}
-          </div>
-          <div className="field"><label>Email</label>
-            <input
-              type="email"
-              value={form.email}
-              onChange={(e) => set('email', stripEmailInput(e.target.value))}
-              onBlur={(e) => {
-                const trimmed = e.target.value.trim();
-                set('email', trimmed);
-                validateEmail(trimmed);
-              }}
-            />
-            {emailError && <div className="error" style={{ margin: '4px 0 0' }}>{emailError}</div>}
+
+          <div className="form-grid-2">
+            <div className="field"><label>First name*</label>
+              <input value={form.firstName} onChange={(e) => set('firstName', e.target.value)} /></div>
+            <div className="field"><label>Last name*</label>
+              <input
+                value={form.lastName}
+                onChange={(e) => set('lastName', e.target.value)}
+                onBlur={() => { if (form.lastName && (form.companyName || form.accountId)) runDuplicateCheck(); }}
+              />
+            </div>
+            <div className="field field-span-2"><label>Company*</label>
+              <SearchSelect
+                options={companyOptions}
+                value={form.accountId || form.companyName}
+                onChange={setCompany}
+                allowCustom
+                placeholder="Search or type a new company…"
+                onCreateNew={() => setShowCreateCompany(true)}
+                createNewLabel="+ Add new company"
+              />
+            </div>
+            {leadNamePreview && (
+              <div className="field field-span-2">
+                <label>Lead name</label>
+                <div className="helper-text" style={{ marginTop: 0 }}>{leadNamePreview}</div>
+              </div>
+            )}
+            <div className="field"><label>Email</label>
+              <input
+                type="email"
+                value={form.email}
+                onChange={(e) => set('email', stripEmailInput(e.target.value))}
+                onBlur={(e) => {
+                  const trimmed = e.target.value.trim();
+                  set('email', trimmed);
+                  validateEmail(trimmed);
+                  if (trimmed) runDuplicateCheck();
+                }}
+              />
+              {emailError && <div className="error" style={{ margin: '4px 0 0' }}>{emailError}</div>}
+            </div>
+            <div className="field"><label>Phone</label>
+              <input
+                value={formatPhoneDisplay(form.phone)}
+                onChange={(e) => set('phone', stripPhoneDigits(e.target.value))}
+                onBlur={() => validatePhone(form.phone)}
+                placeholder="98765-43210"
+                inputMode="numeric"
+              />
+              {phoneError && <div className="error" style={{ margin: '4px 0 0' }}>{phoneError}</div>}
+            </div>
+            <div className="field"><label>Lead source*</label>
+              <select value={form.source} onChange={(e) => set('source', e.target.value as LeadSource)}>
+                {SOURCES.map((s) => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
+              </select>
+            </div>
+            <div className="field"><label>Status</label>
+              <select value={form.stageId} onChange={(e) => onStageChange(e.target.value)}>
+                {stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </div>
+            <div className="field"><label>Lead owner</label>
+              <SearchSelect
+                options={ownerOptions}
+                value={form.ownerId}
+                onChange={(v) => set('ownerId', v)}
+                placeholder="Search owner…"
+                renderAvatar={(opt) => (opt.value ? <div className="avatar avatar-sm">{initials(opt.label)}</div> : undefined)}
+                onCreateNew={canAddOwner ? () => setShowCreateUser(true) : undefined}
+                createNewLabel="+ Add new owner"
+              />
+            </div>
+            <div className="field field-span-2"><label>Notes</label>
+              <textarea
+                rows={3}
+                value={form.notes}
+                onChange={(e) => set('notes', e.target.value)}
+                style={{ width: '100%', padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 6, fontSize: 14, fontFamily: 'inherit' }}
+              />
+            </div>
           </div>
 
-          {leadNamePreview && (
-            <div className="field">
-              <label>Lead name</label>
-              <div className="helper-text" style={{ marginTop: 0 }}>{leadNamePreview}</div>
+          {dupMatch && (
+            <div className="duplicate-warning">
+              Possible duplicate: <strong>{dupMatch.name}</strong> — <Link to={`/leads/${dupMatch.id}`} target="_blank" rel="noreferrer">view lead</Link>
+              <button type="button" onClick={() => setDupMatch(null)} aria-label="Dismiss">×</button>
             </div>
           )}
-          <div className="field"><label>Company</label>
-            <SearchSelect
-              options={companyOptions}
-              value={form.accountId || form.companyName}
-              onChange={setCompany}
-              allowCustom
-              placeholder="Search or type a new company…"
-              onCreateNew={() => setShowCreateCompany(true)}
-              createNewLabel="+ Add new company"
-            />
-          </div>
-          <div className="field"><label>Job title</label>
-            <input value={form.jobTitle} onChange={(e) => set('jobTitle', e.target.value)} /></div>
-          <div className="field"><label>City</label>
-            <input value={form.city} onChange={(e) => set('city', e.target.value)} /></div>
-          <div className="field"><label>Lead source</label>
-            <select value={form.source} onChange={(e) => set('source', e.target.value as LeadSource)}>
-              {SOURCES.map((s) => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
-            </select>
-          </div>
-          <div className="field"><label>Owner</label>
-            <SearchSelect
-              options={ownerOptions}
-              value={form.ownerId}
-              onChange={(v) => set('ownerId', v)}
-              placeholder="Search owner…"
-              renderAvatar={(opt) => (opt.value ? <div className="avatar avatar-sm">{initials(opt.label)}</div> : undefined)}
-              onCreateNew={canAddOwner ? () => setShowCreateUser(true) : undefined}
-              createNewLabel="+ Add new owner"
-            />
-          </div>
-          <div className="field"><label>Stage</label>
-            <select value={form.stageId} onChange={(e) => set('stageId', e.target.value)}>
-              {stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          </div>
-          <div className="field"><label>Lead value</label>
-            <input type="number" min="0" value={form.value} onChange={(e) => set('value', e.target.value)} placeholder="0.00" /></div>
-          <div className="field"><label>Notes</label>
-            <textarea rows={3} value={form.notes} onChange={(e) => set('notes', e.target.value)}
-              style={{ width: '100%', padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 6, fontSize: 14, fontFamily: 'inherit' }} />
-          </div>
+
+          {!isEdit && (
+            <button type="button" className="link-btn" onClick={() => setExpanded((v) => !v)}>
+              {expanded ? 'Hide extra fields' : 'Show more fields'}
+            </button>
+          )}
+
+          {(isEdit || expanded) && (
+            <>
+              <FormSection title="Lead Information">
+                <div className="form-grid-2">
+                  <div className="field"><label>Salutation</label>
+                    <select value={form.salutation} onChange={(e) => set('salutation', e.target.value as Salutation | '')}>
+                      <option value="">—</option>
+                      {SALUTATIONS.map((s) => <option key={s} value={s}>{SALUTATION_LABELS[s]}</option>)}
+                    </select>
+                  </div>
+                  <div className="field"><label>Job title</label>
+                    <input value={form.jobTitle} onChange={(e) => set('jobTitle', e.target.value)} /></div>
+                  <div className="field"><label>Mobile</label>
+                    <input
+                      value={formatPhoneDisplay(form.mobile)}
+                      onChange={(e) => set('mobile', stripPhoneDigits(e.target.value))}
+                      onBlur={() => validateMobile(form.mobile)}
+                      placeholder="98765-43210"
+                      inputMode="numeric"
+                    />
+                    {mobileError && <div className="error" style={{ margin: '4px 0 0' }}>{mobileError}</div>}
+                  </div>
+                  <div className="field"><label>LinkedIn URL</label>
+                    <input
+                      value={form.linkedinUrl}
+                      onChange={(e) => set('linkedinUrl', e.target.value)}
+                      onBlur={(e) => validateLinkedin(e.target.value)}
+                      placeholder="https://linkedin.com/in/…"
+                    />
+                    {linkedinError && <div className="error" style={{ margin: '4px 0 0' }}>{linkedinError}</div>}
+                  </div>
+                  <div className="field"><label>Source details</label>
+                    <input value={form.sourceDetails} onChange={(e) => set('sourceDetails', e.target.value)} placeholder="Campaign name, referrer…" /></div>
+                  <div className="field">
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 22 }}>
+                      <input type="checkbox" checked={form.emailOptIn} onChange={(e) => set('emailOptIn', e.target.checked)} />
+                      Email opt-in
+                    </label>
+                  </div>
+                </div>
+              </FormSection>
+
+              <FormSection title="Company & Address">
+                <div className="helper-text" style={{ marginTop: 0, marginBottom: 10 }}>
+                  Fills in the company record only where information is still missing — existing company data is never overwritten.
+                </div>
+                <div className="form-grid-2">
+                  <div className="field"><label>Industry</label>
+                    <SearchSelect options={INDUSTRY_OPTIONS} value={form.industry} onChange={(v) => set('industry', v)} placeholder="Search industry…" allowCustom /></div>
+                  <div className="field"><label>Company size</label>
+                    <SearchSelect options={SIZE_OPTIONS} value={form.sizeBucket} onChange={(v) => set('sizeBucket', v)} placeholder="Search company size…" /></div>
+                  <div className="field"><label>Annual revenue</label>
+                    <input type="number" min="0" value={form.annualRevenue} onChange={(e) => set('annualRevenue', e.target.value)} /></div>
+                  <div className="field"><label>Currency</label>
+                    <select value={form.currency} onChange={(e) => set('currency', e.target.value as Currency)}>
+                      {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div className="field field-span-2"><label>Website</label>
+                    <input value={form.domain} onChange={(e) => set('domain', e.target.value)} placeholder="companyname.com" /></div>
+                  <div className="field field-span-2"><label>Street</label>
+                    <input value={form.address} onChange={(e) => set('address', e.target.value)} /></div>
+                  <div className="field"><label>City</label>
+                    <input value={form.addressCity} onChange={(e) => set('addressCity', e.target.value)} /></div>
+                  <div className="field"><label>State</label>
+                    <input value={form.state} onChange={(e) => set('state', e.target.value)} /></div>
+                  <div className="field"><label>Postal code</label>
+                    <input value={form.postalCode} onChange={(e) => set('postalCode', e.target.value)} /></div>
+                  <div className="field"><label>Country</label>
+                    <SearchSelect options={COUNTRIES} value={form.country} onChange={(v) => set('country', v)} placeholder="Search country…" /></div>
+                </div>
+              </FormSection>
+
+              <FormSection title="Lead Details">
+                <div className="form-grid-2">
+                  <div className="field"><label>Lead score</label>
+                    <input type="number" min="0" max="100" value={form.score} onChange={(e) => set('score', e.target.value)} placeholder="0–100" /></div>
+                  <div className="field"><label>Rating</label>
+                    <select value={form.rating} onChange={(e) => set('rating', e.target.value as LeadRating | '')}>
+                      <option value="">—</option>
+                      {RATINGS.map((r) => <option key={r} value={r}>{r.charAt(0) + r.slice(1).toLowerCase()}</option>)}
+                    </select>
+                  </div>
+                  <div className="field"><label>Lead value</label>
+                    <input type="number" min="0" value={form.value} onChange={(e) => set('value', e.target.value)} placeholder="0.00" /></div>
+                  {selectedStage?.isLost && (
+                    <div className="field"><label>Unqualified reason*</label>
+                      <select value={form.unqualifiedReason} onChange={(e) => set('unqualifiedReason', e.target.value as LeadUnqualifiedReason | '')}>
+                        <option value="">—</option>
+                        {UNQUALIFIED_REASONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+                      </select>
+                    </div>
+                  )}
+                </div>
+                <div className="field"><label>Tags</label>
+                  <TagsInput value={form.tags} onChange={(v) => set('tags', v)} />
+                </div>
+              </FormSection>
+
+              <FormSection title="Additional">
+                <div className="field"><label>Attachments</label>
+                  <FileUploadList
+                    parentId={lead?.id}
+                    value={attachments}
+                    onChange={setAttachments}
+                    uploadFn={uploadAttachment}
+                    deleteFn={deleteAttachment}
+                  />
+                </div>
+              </FormSection>
+            </>
+          )}
 
           {error && <div className="error">{error}</div>}
           <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
@@ -235,6 +583,27 @@ export function LeadForm({
             setCompany(newAccount.id);
             setShowCreateCompany(false);
           }}
+        />
+      )}
+
+      {showQualifiedPrompt && (
+        <div className="modal-overlay" onClick={() => setShowQualifiedPrompt(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ marginTop: 0 }}>Lead qualified</h3>
+            <p>This lead is qualified — convert to a deal?</p>
+            <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+              <button className="btn" onClick={handleConvertFromPrompt} disabled={saving}>Convert</button>
+              <button className="btn secondary" onClick={() => setShowQualifiedPrompt(false)}>Not now</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {convertingLead && (
+        <ConvertToDealModal
+          lead={convertingLead}
+          onClose={() => { onSaved(convertingLead); onClose(); }}
+          onConverted={() => { onSaved(convertingLead); onClose(); }}
         />
       )}
     </>

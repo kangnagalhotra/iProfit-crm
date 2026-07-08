@@ -38,7 +38,7 @@ function formatValue(value?: string) {
   return n.toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 }
 
-const LEAD_COLUMN_STAGES = ['New', 'Contacted', 'Attempted Contact'];
+const LEAD_COLUMN_STAGES = ['New', 'Contacted', 'Working'];
 
 interface PipelineColumn {
   id: string;

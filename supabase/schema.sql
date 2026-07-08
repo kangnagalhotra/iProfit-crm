@@ -26,8 +26,16 @@ create type role as enum ('ADMIN', 'SALES_MANAGER', 'SALES_REP');
 
 create type lead_source as enum (
   'IMPORT', 'OUTREACH', 'EMAIL', 'CAMPAIGN', 'REFERRAL', 'WEBSITE',
-  'SOCIAL_MEDIA', 'EVENT', 'PARTNER', 'OTHER'
+  'SOCIAL_MEDIA', 'EVENT', 'PARTNER', 'OTHER', 'COLD_CALL', 'ADVERTISEMENT'
 );
+
+create type lead_rating as enum ('HOT', 'WARM', 'COLD');
+
+create type lead_unqualified_reason as enum (
+  'NO_BUDGET', 'NOT_A_FIT', 'NO_RESPONSE', 'COMPETITOR', 'BAD_DATA'
+);
+
+create type salutation as enum ('MR', 'MS', 'MRS', 'DR', 'PROF');
 
 create type activity_type as enum ('CALL', 'EMAIL', 'MEETING', 'NOTE', 'FIELD_UPDATE');
 
@@ -37,9 +45,17 @@ create type task_status as enum ('NOT_STARTED', 'IN_PROGRESS', 'WAITING', 'COMPL
 
 create type task_priority as enum ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL');
 
-create type deal_type as enum ('NEW_BUSINESS', 'EXISTING_BUSINESS', 'RENEWAL');
+create type deal_type as enum ('NEW_BUSINESS', 'EXISTING_BUSINESS', 'RENEWAL', 'UPSELL');
 
 create type deal_priority as enum ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL');
+
+create type currency_code as enum ('USD', 'EUR', 'GBP', 'INR');
+
+create type deal_contact_role as enum ('CHAMPION', 'DECISION_MAKER', 'INFLUENCER', 'BLOCKER');
+
+create type deal_decision_timeframe as enum (
+  'LESS_THAN_1_MONTH', 'ONE_TO_3_MONTHS', 'THREE_TO_6_MONTHS', 'SIX_PLUS_MONTHS'
+);
 
 create type notification_type as enum (
   'RECORD_ASSIGNED', 'TASK_DUE', 'STAGE_CHANGED', 'MENTION', 'LEAD_INACTIVE', 'DEAL_INACTIVE', 'ACCOUNT_INACTIVE'
@@ -127,6 +143,8 @@ create table accounts (
   email varchar(255) check (email is null or email ~* '^[^@\s]+@[^@\s]+\.[^@\s]+$'),
   phone varchar(40) check (phone is null or phone ~ '^\+?[0-9]{10}$'),
   address varchar(255),
+  postal_code varchar(20),
+  currency currency_code not null default 'USD',
   description text,
   stage_id uuid not null references account_stages(id) on delete restrict,
   owner_id uuid references profiles(id) on delete set null,
@@ -162,22 +180,32 @@ create index lead_stages_order_idx on lead_stages("order");
 create table leads (
   id uuid primary key default gen_random_uuid(),
   lead_name varchar(200),
+  salutation salutation,
   first_name varchar(100),
   last_name varchar(100),
   email varchar(255) unique check (email is null or email ~* '^[^@\s]+@[^@\s]+\.[^@\s]+$'),
   phone varchar(40) check (phone is null or phone ~ '^\+?[0-9]{10}$'),
+  mobile varchar(40) check (mobile is null or mobile ~ '^\+?[0-9]{10}$'),
   job_title varchar(150),
+  linkedin_url varchar(500) check (linkedin_url is null or linkedin_url ~* '^https?://([a-z]{2,3}\.)?linkedin\.com/.*$'),
   city varchar(120),
   value numeric(15, 2) check (value is null or value >= 0),
   notes text,
   stage_id uuid not null references lead_stages(id) on delete restrict,
   source lead_source not null default 'OTHER',
-  score int not null default 0,
+  source_details varchar(255),
+  score int not null default 0 check (score between 0 and 100),
+  rating lead_rating,
+  unqualified_reason lead_unqualified_reason,
+  email_opt_in boolean not null default true,
+  tags text[] not null default '{}',
   owner_id uuid references profiles(id) on delete set null,
+  created_by uuid references profiles(id) on delete set null,
   account_id uuid references accounts(id) on delete set null,
   last_activity_at timestamptz,
   -- BANT qualification (Budget/Authority/Need/Timeline), each 0-10; shown as
-  -- a summed score out of 40 on the Lead Qualification card.
+  -- a summed score out of 40 on the Lead Qualification card. Separate and
+  -- unrelated to the 0-100 `score` column above (manual lead-score field).
   budget_score smallint check (budget_score is null or budget_score between 0 and 10),
   authority_score smallint check (authority_score is null or authority_score between 0 and 10),
   need_score smallint check (need_score is null or need_score between 0 and 10),
@@ -194,6 +222,9 @@ create table leads (
 create index leads_owner_id_idx on leads(owner_id);
 create index leads_stage_id_idx on leads(stage_id);
 create index leads_last_activity_at_idx on leads(last_activity_at);
+create index leads_created_by_idx on leads(created_by);
+create index leads_rating_idx on leads(rating);
+create index leads_tags_idx on leads using gin(tags);
 create trigger leads_set_updated_at before update on leads
   for each row execute function set_updated_at();
 
@@ -286,14 +317,83 @@ create table opportunities (
   closed_at timestamptz,
   last_inactivity_alert_at timestamptz, -- last time the 7-day-inactive alert fired; null until the first one
   archived_at timestamptz,
+  currency currency_code not null default 'USD',
+  probability_override int check (probability_override is null or probability_override between 0 and 100), -- null = inherit deal_stages.win_probability
+  next_step varchar(250),
+  next_activity_date timestamptz,
+  competitor varchar(150),
+  budget_confirmed boolean,
+  decision_timeframe deal_decision_timeframe,
+  pain_point text,
+  tags text[] not null default '{}',
+  partner_account_id uuid references accounts(id) on delete set null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 create index opportunities_owner_id_idx on opportunities(owner_id);
 create index opportunities_stage_id_idx on opportunities(stage_id);
 create index opportunities_pipeline_id_idx on opportunities(pipeline_id);
+create index opportunities_partner_account_id_idx on opportunities(partner_account_id);
+create index opportunities_tags_idx on opportunities using gin(tags);
+create index opportunities_next_activity_date_idx on opportunities(next_activity_date);
 create trigger opportunities_set_updated_at before update on opportunities
   for each row execute function set_updated_at();
+
+-- Additional contacts on a deal, each tagged with a role. The single
+-- opportunities.contact_id above stays as "Primary Contact" — orthogonal.
+create table deal_contacts (
+  id uuid primary key default gen_random_uuid(),
+  opportunity_id uuid not null references opportunities(id) on delete cascade,
+  contact_id uuid not null references contacts(id) on delete cascade,
+  role deal_contact_role not null,
+  created_at timestamptz not null default now(),
+  unique (opportunity_id, contact_id)
+);
+create index deal_contacts_opportunity_id_idx on deal_contacts(opportunity_id);
+create index deal_contacts_contact_id_idx on deal_contacts(contact_id);
+
+-- Repeatable product/qty/price rows. No trigger syncs the sum into
+-- opportunities.amount — that's a frontend-only convenience so Value stays
+-- independently overridable.
+create table deal_line_items (
+  id uuid primary key default gen_random_uuid(),
+  opportunity_id uuid not null references opportunities(id) on delete cascade,
+  product_name varchar(200) not null,
+  quantity numeric(12, 2) not null default 1 check (quantity > 0),
+  unit_price numeric(15, 2) not null default 0 check (unit_price >= 0),
+  sort_order int not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index deal_line_items_opportunity_id_idx on deal_line_items(opportunity_id);
+create trigger deal_line_items_set_updated_at before update on deal_line_items
+  for each row execute function set_updated_at();
+
+create table deal_attachments (
+  id uuid primary key default gen_random_uuid(),
+  opportunity_id uuid not null references opportunities(id) on delete cascade,
+  file_name varchar(255) not null,
+  storage_path text not null unique,
+  file_size bigint not null check (file_size > 0),
+  mime_type varchar(150) not null,
+  uploaded_by uuid not null references profiles(id) on delete restrict,
+  created_at timestamptz not null default now()
+);
+create index deal_attachments_opportunity_id_idx on deal_attachments(opportunity_id);
+create index deal_attachments_uploaded_by_idx on deal_attachments(uploaded_by);
+
+create table lead_attachments (
+  id uuid primary key default gen_random_uuid(),
+  lead_id uuid not null references leads(id) on delete cascade,
+  file_name varchar(255) not null,
+  storage_path text not null unique,
+  file_size bigint not null check (file_size > 0),
+  mime_type varchar(150) not null,
+  uploaded_by uuid not null references profiles(id) on delete restrict,
+  created_at timestamptz not null default now()
+);
+create index lead_attachments_lead_id_idx on lead_attachments(lead_id);
+create index lead_attachments_uploaded_by_idx on lead_attachments(uploaded_by);
 
 create table stage_history (
   id uuid primary key default gen_random_uuid(),
@@ -379,4 +479,38 @@ create table assignment_state (
   id boolean primary key default true check (id), -- singleton row
   last_user_id uuid references profiles(id) on delete set null
 );
+
+-- ---------------------------------------------------------------------------
+-- STORAGE — deal attachments (private bucket; access via RLS on
+-- storage.objects, see rls.sql). Path convention: {opportunity_id}/{uuid}-{filename}.
+-- ---------------------------------------------------------------------------
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'deal-attachments', 'deal-attachments', false, 26214400,
+  array[
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'image/png', 'image/jpeg', 'image/webp'
+  ]
+)
+on conflict (id) do nothing;
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'lead-attachments', 'lead-attachments', false, 26214400,
+  array[
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'image/png', 'image/jpeg', 'image/webp'
+  ]
+)
+on conflict (id) do nothing;
+
 insert into assignment_state (id, last_user_id) values (true, null);

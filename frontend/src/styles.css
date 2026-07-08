@@ -136,6 +136,57 @@ tr.clickable-row:hover td { background: var(--pale); }
 .chip { font-size: 12px; padding: 3px 9px; border-radius: 999px; background: var(--pale); color: var(--navy-text); border: 1px solid rgba(0,0,0,.06); }
 .modal-overlay { position: fixed; inset: 0; background: rgba(16,24,40,.45); display: flex; justify-content: flex-end; z-index: 50; }
 .modal { width: 440px; background: var(--surface); height: 100%; padding: var(--space-7); overflow-y: auto; box-shadow: var(--shadow-xl); }
+.modal.modal-wide { width: 640px; }
+
+.form-section { border-top: 1px solid var(--line); padding-top: var(--space-5); margin-top: var(--space-5); }
+.form-section:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+.form-section-header { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
+.form-section-header h4 { margin: 0; flex: 1; font-size: var(--font-md); font-weight: 600; }
+.form-section-chevron { background: none; border: none; color: var(--muted); cursor: pointer; padding: 2px; display: flex; transition: transform .15s ease; }
+.form-section-chevron.collapsed { transform: rotate(-90deg); }
+.form-section-body { margin-top: 14px; }
+.form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+.form-grid-2 .field-span-2 { grid-column: 1 / -1; }
+.link-btn { background: none; border: none; color: var(--blue); font-size: 13px; font-weight: 600; cursor: pointer; padding: 0; margin: 4px 0 10px; }
+.link-btn:hover { text-decoration: underline; }
+
+.multi-contact-rows { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.multi-contact-row { display: flex; align-items: center; gap: 8px; }
+.multi-contact-name { flex: 1; font-size: 14px; }
+.row-remove-btn { background: none; border: none; color: var(--muted); cursor: pointer; padding: 4px; display: flex; }
+.row-remove-btn:hover { color: #b91c1c; }
+
+.line-items-editor { margin-top: 4px; }
+.line-items-header-row, .line-items-row { display: grid; grid-template-columns: 2fr 70px 100px 100px 28px; gap: 8px; align-items: center; }
+.line-items-header-row { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .02em; margin-bottom: 6px; }
+.line-items-row { margin-bottom: 8px; }
+.line-item-total { font-size: 14px; font-weight: 600; text-align: right; }
+
+.tags-input { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.tags-input:focus-within { border-color: var(--blue); box-shadow: var(--focus-ring); }
+.chip-removable { display: inline-flex; align-items: center; gap: 5px; }
+.chip-removable button { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 14px; line-height: 1; padding: 0; }
+.chip-removable button:hover { color: #b91c1c; }
+.tags-input-field { flex: 1; min-width: 80px; border: none; outline: none; font-size: 14px; padding: 3px 2px; background: none; color: var(--ink); }
+
+.file-upload-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.file-upload-row { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.file-upload-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.duplicate-warning {
+  display: flex; align-items: center; gap: 8px;
+  background: #FEF3C7; border: 1px solid #FDE68A; color: #92400E;
+  border-radius: var(--radius-sm); padding: 8px 12px; font-size: 13px; margin: 4px 0 14px;
+}
+.duplicate-warning a { color: #92400E; text-decoration: underline; font-weight: 600; }
+.duplicate-warning button { margin-left: auto; background: none; border: none; color: #92400E; cursor: pointer; font-size: 15px; line-height: 1; padding: 0; }
+
+.lead-locked-badge { background: #F3F4F6; color: var(--muted); }
+.file-upload-size { color: var(--muted); }
+
+.stage-history-list { display: flex; flex-direction: column; gap: 10px; }
+.stage-history-row { display: flex; align-items: center; gap: 10px; }
+.stage-history-meta { font-size: 12px; color: var(--muted); }
 .field { margin-bottom: 14px; }
 .field label { display: block; font-size: 13px; margin-bottom: 5px; color: var(--muted); }
 .field input, .field select { width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: var(--radius-sm); font-size: 14px; transition: border-color .1s ease, box-shadow .1s ease; }
