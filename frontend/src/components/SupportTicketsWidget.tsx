@@ -6,6 +6,7 @@ import { SupportTicketForm } from './SupportTicketForm';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 import { Icon } from './Icon';
+import { EmptyState } from './EmptyState';
 
 const STATUSES: TicketStatus[] = ['OPEN', 'IN_PROGRESS', 'WAITING_ON_CUSTOMER', 'RESOLVED', 'CLOSED'];
 
@@ -59,10 +60,7 @@ export function SupportTicketsWidget({ accountId }: { accountId: string }) {
         {loading ? (
           <div className="skeleton-row"><div className="skeleton-lines"><div className="skeleton-line" /><div className="skeleton-line short" /></div></div>
         ) : tickets.length === 0 ? (
-          <div className="empty-state">
-            <span className="icon"><Icon name="check" size={18} /></span>
-            <p>No support tickets yet.</p>
-          </div>
+          <EmptyState icon="check" description="No support tickets yet." size="sm" />
         ) : tickets.map((ticket) => (
           <div key={ticket.id} className="task-card">
             <div className="task-card-top">

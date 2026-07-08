@@ -3,10 +3,11 @@ import Papa from 'papaparse';
 import { bulkImport } from '../api/bulkImport';
 import { downloadExcelTemplate } from '../utils/excelTemplate';
 
-const TEMPLATE_HEADERS = ['Task Name', 'Type', 'Priority', 'Due Date', 'Status', 'Related Module', 'Related Record'];
+const TEMPLATE_HEADERS = ['Task Title', 'Type', 'Priority', 'Due Date', 'Status', 'Related Module', 'Related Record'];
 const TEMPLATE_SAMPLE = ['Follow up call', 'CALL', 'HIGH', '2026-09-01', 'Not Started', 'Deal', 'Acme Renewal'];
 
 const HEADER_MAP: Record<string, string> = {
+  'task title': 'title',
   'task name': 'title',
   name: 'title',
   title: 'title',
@@ -44,7 +45,7 @@ function mapRow(raw: Record<string, string>): PreviewRow {
     if (field && value?.trim()) mapped[field] = value.trim();
   }
   if (mapped.relatedModule) mapped.relatedModule = mapped.relatedModule.toLowerCase().replace('company', 'account').replace('deal', 'opportunity');
-  if (!mapped.title) return { ...mapped, valid: false, reason: 'Missing task name' };
+  if (!mapped.title) return { ...mapped, valid: false, reason: 'Missing task title' };
   if (!mapped.dueAt) return { ...mapped, valid: false, reason: 'Missing due date' };
   return {
     title: mapped.title,
@@ -113,7 +114,7 @@ export function TaskImport({ onClose, onImported }: { onClose: () => void; onImp
         {!result && (
           <>
             <div className="field">
-              <label>CSV file (Task Name, Type, Priority, Due Date, Status, Related Module, Related Record)</label>
+              <label>CSV file (Task Title, Type, Priority, Due Date, Status, Related Module, Related Record)</label>
               <input
                 type="file"
                 accept=".csv,text/csv"
@@ -139,7 +140,7 @@ export function TaskImport({ onClose, onImported }: { onClose: () => void; onImp
                 <div style={{ maxHeight: 260, overflowY: 'auto', border: '1px solid var(--line)', borderRadius: 8 }}>
                   <table>
                     <thead>
-                      <tr><th>Name</th><th>Due Date</th><th>Status</th><th>Related</th></tr>
+                      <tr><th>Title</th><th>Due Date</th><th>Status</th><th>Related</th></tr>
                     </thead>
                     <tbody>
                       {rows.map((r, i) => (
@@ -174,7 +175,7 @@ export function TaskImport({ onClose, onImported }: { onClose: () => void; onImp
             {result.errors.length > 0 && (
               <div style={{ maxHeight: 220, overflowY: 'auto', border: '1px solid var(--line)', borderRadius: 8 }}>
                 <table>
-                  <thead><tr><th>Row</th><th>Name</th><th>Reason</th></tr></thead>
+                  <thead><tr><th>Row</th><th>Title</th><th>Reason</th></tr></thead>
                   <tbody>
                     {result.errors.map((e) => (
                       <tr key={e.row}><td>{e.row}</td><td>{e.title ?? '—'}</td><td>{e.message}</td></tr>

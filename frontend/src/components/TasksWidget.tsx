@@ -8,6 +8,7 @@ import { TaskForm } from './TaskForm';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 import { Icon } from './Icon';
+import { EmptyState } from './EmptyState';
 
 const STATUSES: TaskStatus[] = ['NOT_STARTED', 'IN_PROGRESS', 'WAITING', 'COMPLETED', 'CANCELLED'];
 
@@ -72,10 +73,7 @@ export function TasksWidget({
             <div className="skeleton-row"><div className="skeleton-lines"><div className="skeleton-line" /><div className="skeleton-line short" /></div></div>
           </>
         ) : tasks.length === 0 ? (
-          <div className="empty-state">
-            <span className="icon"><Icon name="check" size={18} /></span>
-            <p>No tasks yet — add one to keep this moving.</p>
-          </div>
+          <EmptyState icon="check" description="No tasks yet — add one to keep this moving." size="sm" />
         ) : tasks.map((task) => (
           <div key={task.id} className="task-card">
             <div className="task-card-top">

@@ -16,6 +16,10 @@ import { AddActivityModal } from '../components/AddActivityModal';
 import { LeadQualificationCard } from '../components/LeadQualificationCard';
 import { ConvertToDealModal } from '../components/ConvertToDealModal';
 import { Icon } from '../components/Icon';
+import { CollapsibleCard } from '../components/CollapsibleCard';
+import { AssociationsPanel } from '../components/AssociationsPanel';
+import type { AssociationGroup } from '../components/AssociationsPanel';
+import { SkeletonDetailPage } from '../components/Skeleton';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 import { timeAgo } from '../utils/timeAgo';
@@ -106,7 +110,7 @@ export function LeadDetail() {
     return () => document.removeEventListener('mousedown', onDocClick);
   }, []);
 
-  if (!lead) return <p>Loading…</p>;
+  if (!lead) return <SkeletonDetailPage />;
 
   const name = lead.leadName || [lead.firstName, lead.lastName].filter(Boolean).join(' ') || lead.email || 'Untitled lead';
 
@@ -260,8 +264,7 @@ export function LeadDetail() {
       </div>
 
       <div className="detail-sidebar">
-      <div className="card">
-        <h3 style={{ marginTop: 0 }}>Key information</h3>
+      <CollapsibleCard title="Key information" storageKey="collapsible:lead:key-info">
         <div className="key-info">
           <EditableRow
             label="Lead owner"
@@ -348,11 +351,37 @@ export function LeadDetail() {
             <div style={{ fontSize: 14, whiteSpace: 'pre-wrap' }}>{lead.notes}</div>
           </div>
         )}
-      </div>
+      </CollapsibleCard>
       <LeadQualificationCard lead={lead} onSaved={setLead} />
       </div>
 
       <div className="detail-main">
+      <AssociationsPanel
+        groups={[
+          {
+            key: 'company',
+            label: 'Company',
+            icon: 'building',
+            emptyLabel: 'Not linked to a company yet.',
+            items: lead.account ? [lead.account] : [],
+            onRowClick: (a: { id: string; name: string }) => navigate(`/companies/${a.id}`),
+            columns: [
+              { header: 'Company Name', render: (a: { id: string; name: string }) => <Link to={`/companies/${a.id}`} onClick={(e) => e.stopPropagation()}>{a.name}</Link> },
+            ],
+          },
+          {
+            key: 'deal',
+            label: 'Deal',
+            icon: 'dollar',
+            emptyLabel: 'Not converted to a deal yet.',
+            items: convertedDeal ? [convertedDeal] : [],
+            onRowClick: (d: { id: string; name: string }) => navigate(`/deals/${d.id}`),
+            columns: [
+              { header: 'Deal Name', render: (d: { id: string; name: string }) => <Link to={`/deals/${d.id}`} onClick={(e) => e.stopPropagation()}>{d.name}</Link> },
+            ],
+          },
+        ] as AssociationGroup[]}
+      />
       <ActivityTimeline key={activityKey} leadId={lead.id} />
       <TasksWidget key={activityKey} leadId={lead.id} />
       <NotesSection leadId={lead.id} />

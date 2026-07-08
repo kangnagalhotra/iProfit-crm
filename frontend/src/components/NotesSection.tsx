@@ -6,7 +6,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
-import { Icon } from './Icon';
+import { EmptyState } from './EmptyState';
 
 const textareaStyle = {
   width: '100%', padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 6, fontSize: 14, fontFamily: 'inherit',
@@ -96,10 +96,7 @@ export function NotesSection({
             <div className="skeleton-row"><div className="skeleton-lines"><div className="skeleton-line" /><div className="skeleton-line short" /></div></div>
           </>
         ) : notes.length === 0 ? (
-          <div className="empty-state">
-            <span className="icon"><Icon name="note" size={18} /></span>
-            <p>No notes yet.</p>
-          </div>
+          <EmptyState icon="note" description="No notes yet." size="sm" />
         ) : notes.map((note) => {
           const isOwn = note.creator.id === user?.id;
           return (

@@ -16,7 +16,21 @@ import { SupportTicketDetail } from './pages/SupportTicketDetail';
 import { TasksPage } from './pages/TasksPage';
 import { TaskDetail } from './pages/TaskDetail';
 import { NotificationBell } from './components/NotificationBell';
+import { GlobalSearch } from './components/GlobalSearch';
+import { Icon } from './components/Icon';
+import type { IconName } from './components/Icon';
 import type { ReactNode } from 'react';
+
+const NAV_LINKS: { to: string; label: string; icon: IconName; end?: boolean }[] = [
+  { to: '/', label: 'Home', icon: 'home', end: true },
+  { to: '/leads', label: 'Leads', icon: 'person' },
+  { to: '/companies', label: 'Companies', icon: 'building' },
+  { to: '/deals', label: 'Deals', icon: 'dollar' },
+  { to: '/pipeline', label: 'Pipeline', icon: 'columns' },
+  { to: '/customer-success', label: 'Customer Success', icon: 'headset' },
+  { to: '/support-tickets', label: 'Support Tickets', icon: 'ticket' },
+  { to: '/tasks', label: 'Tasks', icon: 'checklist' },
+];
 
 function Shell({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth();
@@ -27,19 +41,17 @@ function Shell({ children }: { children: ReactNode }) {
       <aside className="sidebar">
         <h1>iProfit CRM</h1>
         <nav>
-          <NavLink to="/" end>Home</NavLink>
-          <NavLink to="/leads">Leads</NavLink>
-          <NavLink to="/companies">Companies</NavLink>
-          <NavLink to="/deals">Deals</NavLink>
-          <NavLink to="/pipeline">Pipeline</NavLink>
-          <NavLink to="/customer-success">Customer Success</NavLink>
-          <NavLink to="/support-tickets">Support Tickets</NavLink>
-          <NavLink to="/tasks">Tasks</NavLink>
+          {NAV_LINKS.map((l) => (
+            <NavLink key={l.to} to={l.to} end={l.end}>
+              <Icon name={l.icon} size={18} />
+              <span>{l.label}</span>
+            </NavLink>
+          ))}
         </nav>
       </aside>
       <div className="main">
         <div className="topbar">
-          <div />
+          <GlobalSearch />
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <button
               className="btn secondary"

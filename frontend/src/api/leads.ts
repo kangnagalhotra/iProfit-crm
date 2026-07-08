@@ -1,5 +1,7 @@
 import { supabase } from '../lib/supabase';
-import type { Lead, Opportunity, Paginated } from './types';
+import type {
+  Lead, LeadSource, Opportunity, Paginated,
+} from './types';
 import { createDeal } from './deals';
 import { createContact } from './contacts';
 
@@ -45,7 +47,7 @@ function mapLead(row: any): Lead {
 export interface ListLeadsParams {
   page?: number; pageSize?: number; sortBy?: string; sortDir?: 'asc' | 'desc';
   search?: string; stageId?: string; ownerId?: string; accountId?: string; createdAfter?: string;
-  includeArchived?: boolean;
+  source?: LeadSource; includeArchived?: boolean;
 }
 
 export async function listLeads(params: ListLeadsParams = {}): Promise<Paginated<Lead>> {
@@ -58,6 +60,7 @@ export async function listLeads(params: ListLeadsParams = {}): Promise<Paginated
   if (params.ownerId) query = query.eq('owner_id', params.ownerId);
   if (params.accountId) query = query.eq('account_id', params.accountId);
   if (params.createdAfter) query = query.gte('created_at', params.createdAfter);
+  if (params.source) query = query.eq('source', params.source);
   if (params.search) {
     const term = `%${params.search}%`;
     query = query.or(`first_name.ilike.${term},last_name.ilike.${term},email.ilike.${term}`);

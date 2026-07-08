@@ -47,7 +47,7 @@ where p.name = 'Sales Pipeline'
 
 insert into account_stages (name, "order", color, is_default, is_customer_stage, is_inactive_stage)
 select * from (values
-  ('Prospect',          1, '#025ADF'::stage_color, true,  false, false),
+  ('Lead',              1, '#025ADF'::stage_color, true,  false, false),
   ('Customer',          2, '#16A34A'::stage_color, false, true,  false),
   ('Strategic Account', 3, '#8B5CF6'::stage_color, false, true,  false),
   ('On Hold',           4, '#F97316'::stage_color, false, false, false),

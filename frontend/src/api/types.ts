@@ -96,7 +96,6 @@ export interface Account {
   city?: string;
   state?: string;
   country?: string;
-  companyType?: string;
   email?: string;
   phone?: string;
   address?: string;
@@ -119,6 +118,7 @@ export interface ImportAccountsResult {
 }
 
 export type DealType = 'NEW_BUSINESS' | 'EXISTING_BUSINESS' | 'RENEWAL';
+export type DealPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 
 export interface DealStage extends Stage {
   winProbability: number;
@@ -133,6 +133,8 @@ export interface Opportunity {
   closeDate?: string;
   closedAt?: string;
   dealType: DealType;
+  priority: DealPriority;
+  lossReason?: string;
   description?: string;
   source?: string;
   pipeline: { id: string; name: string };

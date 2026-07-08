@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Icon } from './Icon';
 
 // A shared visual shell only — no PATCH/business logic. Each detail page keeps
 // its own `editingField` state and decides what onStartEdit does (open an inline
@@ -29,7 +30,7 @@ export function EditableRow({
           <span className="editable-row-display">
             {value}
             {editable && (
-              <button type="button" className="edit-icon" onClick={onStartEdit} title={`Edit ${label}`}>✎</button>
+              <button type="button" className="edit-icon" onClick={onStartEdit} title={`Edit ${label}`}><Icon name="edit" size={12} /></button>
             )}
           </span>
         )}

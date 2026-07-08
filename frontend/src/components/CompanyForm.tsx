@@ -13,9 +13,6 @@ import {
 } from '../utils/validation';
 
 const COMPANY_SIZES = ['1-10', '11-50', '51-100', '101-250', '251-500', '501-1000', '1001-5000', '5001-10000', '10000+'];
-const COMPANY_TYPES = [
-  'Prospect', 'Customer', 'Partner', 'Vendor', 'Agency', 'Reseller', 'Startup', 'Enterprise', 'Other',
-];
 const INDUSTRIES = [
   'Technology', 'Finance', 'Healthcare', 'Retail', 'Manufacturing', 'Education', 'Real Estate', 'Hospitality',
   'Telecommunications', 'Media & Entertainment', 'Transportation & Logistics', 'Construction', 'Energy',
@@ -54,7 +51,7 @@ export function CompanyForm({
   const [form, setForm] = useState({
     name: account?.name ?? '', domain: account?.domain ? stripWww(account.domain) : '', industry: account?.industry ?? '',
     sizeBucket: account?.sizeBucket ?? '', annualRevenue: account?.annualRevenue ?? '',
-    companyType: account?.companyType ?? '', email: account?.email ?? '', phone: stripPhoneDigits(account?.phone ?? ''),
+    email: account?.email ?? '', phone: stripPhoneDigits(account?.phone ?? ''),
     address: account?.address ?? '', description: account?.description ?? '',
     city: account?.city ?? '', state: account?.state ?? '', country: account?.country ?? '',
     ownerId: account?.owner?.id ?? '', stageId: account?.stage.id ?? defaultStageId ?? '',
@@ -175,31 +172,22 @@ export function CompanyForm({
           <div className="helper-text">Enter only the domain name.</div>
           {domainError && <div className="error" style={{ margin: '4px 0 0' }}>{domainError}</div>}
         </div>
-        <div className="field"><label>Company size</label>
+        <div className="field"><label>Number of employees</label>
           <SearchSelect
             options={toOptions(COMPANY_SIZES)}
             value={form.sizeBucket}
             onChange={(v) => set('sizeBucket', v)}
-            placeholder="Search company size…"
+            placeholder="Search number of employees…"
           />
         </div>
         <div className="field"><label>Annual revenue</label>
           <input type="number" min="0" value={form.annualRevenue} onChange={(e) => set('annualRevenue', e.target.value)} /></div>
-        <div className="field"><label>Company type</label>
-          <SearchSelect
-            options={toOptions(COMPANY_TYPES)}
-            value={form.companyType}
-            onChange={(v) => set('companyType', v)}
-            placeholder="Search company type…"
-            allowCustom
-          />
-        </div>
-        <div className="field"><label>Status</label>
+        <div className="field"><label>Lifecycle Stage</label>
           <SearchSelect
             options={stageOptions}
             value={form.stageId}
             onChange={(v) => set('stageId', v)}
-            placeholder="Search status…"
+            placeholder="Search lifecycle stage…"
           />
         </div>
         <div className="field"><label>Email</label>

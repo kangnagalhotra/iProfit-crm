@@ -7,6 +7,8 @@ import { listStages, createStage } from '../api/stages';
 import { Kanban } from './kanban/Kanban';
 import type { KanbanColumn } from './kanban/Kanban';
 import { StageColumnHeader } from './kanban/StageColumnHeader';
+import { Icon } from './Icon';
+import { SkeletonKanban } from './Skeleton';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 
@@ -107,7 +109,7 @@ export function CustomerSuccessKanban() {
     }
   }
 
-  if (loading) return <p>Loading…</p>;
+  if (loading) return <SkeletonKanban columns={stages.length || 4} />;
 
   const stageIds = stages.map((s) => s.id);
   const columns: KanbanColumn<Account>[] = stages.map((stage) => ({
@@ -141,7 +143,7 @@ export function CustomerSuccessKanban() {
         }}
         emptyState={() => (
           <div className="kanban-empty">
-            <div className="icon">🎉</div>
+            <div className="icon"><Icon name="sparkle" size={18} /></div>
             <p>No customers in this stage yet</p>
           </div>
         )}
@@ -177,7 +179,7 @@ export function CustomerSuccessKanban() {
                   {account.owner && <div className="avatar avatar-sm" title={account.owner.fullName}>{initials(account.owner.fullName)}</div>}
                 </div>
                 <div className="kanban-card-footer">
-                  <span className="kanban-card-badge">🕐 Updated {new Date(account.updatedAt).toLocaleDateString()}</span>
+                  <span className="kanban-card-badge"><Icon name="clock" size={11} /> Updated {new Date(account.updatedAt).toLocaleDateString()}</span>
                 </div>
               </Link>
               <div className="kanban-card-actions">
@@ -185,7 +187,7 @@ export function CustomerSuccessKanban() {
                   title="View"
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate(`/companies/${account.id}`); }}
-                >👁</button>
+                ><Icon name="eye" size={13} /></button>
               </div>
             </>
           );

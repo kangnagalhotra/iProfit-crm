@@ -14,6 +14,7 @@ import { getTicketSummary } from '../api/supportTickets';
 import { listStages } from '../api/stages';
 import { listUsers } from '../api/users';
 import { countByDay, countBy } from '../utils/aggregate';
+import { SkeletonCards } from '../components/Skeleton';
 
 type RangeOption = 7 | 30 | 90;
 
@@ -192,7 +193,7 @@ export function Dashboard() {
         )}
       </div>
 
-      {loading ? <p>Loading…</p> : (
+      {loading ? <SkeletonCards count={5} height={CHART_HEIGHT} /> : (
         <div className="dashboard-grid">
           <div className="card">
             <div className="label">New Leads Created</div>
@@ -258,7 +259,7 @@ export function Dashboard() {
         </div>
       )}
 
-      {overviewLoading ? <p>Loading overview…</p> : (
+      {overviewLoading ? <SkeletonCards count={4} height={40} /> : (
         <>
           <h3 style={{ marginTop: 28 }}>Leads Overview</h3>
           <div className="dashboard-grid">

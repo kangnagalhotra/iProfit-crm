@@ -4,6 +4,7 @@ import type { Notification } from '../api/types';
 import {
   listNotifications, markNotificationRead, markAllNotificationsRead,
 } from '../api/notifications';
+import { EmptyState } from './EmptyState';
 
 export function NotificationBell() {
   const navigate = useNavigate();
@@ -58,7 +59,7 @@ export function NotificationBell() {
             {unreadCount > 0 && <button className="copy-btn" onClick={markAllRead}>Mark all read</button>}
           </div>
           {notifications.length === 0 ? (
-            <p style={{ color: 'var(--muted)', padding: '10px 14px' }}>No notifications yet.</p>
+            <EmptyState icon="check" description="No notifications yet." size="sm" />
           ) : notifications.map((n) => (
             <button
               key={n.id}

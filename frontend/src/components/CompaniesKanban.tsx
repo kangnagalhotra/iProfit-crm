@@ -7,6 +7,8 @@ import { Kanban } from './kanban/Kanban';
 import type { KanbanColumn } from './kanban/Kanban';
 import { StageColumnHeader } from './kanban/StageColumnHeader';
 import { CompanyForm } from './CompanyForm';
+import { Icon } from './Icon';
+import { SkeletonKanban } from './Skeleton';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
@@ -93,7 +95,7 @@ export function CompaniesKanban() {
     }
   }
 
-  if (loading) return <p>Loading…</p>;
+  if (loading) return <SkeletonKanban columns={stages.length || 4} />;
 
   const stageIds = stages.map((s) => s.id);
   const columns: KanbanColumn<Account>[] = stages.map((stage) => ({
@@ -130,7 +132,7 @@ export function CompaniesKanban() {
         )}
         emptyState={(col) => (
           <div className="kanban-empty">
-            <div className="icon">📭</div>
+            <div className="icon"><Icon name="inbox" size={18} /></div>
             <p>No companies in this stage</p>
             <button className="btn secondary" onClick={() => setFormState({ defaultStageId: col.id })}>+ Add company</button>
           </div>
@@ -161,7 +163,7 @@ export function CompaniesKanban() {
                 {account.owner && <div className="avatar avatar-sm" title={account.owner.fullName}>{initials(account.owner.fullName)}</div>}
               </div>
               <div className="kanban-card-footer">
-                <span className="kanban-card-badge">🕐 Updated {new Date(account.updatedAt).toLocaleDateString()}</span>
+                <span className="kanban-card-badge"><Icon name="clock" size={11} /> Updated {new Date(account.updatedAt).toLocaleDateString()}</span>
               </div>
             </Link>
             <div className="kanban-card-actions">
@@ -169,18 +171,18 @@ export function CompaniesKanban() {
                 title="View"
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate(`/companies/${account.id}`); }}
-              >👁</button>
+              ><Icon name="eye" size={13} /></button>
               <button
                 title="Edit"
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); setFormState({ account }); }}
-              >✎</button>
+              ><Icon name="edit" size={13} /></button>
               <button
                 className="danger"
                 title="Delete"
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDelete(account); }}
-              >🗑</button>
+              ><Icon name="trash" size={13} /></button>
             </div>
           </>
         )}

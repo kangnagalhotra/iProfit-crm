@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import type { Opportunity, Paginated } from './types';
+import type { DealPriority, Opportunity, Paginated } from './types';
 
 const SELECT = `*, pipeline:pipelines(id, name), stage:deal_stages(*), owner:profiles(id, full_name),
   account:accounts(id, name, stage:account_stages(name, color)), lead:leads(id, first_name, last_name, email),
@@ -17,6 +17,8 @@ function mapDeal(row: any): Opportunity {
     closeDate: row.close_date ?? undefined,
     closedAt: row.closed_at ?? undefined,
     dealType: row.deal_type,
+    priority: row.priority,
+    lossReason: row.loss_reason ?? undefined,
     description: row.description ?? undefined,
     source: row.source ?? undefined,
     pipeline: { id: row.pipeline.id, name: row.pipeline.name },
@@ -45,7 +47,7 @@ function mapDeal(row: any): Opportunity {
 export interface ListDealsParams {
   page?: number; pageSize?: number; sortBy?: string; sortDir?: 'asc' | 'desc';
   search?: string; stageId?: string; ownerId?: string; accountId?: string; contactId?: string; createdAfter?: string;
-  includeArchived?: boolean;
+  priority?: DealPriority; includeArchived?: boolean;
 }
 
 export async function listDeals(params: ListDealsParams = {}): Promise<Paginated<Opportunity>> {
@@ -59,6 +61,7 @@ export async function listDeals(params: ListDealsParams = {}): Promise<Paginated
   if (params.ownerId) query = query.eq('owner_id', params.ownerId);
   if (params.accountId) query = query.eq('account_id', params.accountId);
   if (params.createdAfter) query = query.gte('created_at', params.createdAfter);
+  if (params.priority) query = query.eq('priority', params.priority);
   if (params.search) query = query.ilike('name', `%${params.search}%`);
 
   if (params.sortBy === 'stage') {
@@ -103,9 +106,9 @@ async function defaultDealStageId(pipelineId: string): Promise<string> {
 
 function toRow(input: Record<string, any>) {
   const row: Record<string, any> = {
-    name: input.name, amount: input.amount, deal_type: input.dealType, description: input.description,
+    name: input.name, amount: input.amount, deal_type: input.dealType, priority: input.priority, description: input.description,
     source: input.source, owner_id: input.ownerId, stage_id: input.stageId, account_id: input.accountId, lead_id: input.leadId,
-    contact_id: input.contactId, close_date: input.closeDate, archived_at: input.archivedAt,
+    contact_id: input.contactId, close_date: input.closeDate, archived_at: input.archivedAt, loss_reason: input.lossReason,
   };
   Object.keys(row).forEach((k) => { if (row[k] === undefined) delete row[k]; });
   return row;

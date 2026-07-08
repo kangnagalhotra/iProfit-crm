@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import type { Lead, LeadStage, User } from '../api/types';
+import type {
+  Lead, LeadSource, LeadStage, User,
+} from '../api/types';
 import { listLeads, updateLead, bulkDeleteLeads } from '../api/leads';
 import { listStages } from '../api/stages';
 import { listUsers } from '../api/users';
@@ -14,10 +16,47 @@ import type { ListView } from '../components/ViewToggle';
 import { ExportMenu } from '../components/ExportMenu';
 import type { ExportColumn } from '../components/ExportMenu';
 import { InlineCell } from '../components/InlineCell';
+import { ColumnVisibilityMenu } from '../components/ColumnVisibilityMenu';
+import type { ColumnDef } from '../components/ColumnVisibilityMenu';
+import { FilterBar } from '../components/FilterBar';
+import type { FilterField } from '../components/FilterBar';
+import { SavedViewsBar } from '../components/SavedViewsBar';
+import { useSavedViews } from '../hooks/useSavedViews';
+import { SkeletonTable } from '../components/Skeleton';
+import { EmptyState } from '../components/EmptyState';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 
 type SortBy = 'firstName' | 'value' | 'updatedAt' | 'createdAt';
+
+interface LeadFilters { [key: string]: string; stageId: string; ownerId: string; source: string; }
+
+const EMPTY_LEAD_FILTERS: LeadFilters = { stageId: '', ownerId: '', source: '' };
+
+const LEAD_COLUMNS: ColumnDef[] = [
+  { key: 'name', label: 'Name', required: true },
+  { key: 'email', label: 'Email' },
+  { key: 'stage', label: 'Stage' },
+  { key: 'owner', label: 'Owner' },
+  { key: 'company', label: 'Company' },
+  { key: 'value', label: 'Value' },
+  { key: 'lastActivity', label: 'Last Activity' },
+  { key: 'created', label: 'Created' },
+];
+const ALL_LEAD_COLUMN_KEYS = LEAD_COLUMNS.map((c) => c.key);
+
+const LEAD_SOURCE_OPTIONS: { value: LeadSource; label: string }[] = [
+  { value: 'IMPORT', label: 'Import' },
+  { value: 'OUTREACH', label: 'Outreach' },
+  { value: 'EMAIL', label: 'Email' },
+  { value: 'CAMPAIGN', label: 'Campaign' },
+  { value: 'REFERRAL', label: 'Referral' },
+  { value: 'WEBSITE', label: 'Website' },
+  { value: 'SOCIAL_MEDIA', label: 'Social Media' },
+  { value: 'EVENT', label: 'Event' },
+  { value: 'PARTNER', label: 'Partner' },
+  { value: 'OTHER', label: 'Other' },
+];
 
 function formatValue(value?: string) {
   if (!value) return '—';
@@ -73,6 +112,38 @@ export function LeadsList() {
   const [users, setUsers] = useState<User[]>([]);
   const [editingCell, setEditingCell] = useState<{ id: string; field: 'stage' | 'owner' } | null>(null);
   const [convertingLead, setConvertingLead] = useState<Lead | null>(null);
+  const [filters, setFilters] = useState<LeadFilters>(EMPTY_LEAD_FILTERS);
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(ALL_LEAD_COLUMN_KEYS);
+  const {
+    views, activeView, activeViewId, setActiveViewId, saveView, updateView, deleteView,
+  } = useSavedViews<LeadFilters>('leads');
+
+  useEffect(() => {
+    if (activeView) {
+      setFilters(activeView.filters);
+      setVisibleColumns(activeView.visibleColumns ?? ALL_LEAD_COLUMN_KEYS);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeView?.id]);
+
+  function selectView(id: string | null) {
+    setActiveViewId(id);
+    if (id === null) {
+      setFilters(EMPTY_LEAD_FILTERS);
+      setVisibleColumns(ALL_LEAD_COLUMN_KEYS);
+    }
+  }
+
+  const isViewDirty = !!activeView && (
+    JSON.stringify(filters) !== JSON.stringify(activeView.filters)
+    || JSON.stringify(visibleColumns) !== JSON.stringify(activeView.visibleColumns ?? ALL_LEAD_COLUMN_KEYS)
+  );
+
+  const LEAD_FILTER_FIELDS: FilterField[] = [
+    { key: 'stageId', label: 'Stage', options: stages.map((s) => ({ value: s.id, label: s.name })) },
+    { key: 'ownerId', label: 'Owner', options: users.map((u) => ({ value: u.id, label: u.fullName })) },
+    { key: 'source', label: 'Source', options: LEAD_SOURCE_OPTIONS },
+  ];
 
   useEffect(() => {
     Promise.all([listStages('lead_stages'), listUsers()])
@@ -82,14 +153,22 @@ export function LeadsList() {
   const load = useCallback(() => {
     setLoading(true);
     listLeads({
-      search: search || undefined, includeArchived, page, pageSize, sortBy, sortDir,
+      search: search || undefined,
+      includeArchived,
+      page,
+      pageSize,
+      sortBy,
+      sortDir,
+      stageId: filters.stageId || undefined,
+      ownerId: filters.ownerId || undefined,
+      source: (filters.source || undefined) as LeadSource | undefined,
     })
       .then((data) => { setLeads(data.data); setTotal(data.total); setSelected(new Set()); })
       .finally(() => setLoading(false));
-  }, [search, includeArchived, page, pageSize, sortBy, sortDir]);
+  }, [search, includeArchived, page, pageSize, sortBy, sortDir, filters]);
 
   useEffect(() => { if (view === 'board') load(); }, [load, view]);
-  useEffect(() => { setPage(1); }, [search, includeArchived]);
+  useEffect(() => { setPage(1); }, [search, includeArchived, filters]);
 
   function toggleSort(field: SortBy) {
     if (sortBy === field) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
@@ -152,6 +231,7 @@ export function LeadsList() {
                 getSelected={() => leads.filter((l) => selected.has(l.id))}
                 selectedCount={selected.size}
               />
+              <ColumnVisibilityMenu columns={LEAD_COLUMNS} visible={visibleColumns} onChange={setVisibleColumns} />
             </>
           )}
           <AddContactsMenu onCreateNew={() => setShowForm(true)} onImport={() => setShowImport(true)} />
@@ -159,19 +239,36 @@ export function LeadsList() {
       </div>
 
       {view === 'board' && (
-        <div className="quick-filter-chips">
-          <button
-            className={`chip-filter${includeArchived ? ' active' : ''}`}
-            onClick={() => setIncludeArchived((v) => !v)}
-          >
-            Show archived
-          </button>
-        </div>
+        <>
+          <SavedViewsBar
+            views={views}
+            activeViewId={activeViewId}
+            isDirty={isViewDirty}
+            onSelect={selectView}
+            onSave={(name) => saveView(name, { filters, visibleColumns })}
+            onUpdate={() => activeViewId && updateView(activeViewId, { filters, visibleColumns })}
+            onDelete={(id) => deleteView(id)}
+          />
+          <FilterBar fields={LEAD_FILTER_FIELDS} values={filters} onChange={(v) => setFilters(v as LeadFilters)} />
+          <div className="quick-filter-chips">
+            <button
+              className={`chip-filter${includeArchived ? ' active' : ''}`}
+              onClick={() => setIncludeArchived((v) => !v)}
+            >
+              Show archived
+            </button>
+          </div>
+        </>
       )}
 
       {view === 'board' ? (
-        loading ? <p>Loading…</p> : leads.length === 0 ? (
-          <p style={{ color: 'var(--muted)' }}>No leads yet. Create your first one.</p>
+        loading ? <SkeletonTable columns={9} /> : leads.length === 0 ? (
+          <EmptyState
+            icon="inbox"
+            title="No leads yet"
+            description="Create your first lead to start tracking prospects."
+            action={{ label: '+ Create lead', onClick: () => setShowForm(true) }}
+          />
         ) : (
           <>
             {selected.size > 0 && (
@@ -187,13 +284,13 @@ export function LeadsList() {
                     <input type="checkbox" checked={selected.size === leads.length && leads.length > 0} onChange={toggleSelectAll} />
                   </th>
                   <th className="sortable" onClick={() => toggleSort('firstName')}>Name{sortArrow('firstName')}</th>
-                  <th>Email</th>
-                  <th>Stage</th>
-                  <th>Owner</th>
-                  <th>Company</th>
-                  <th className="sortable" onClick={() => toggleSort('value')}>Value{sortArrow('value')}</th>
-                  <th className="sortable" onClick={() => toggleSort('updatedAt')}>Last Activity{sortArrow('updatedAt')}</th>
-                  <th className="sortable" onClick={() => toggleSort('createdAt')}>Created{sortArrow('createdAt')}</th>
+                  {visibleColumns.includes('email') && <th>Email</th>}
+                  {visibleColumns.includes('stage') && <th>Stage</th>}
+                  {visibleColumns.includes('owner') && <th>Owner</th>}
+                  {visibleColumns.includes('company') && <th>Company</th>}
+                  {visibleColumns.includes('value') && <th className="sortable" onClick={() => toggleSort('value')}>Value{sortArrow('value')}</th>}
+                  {visibleColumns.includes('lastActivity') && <th className="sortable" onClick={() => toggleSort('updatedAt')}>Last Activity{sortArrow('updatedAt')}</th>}
+                  {visibleColumns.includes('created') && <th className="sortable" onClick={() => toggleSort('createdAt')}>Created{sortArrow('createdAt')}</th>}
                   <th />
                 </tr>
               </thead>
@@ -202,43 +299,47 @@ export function LeadsList() {
                   <tr key={l.id}>
                     <td><input type="checkbox" checked={selected.has(l.id)} onChange={() => toggleSelect(l.id)} /></td>
                     <td><Link to={`/leads/${l.id}`}>{l.leadName || [l.firstName, l.lastName].filter(Boolean).join(' ') || '—'}</Link></td>
-                    <td>{l.email ?? '—'}</td>
-                    <td>
-                      <InlineCell
-                        display={<span className="chip" style={{ background: l.stage.color + '22', color: l.stage.color }}>{l.stage.name}</span>}
-                        editing={editingCell?.id === l.id && editingCell.field === 'stage'}
-                        onStartEdit={() => setEditingCell({ id: l.id, field: 'stage' })}
-                      >
-                        <select
-                          autoFocus
-                          defaultValue={l.stage.id}
-                          onBlur={() => setEditingCell(null)}
-                          onChange={(e) => { inlineUpdate(l, { stageId: e.target.value }); setEditingCell(null); }}
+                    {visibleColumns.includes('email') && <td>{l.email ?? '—'}</td>}
+                    {visibleColumns.includes('stage') && (
+                      <td>
+                        <InlineCell
+                          display={<span className="chip" style={{ background: l.stage.color + '22', color: l.stage.color }}>{l.stage.name}</span>}
+                          editing={editingCell?.id === l.id && editingCell.field === 'stage'}
+                          onStartEdit={() => setEditingCell({ id: l.id, field: 'stage' })}
                         >
-                          {stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                        </select>
-                      </InlineCell>
-                    </td>
-                    <td>
-                      <InlineCell
-                        display={l.owner?.fullName ?? '—'}
-                        editing={editingCell?.id === l.id && editingCell.field === 'owner'}
-                        onStartEdit={() => setEditingCell({ id: l.id, field: 'owner' })}
-                      >
-                        <select
-                          autoFocus
-                          defaultValue={l.owner?.id ?? ''}
-                          onBlur={() => setEditingCell(null)}
-                          onChange={(e) => { inlineUpdate(l, { ownerId: e.target.value }); setEditingCell(null); }}
+                          <select
+                            autoFocus
+                            defaultValue={l.stage.id}
+                            onBlur={() => setEditingCell(null)}
+                            onChange={(e) => { inlineUpdate(l, { stageId: e.target.value }); setEditingCell(null); }}
+                          >
+                            {stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                          </select>
+                        </InlineCell>
+                      </td>
+                    )}
+                    {visibleColumns.includes('owner') && (
+                      <td>
+                        <InlineCell
+                          display={l.owner?.fullName ?? '—'}
+                          editing={editingCell?.id === l.id && editingCell.field === 'owner'}
+                          onStartEdit={() => setEditingCell({ id: l.id, field: 'owner' })}
                         >
-                          {users.map((u) => <option key={u.id} value={u.id}>{u.fullName}</option>)}
-                        </select>
-                      </InlineCell>
-                    </td>
-                    <td>{l.account ? <Link to={`/companies/${l.account.id}`}>{l.account.name}</Link> : '—'}</td>
-                    <td>{formatValue(l.value)}</td>
-                    <td>{l.lastActivityAt ? new Date(l.lastActivityAt).toLocaleDateString() : '—'}</td>
-                    <td>{new Date(l.createdAt).toLocaleDateString()}</td>
+                          <select
+                            autoFocus
+                            defaultValue={l.owner?.id ?? ''}
+                            onBlur={() => setEditingCell(null)}
+                            onChange={(e) => { inlineUpdate(l, { ownerId: e.target.value }); setEditingCell(null); }}
+                          >
+                            {users.map((u) => <option key={u.id} value={u.id}>{u.fullName}</option>)}
+                          </select>
+                        </InlineCell>
+                      </td>
+                    )}
+                    {visibleColumns.includes('company') && <td>{l.account ? <Link to={`/companies/${l.account.id}`}>{l.account.name}</Link> : '—'}</td>}
+                    {visibleColumns.includes('value') && <td>{formatValue(l.value)}</td>}
+                    {visibleColumns.includes('lastActivity') && <td>{l.lastActivityAt ? new Date(l.lastActivityAt).toLocaleDateString() : '—'}</td>}
+                    {visibleColumns.includes('created') && <td>{new Date(l.createdAt).toLocaleDateString()}</td>}
                     <td>
                       {l.stage.isWon && !l.convertedAt && (
                         <button className="btn secondary" onClick={() => setConvertingLead(l)}>Convert to Deal</button>

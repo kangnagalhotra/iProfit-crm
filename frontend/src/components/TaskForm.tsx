@@ -126,7 +126,7 @@ export function TaskForm({
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h3 style={{ marginTop: 0 }}>{isEdit ? 'Edit task' : 'Create task'}</h3>
-        <div className="field"><label>Task name</label>
+        <div className="field"><label>Task title</label>
           <input value={form.title} onChange={(e) => set('title', e.target.value)} /></div>
         <div className="field"><label>Task type</label>
           <select value={form.type} onChange={(e) => set('type', e.target.value as TaskType)}>

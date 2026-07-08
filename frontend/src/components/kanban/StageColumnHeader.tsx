@@ -7,7 +7,7 @@ import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../context/ConfirmContext';
 
 export function StageColumnHeader<T extends Stage>({
-  stage, count, editable, table, allStageIds, myIndex, onChanged, onDeleted, onReordered, subtitle,
+  stage, count, editable, table, allStageIds, myIndex, onChanged, onDeleted, onReordered, subtitle, weightedSubtitle,
 }: {
   stage: T;
   count: number;
@@ -19,6 +19,7 @@ export function StageColumnHeader<T extends Stage>({
   onDeleted: (stageId: string) => void;
   onReordered: (stages: T[]) => void;
   subtitle?: string;
+  weightedSubtitle?: string;
 }) {
   const toast = useToast();
   const confirm = useConfirm();
@@ -26,8 +27,11 @@ export function StageColumnHeader<T extends Stage>({
   const [name, setName] = useState(stage.name);
   const [menuOpen, setMenuOpen] = useState(false);
   const [colorMenuOpen, setColorMenuOpen] = useState(false);
+  const [editingProbability, setEditingProbability] = useState(false);
+  const [probabilityInput, setProbabilityInput] = useState('');
   const menuRef = useRef<HTMLDivElement>(null);
   const colorMenuRef = useRef<HTMLDivElement>(null);
+  const winProbability = 'winProbability' in stage ? (stage as unknown as { winProbability: number }).winProbability : undefined;
 
   if (!editable) {
     return (
@@ -37,11 +41,25 @@ export function StageColumnHeader<T extends Stage>({
           <span className="count">{count}</span>
         </div>
         {subtitle && <div className="stage-subtitle">{subtitle}</div>}
+        {weightedSubtitle && <div className="stage-subtitle-weighted">{weightedSubtitle} weighted</div>}
       </div>
     );
   }
 
   const stageTable = table!;
+
+  async function saveProbability() {
+    setEditingProbability(false);
+    const value = Number(probabilityInput);
+    if (Number.isNaN(value) || value === winProbability) return;
+    const clamped = Math.max(0, Math.min(100, value));
+    try {
+      const data = await updateStage(stageTable, stage.id, { winProbability: clamped });
+      onChanged(data as unknown as T);
+    } catch (e: any) {
+      toast.error(e.message ?? 'Could not update probability');
+    }
+  }
 
   async function saveName() {
     setEditingName(false);
@@ -146,6 +164,33 @@ export function StageColumnHeader<T extends Stage>({
         </div>
       </div>
       {subtitle && <div className="stage-subtitle">{subtitle}</div>}
+      {weightedSubtitle && winProbability !== undefined && (
+        editingProbability ? (
+          <div className="stage-subtitle-weighted">
+            <input
+              type="number"
+              min={0}
+              max={100}
+              autoFocus
+              defaultValue={winProbability}
+              onChange={(e) => setProbabilityInput(e.target.value)}
+              onBlur={saveProbability}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                if (e.key === 'Escape') setEditingProbability(false);
+              }}
+            />% win rate
+          </div>
+        ) : (
+          <div
+            className="stage-subtitle-weighted"
+            title="Click to edit win probability"
+            onClick={() => { setProbabilityInput(String(winProbability)); setEditingProbability(true); }}
+          >
+            {weightedSubtitle} weighted ({winProbability}%)
+          </div>
+        )
+      )}
     </div>
   );
 }

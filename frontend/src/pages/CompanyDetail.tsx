@@ -21,6 +21,10 @@ import { CompanyForm } from '../components/CompanyForm';
 import { ContactForm } from '../components/ContactForm';
 import { AddActivityModal } from '../components/AddActivityModal';
 import { Icon } from '../components/Icon';
+import { CollapsibleCard } from '../components/CollapsibleCard';
+import { AssociationsPanel } from '../components/AssociationsPanel';
+import type { AssociationGroup } from '../components/AssociationsPanel';
+import { SkeletonDetailPage } from '../components/Skeleton';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
@@ -53,6 +57,10 @@ function Row({
       </div>
     </div>
   );
+}
+
+function leadName(l: Lead) {
+  return l.leadName || [l.firstName, l.lastName].filter(Boolean).join(' ') || l.email || 'Untitled lead';
 }
 
 function websiteUrl(domain: string) {
@@ -137,6 +145,9 @@ export function CompanyDetail() {
     .map((d) => d.closedAt)
     .filter((d): d is string => !!d)
     .sort()[0];
+  const mostRecentLead = associatedLeads.length
+    ? [...associatedLeads].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
+    : undefined;
 
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
@@ -146,7 +157,7 @@ export function CompanyDetail() {
     return () => document.removeEventListener('mousedown', onDocClick);
   }, []);
 
-  if (!account) return <p>Loading…</p>;
+  if (!account) return <SkeletonDetailPage />;
 
   async function saveField(data: Record<string, any>) {
     try {
@@ -180,7 +191,6 @@ export function CompanyDetail() {
         industry: account!.industry,
         sizeBucket: account!.sizeBucket,
         annualRevenue: account!.annualRevenue,
-        companyType: account!.companyType,
         email: account!.email,
         phone: account!.phone,
         address: account!.address,
@@ -254,7 +264,7 @@ export function CompanyDetail() {
                 <div className="dropdown-menu">
                   <button onClick={() => { setMoreOpen(false); setShowEditModal(true); }}>Edit Details</button>
                   <button onClick={() => { setMoreOpen(false); setEditingField('owner'); scrollToKeyInfo(); }}>Change Owner</button>
-                  <button onClick={() => { setMoreOpen(false); setEditingField('stage'); scrollToKeyInfo(); }}>Change Status</button>
+                  <button onClick={() => { setMoreOpen(false); setEditingField('stage'); scrollToKeyInfo(); }}>Change Lifecycle Stage</button>
                   {canManageStatus && account.stage.name === 'Customer' && (
                     <button onClick={() => { setMoreOpen(false); markStrategicAccount(); }}>Mark Strategic Account</button>
                   )}
@@ -307,15 +317,17 @@ export function CompanyDetail() {
       {account.lastInactivityAlertAt && !account.stage.isInactiveStage && (
         <div className="card" style={{ background: '#FEF3C7', border: '1px solid #F59E0B' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-            <span>⚠ This company has been inactive for 180+ days. Recommended status: <strong>Inactive</strong>.</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Icon name="alert" size={14} />
+              This company has been inactive for 180+ days. Recommended lifecycle stage: <strong>Inactive</strong>.
+            </span>
             <button className="btn secondary" onClick={markInactive}>Mark as Inactive</button>
           </div>
         </div>
       )}
 
       <div className="detail-sidebar">
-      <div className="card">
-        <h3 style={{ marginTop: 0 }}>Key information</h3>
+      <CollapsibleCard title="Key information" storageKey="collapsible:company:key-info">
         <div className="key-info">
           <EditableRow
             label="Owner"
@@ -338,7 +350,7 @@ export function CompanyDetail() {
           onEmptyClick={() => setShowEditModal(true)}
           />
           <Row label="Industry" value={account.industry} onEmptyClick={() => setShowEditModal(true)} />
-          <Row label="Company size" value={account.sizeBucket} onEmptyClick={() => setShowEditModal(true)} />
+          <Row label="Number of employees" value={account.sizeBucket} onEmptyClick={() => setShowEditModal(true)} />
           <EditableRow
             label="Annual revenue"
             value={formatRevenue(account.annualRevenue)}
@@ -358,9 +370,8 @@ export function CompanyDetail() {
               }}
             />
           </EditableRow>
-          <Row label="Company type" value={account.companyType} onEmptyClick={() => setShowEditModal(true)} />
           <EditableRow
-            label="Status"
+            label="Lifecycle Stage"
             value={<span className="chip" style={{ background: account.stage.color + '22', color: account.stage.color }}>{account.stage.name}</span>}
             editing={editingField === 'stage'}
             onStartEdit={() => setEditingField('stage')}
@@ -369,9 +380,17 @@ export function CompanyDetail() {
               options={stages.map((s) => ({ value: s.id, label: s.name }))}
               value={account.stage.id}
               onChange={(v) => saveField({ stageId: v })}
-              placeholder="Search status…"
+              placeholder="Search lifecycle stage…"
             />
           </EditableRow>
+          <Row
+            label="Lead Status"
+            value={mostRecentLead ? (
+              <span className="chip" style={{ background: mostRecentLead.stage.color + '22', color: mostRecentLead.stage.color }}>
+                {mostRecentLead.stage.name}
+              </span>
+            ) : undefined}
+          />
           <Row label="Email" value={account.email} onEmptyClick={() => setShowEditModal(true)} />
           <Row label="Phone" value={account.phone} onEmptyClick={() => setShowEditModal(true)} />
           <Row
@@ -395,118 +414,58 @@ export function CompanyDetail() {
             <div style={{ fontSize: 14, whiteSpace: 'pre-wrap' }}>{account.description}</div>
           </div>
         )}
-      </div>
+      </CollapsibleCard>
       </div>
 
       <div className="detail-main">
-      <div className="card">
-        <h3 style={{ marginTop: 0 }}>Associated Leads ({associatedLeads.length})</h3>
-        {associatedLeads.length === 0 ? (
-          <div className="empty-state">
-            <span className="icon"><Icon name="note" size={18} /></span>
-            <p>No leads linked to this company yet.</p>
-          </div>
-        ) : (
-          <div style={{ overflowX: 'auto' }}>
-          <table>
-            <thead>
-              <tr>
-                <th>Lead Name</th>
-                <th>Owner</th>
-                <th>Stage</th>
-                <th>Email</th>
-                <th>Phone</th>
-                <th>Last Activity</th>
-              </tr>
-            </thead>
-            <tbody>
-              {associatedLeads.map((l) => {
-                const leadName = l.leadName || [l.firstName, l.lastName].filter(Boolean).join(' ') || l.email || 'Untitled lead';
-                return (
-                  <tr key={l.id} className="clickable-row" onClick={() => navigate(`/leads/${l.id}`)}>
-                    <td><Link to={`/leads/${l.id}`} onClick={(e) => e.stopPropagation()}>{leadName}</Link></td>
-                    <td>{l.owner?.fullName ?? '—'}</td>
-                    <td><span className="chip" style={{ background: l.stage.color + '22', color: l.stage.color }}>{l.stage.name}</span></td>
-                    <td>{l.email ?? '—'}</td>
-                    <td>{l.phone ?? '—'}</td>
-                    <td>{l.lastActivityAt ? new Date(l.lastActivityAt).toLocaleDateString() : '—'}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          </div>
-        )}
-      </div>
-
-      <div className="card">
-        <h3 style={{ marginTop: 0 }}>Associated Deals ({associatedDeals.length})</h3>
-        {associatedDeals.length === 0 ? (
-          <div className="empty-state">
-            <span className="icon"><Icon name="check" size={18} /></span>
-            <p>No deals linked to this company yet.</p>
-          </div>
-        ) : (
-          <div style={{ overflowX: 'auto' }}>
-          <table>
-            <thead>
-              <tr>
-                <th>Deal Name</th>
-                <th>Owner</th>
-                <th>Stage</th>
-                <th>Amount</th>
-                <th>Close Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {associatedDeals.map((d) => (
-                <tr key={d.id} className="clickable-row" onClick={() => navigate(`/deals/${d.id}`)}>
-                  <td><Link to={`/deals/${d.id}`} onClick={(e) => e.stopPropagation()}>{d.name}</Link></td>
-                  <td>{d.owner?.fullName ?? '—'}</td>
-                  <td><span className="chip" style={{ background: d.stage.color + '22', color: d.stage.color }}>{d.stage.name}</span></td>
-                  <td>{d.amount ? formatMoney(parseFloat(d.amount)) : '—'}</td>
-                  <td>{d.closeDate ? new Date(d.closeDate).toLocaleDateString() : '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          </div>
-        )}
-      </div>
-
-      <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3 style={{ marginTop: 0 }}>Contacts ({associatedContacts.length})</h3>
-          <button className="btn secondary" onClick={() => setShowContactForm(true)}>+ Add Contact</button>
-        </div>
-        {associatedContacts.length === 0 ? (
-          <div className="empty-state">
-            <span className="icon"><Icon name="note" size={18} /></span>
-            <p>No contacts linked to this company yet.</p>
-          </div>
-        ) : (
-          <div style={{ overflowX: 'auto' }}>
-          <table>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Job Title</th>
-              </tr>
-            </thead>
-            <tbody>
-              {associatedContacts.map((c) => (
-                <tr key={c.id}>
-                  <td>{[c.firstName, c.lastName].filter(Boolean).join(' ') || c.email || 'Untitled contact'}</td>
-                  <td>{c.email ?? '—'}</td>
-                  <td>{c.jobTitle ?? '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          </div>
-        )}
-      </div>
+      <AssociationsPanel
+        groups={[
+          {
+            key: 'leads',
+            label: `Leads (${associatedLeads.length})`,
+            icon: 'person',
+            emptyLabel: 'No leads linked to this company yet.',
+            items: associatedLeads,
+            onRowClick: (l: Lead) => navigate(`/leads/${l.id}`),
+            columns: [
+              { header: 'Lead Name', render: (l: Lead) => <Link to={`/leads/${l.id}`} onClick={(e) => e.stopPropagation()}>{leadName(l)}</Link> },
+              { header: 'Owner', render: (l: Lead) => l.owner?.fullName ?? '—' },
+              { header: 'Stage', render: (l: Lead) => <span className="chip" style={{ background: l.stage.color + '22', color: l.stage.color }}>{l.stage.name}</span> },
+              { header: 'Email', render: (l: Lead) => l.email ?? '—' },
+              { header: 'Phone', render: (l: Lead) => l.phone ?? '—' },
+              { header: 'Last Activity', render: (l: Lead) => (l.lastActivityAt ? new Date(l.lastActivityAt).toLocaleDateString() : '—') },
+            ],
+          },
+          {
+            key: 'deals',
+            label: `Deals (${associatedDeals.length})`,
+            icon: 'dollar',
+            emptyLabel: 'No deals linked to this company yet.',
+            items: associatedDeals,
+            onRowClick: (d: Opportunity) => navigate(`/deals/${d.id}`),
+            columns: [
+              { header: 'Deal Name', render: (d: Opportunity) => <Link to={`/deals/${d.id}`} onClick={(e) => e.stopPropagation()}>{d.name}</Link> },
+              { header: 'Owner', render: (d: Opportunity) => d.owner?.fullName ?? '—' },
+              { header: 'Stage', render: (d: Opportunity) => <span className="chip" style={{ background: d.stage.color + '22', color: d.stage.color }}>{d.stage.name}</span> },
+              { header: 'Amount', render: (d: Opportunity) => (d.amount ? formatMoney(parseFloat(d.amount)) : '—') },
+              { header: 'Close Date', render: (d: Opportunity) => (d.closeDate ? new Date(d.closeDate).toLocaleDateString() : '—') },
+            ],
+          },
+          {
+            key: 'contacts',
+            label: `Contacts (${associatedContacts.length})`,
+            icon: 'person',
+            emptyLabel: 'No contacts linked to this company yet.',
+            items: associatedContacts,
+            addAction: { label: '+ Add Contact', onClick: () => setShowContactForm(true) },
+            columns: [
+              { header: 'Name', render: (c: Contact) => [c.firstName, c.lastName].filter(Boolean).join(' ') || c.email || 'Untitled contact' },
+              { header: 'Email', render: (c: Contact) => c.email ?? '—' },
+              { header: 'Job Title', render: (c: Contact) => c.jobTitle ?? '—' },
+            ],
+          },
+        ] as AssociationGroup[]}
+      />
 
       <ActivityTimeline
         key={activityKey}

@@ -18,6 +18,10 @@ import { SearchSelect } from '../components/SearchSelect';
 import { DealForm } from '../components/DealForm';
 import { AddActivityModal } from '../components/AddActivityModal';
 import { Icon } from '../components/Icon';
+import { CollapsibleCard } from '../components/CollapsibleCard';
+import { AssociationsPanel } from '../components/AssociationsPanel';
+import type { AssociationGroup } from '../components/AssociationsPanel';
+import { SkeletonDetailPage } from '../components/Skeleton';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 import { timeAgo } from '../utils/timeAgo';
@@ -56,6 +60,10 @@ function formatValue(value?: string) {
   const n = parseFloat(value);
   if (Number.isNaN(n)) return undefined;
   return n.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
+}
+
+function priorityColor(p: Opportunity['priority']) {
+  return p === 'CRITICAL' ? '#991B1B' : p === 'HIGH' ? '#DC2626' : p === 'MEDIUM' ? '#F59E0B' : '#6B7280';
 }
 
 function contactName(deal: Opportunity) {
@@ -116,7 +124,7 @@ export function DealDetail() {
     return () => document.removeEventListener('mousedown', onDocClick);
   }, []);
 
-  if (!deal) return <p>Loading…</p>;
+  if (!deal) return <SkeletonDetailPage />;
 
   async function saveField(data: Record<string, any>) {
     try {
@@ -231,8 +239,7 @@ export function DealDetail() {
       </div>
 
       <div className="detail-sidebar">
-      <div className="card">
-        <h3 style={{ marginTop: 0 }}>Key information</h3>
+      <CollapsibleCard title="Key information" storageKey="collapsible:deal:key-info">
         <div className="key-info">
           <EditableRow
             label="Owner"
@@ -319,6 +326,39 @@ export function DealDetail() {
             />
           </EditableRow>
           <Row label="Deal type" value={deal.dealType.replace('_', ' ')} onEmptyClick={() => setShowEditModal(true)} />
+          <EditableRow
+            label="Priority"
+            value={<span className="chip" style={{ background: priorityColor(deal.priority) + '22', color: priorityColor(deal.priority) }}>{deal.priority}</span>}
+            editing={editingField === 'priority'}
+            onStartEdit={() => setEditingField('priority')}
+          >
+            <select
+              autoFocus
+              defaultValue={deal.priority}
+              onBlur={() => setEditingField(null)}
+              onChange={(e) => saveField({ priority: e.target.value })}
+            >
+              {(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as const).map((p) => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </EditableRow>
+          {deal.stage.isClosedLost && (
+            <EditableRow
+              label="Closed lost reason"
+              value={deal.lossReason}
+              editing={editingField === 'lossReason'}
+              onStartEdit={() => setEditingField('lossReason')}
+            >
+              <input
+                autoFocus
+                defaultValue={deal.lossReason ?? ''}
+                onBlur={(e) => saveField({ lossReason: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                  if (e.key === 'Escape') setEditingField(null);
+                }}
+              />
+            </EditableRow>
+          )}
           <Row label="Source" value={deal.source} onEmptyClick={() => setShowEditModal(true)} />
           <Row
             label="Closing date"
@@ -332,10 +372,46 @@ export function DealDetail() {
             <div style={{ fontSize: 14, whiteSpace: 'pre-wrap' }}>{deal.description}</div>
           </div>
         )}
-      </div>
+      </CollapsibleCard>
       </div>
 
       <div className="detail-main">
+      <AssociationsPanel
+        groups={[
+          {
+            key: 'company',
+            label: 'Company',
+            icon: 'building',
+            emptyLabel: 'Not linked to a company yet.',
+            items: deal.account ? [deal.account] : [],
+            onRowClick: (a: NonNullable<Opportunity['account']>) => navigate(`/companies/${a.id}`),
+            columns: [
+              {
+                header: 'Company Name',
+                render: (a: NonNullable<Opportunity['account']>) => (
+                  <>
+                    <Link to={`/companies/${a.id}`} onClick={(e) => e.stopPropagation()}>{a.name}</Link>
+                    {a.stage && (
+                      <span className="chip" style={{ background: a.stage.color + '22', color: a.stage.color, marginLeft: 6 }}>{a.stage.name}</span>
+                    )}
+                  </>
+                ),
+              },
+            ],
+          },
+          {
+            key: 'contact',
+            label: 'Contact',
+            icon: 'person',
+            emptyLabel: 'No contact linked to this deal yet.',
+            items: deal.contact ? [deal.contact] : [],
+            columns: [
+              { header: 'Name', render: (c: NonNullable<Opportunity['contact']>) => [c.firstName, c.lastName].filter(Boolean).join(' ') || c.email || 'Untitled contact' },
+              { header: 'Email', render: (c: NonNullable<Opportunity['contact']>) => c.email ?? '—' },
+            ],
+          },
+        ] as AssociationGroup[]}
+      />
       <ActivityTimeline key={activityKey} opportunityId={deal.id} />
       <TasksWidget key={activityKey} opportunityId={deal.id} />
       <NotesSection opportunityId={deal.id} />

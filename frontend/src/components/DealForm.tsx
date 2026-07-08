@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type {
-  Account, Contact, DealStage, DealType, Opportunity, User,
+  Account, Contact, DealPriority, DealStage, DealType, Opportunity, User,
 } from '../api/types';
 import { createDeal, updateDeal } from '../api/deals';
 import { listStages } from '../api/stages';
@@ -9,6 +9,7 @@ import { listAccounts } from '../api/accounts';
 import { listContacts } from '../api/contacts';
 
 const DEAL_TYPES: DealType[] = ['NEW_BUSINESS', 'EXISTING_BUSINESS', 'RENEWAL'];
+const DEAL_PRIORITIES: DealPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 
 export function DealForm({
   deal, defaultStageId, onClose, onSaved,
@@ -24,6 +25,8 @@ export function DealForm({
     amount: deal?.amount ?? '',
     closeDate: deal?.closeDate ? deal.closeDate.slice(0, 10) : '',
     dealType: (deal?.dealType ?? 'NEW_BUSINESS') as DealType,
+    priority: (deal?.priority ?? 'MEDIUM') as DealPriority,
+    lossReason: deal?.lossReason ?? '',
     description: deal?.description ?? '',
     source: deal?.source ?? '',
     stageId: deal?.stage.id ?? defaultStageId ?? '',
@@ -121,9 +124,18 @@ export function DealForm({
             {DEAL_TYPES.map((t) => <option key={t} value={t}>{t.replace('_', ' ')}</option>)}
           </select>
         </div>
+        <div className="field"><label>Priority</label>
+          <select value={form.priority} onChange={(e) => set('priority', e.target.value as DealPriority)}>
+            {DEAL_PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}
+          </select>
+        </div>
         <div className="field"><label>Probability</label>
           <input value={selectedStage ? `${selectedStage.winProbability}%` : '—'} disabled />
         </div>
+        {selectedStage?.isClosedLost && (
+          <div className="field"><label>Closed lost reason</label>
+            <input value={form.lossReason} onChange={(e) => set('lossReason', e.target.value)} /></div>
+        )}
         <div className="field"><label>Source</label>
           <input value={form.source} onChange={(e) => set('source', e.target.value)} /></div>
         <div className="field"><label>Description</label>

@@ -17,7 +17,6 @@ function mapAccount(row: any): Account {
     city: row.city ?? undefined,
     state: row.state ?? undefined,
     country: row.country ?? undefined,
-    companyType: row.company_type ?? undefined,
     email: row.email ?? undefined,
     phone: row.phone ?? undefined,
     address: row.address ?? undefined,
@@ -41,7 +40,7 @@ function mapAccount(row: any): Account {
 
 export interface ListAccountsParams {
   page?: number; pageSize?: number; sortBy?: string; sortDir?: 'asc' | 'desc';
-  search?: string; stageId?: string; ownerId?: string; includeArchived?: boolean;
+  search?: string; stageId?: string; ownerId?: string; industry?: string; includeArchived?: boolean;
 }
 
 export async function listAccounts(params: ListAccountsParams = {}): Promise<Paginated<Account>> {
@@ -52,6 +51,7 @@ export async function listAccounts(params: ListAccountsParams = {}): Promise<Pag
   if (!params.includeArchived) query = query.is('archived_at', null);
   if (params.stageId) query = query.eq('stage_id', params.stageId);
   if (params.ownerId) query = query.eq('owner_id', params.ownerId);
+  if (params.industry) query = query.eq('industry', params.industry);
   if (params.search) {
     const term = `%${params.search}%`;
     query = query.or(`name.ilike.${term},domain.ilike.${term}`);
@@ -89,7 +89,7 @@ function toRow(input: Record<string, any>) {
   const row: Record<string, any> = {
     name: input.name, domain: input.domain, industry: input.industry, size_bucket: input.sizeBucket,
     annual_revenue: input.annualRevenue, city: input.city, state: input.state, country: input.country,
-    company_type: input.companyType, email: input.email, phone: input.phone, address: input.address,
+    email: input.email, phone: input.phone, address: input.address,
     description: input.description, owner_id: input.ownerId, stage_id: input.stageId,
     customer_stage_id: input.customerStageId, archived_at: input.archivedAt,
   };

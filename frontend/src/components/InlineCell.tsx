@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Icon } from './Icon';
 
 // Table-cell version of the EditableRow pattern: shows plain display content with
 // a pencil icon that only appears on hover, so board tables don't look cluttered
@@ -21,7 +22,7 @@ export function InlineCell({
         className="edit-icon"
         onClick={(e) => { e.stopPropagation(); onStartEdit(); }}
         title="Edit"
-      >✎
+      ><Icon name="edit" size={12} />
       </button>
     </span>
   );

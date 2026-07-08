@@ -17,6 +17,9 @@ import type { ListView } from '../components/ViewToggle';
 import { ExportMenu } from '../components/ExportMenu';
 import type { ExportColumn } from '../components/ExportMenu';
 import { InlineCell } from '../components/InlineCell';
+import { SkeletonTable } from '../components/Skeleton';
+import { EmptyState } from '../components/EmptyState';
+import { Icon } from '../components/Icon';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 
@@ -49,7 +52,7 @@ function relatedRecord(task: Task) {
 }
 
 const EXPORT_COLUMNS: ExportColumn<Task>[] = [
-  { label: 'Task Name', get: (t) => t.title },
+  { label: 'Task Title', get: (t) => t.title },
   { label: 'Type', get: (t) => t.type },
   { label: 'Priority', get: (t) => t.priority },
   { label: 'Related Record', get: (t) => relatedRecord(t)?.label ?? '' },
@@ -267,8 +270,13 @@ export function TasksPage() {
       )}
 
       {view === 'board' ? (
-        loading ? <p>Loading…</p> : tasks.length === 0 ? (
-          <p style={{ color: 'var(--muted)' }}>No tasks match these filters.</p>
+        loading ? <SkeletonTable columns={10} /> : tasks.length === 0 ? (
+          <EmptyState
+            icon="inbox"
+            title="No matching tasks"
+            description="No tasks match these filters — try adjusting them, or create a new task."
+            action={{ label: '+ Add task', onClick: () => setShowForm(true) }}
+          />
         ) : (
           <>
             {selected.size > 0 && (
@@ -291,7 +299,7 @@ export function TasksPage() {
                   <th style={{ width: 32 }}>
                     <input type="checkbox" checked={selected.size === tasks.length && tasks.length > 0} onChange={toggleSelectAll} />
                   </th>
-                  <th className="sortable" onClick={() => toggleSort('title')}>Task Name{sortArrow('title')}</th>
+                  <th className="sortable" onClick={() => toggleSort('title')}>Task Title{sortArrow('title')}</th>
                   <th>Related Record</th>
                   <th>Module</th>
                   <th>Owner</th>
@@ -311,7 +319,7 @@ export function TasksPage() {
                     <tr key={t.id}>
                       <td><input type="checkbox" checked={selected.has(t.id)} onChange={() => toggleSelect(t.id)} /></td>
                       <td>
-                        {overdue && <span title="Overdue" style={{ color: '#DC2626', marginRight: 4 }}>⚠</span>}
+                        {overdue && <span title="Overdue" style={{ color: '#DC2626', marginRight: 4, display: 'inline-flex', verticalAlign: 'middle' }}><Icon name="alert" size={12} /></span>}
                         <Link to={`/tasks/${t.id}`}>{t.title}</Link>
                       </td>
                       <td>{related ? <Link to={related.to}>{related.label}</Link> : '—'}</td>

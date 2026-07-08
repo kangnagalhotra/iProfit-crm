@@ -7,6 +7,8 @@ import { Kanban } from './kanban/Kanban';
 import type { KanbanColumn } from './kanban/Kanban';
 import { StageColumnHeader } from './kanban/StageColumnHeader';
 import { DealForm } from './DealForm';
+import { Icon } from './Icon';
+import { SkeletonKanban } from './Skeleton';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
@@ -93,7 +95,7 @@ export function DealsKanban() {
     }
   }
 
-  if (loading) return <p>Loading…</p>;
+  if (loading) return <SkeletonKanban columns={stages.length || 4} />;
 
   const stageIds = stages.map((s) => s.id);
   const columns: KanbanColumn<Opportunity>[] = stages.map((stage) => ({
@@ -112,6 +114,9 @@ export function DealsKanban() {
         renderColumnHeader={(col) => {
           const stage = stages.find((s) => s.id === col.id)!;
           const totalValue = col.items.reduce((sum, d) => sum + (d.amount ? parseFloat(d.amount) : 0), 0);
+          const weightedValue = col.items.reduce(
+            (sum, d) => sum + (d.amount ? (parseFloat(d.amount) * stage.winProbability) / 100 : 0), 0,
+          );
           return (
             <StageColumnHeader
               stage={stage}
@@ -124,6 +129,7 @@ export function DealsKanban() {
               onDeleted={(id) => setStages((s) => s.filter((st) => st.id !== id))}
               onReordered={setStages}
               subtitle={totalValue > 0 ? formatValue(String(totalValue)) ?? undefined : undefined}
+              weightedSubtitle={totalValue > 0 ? formatValue(String(weightedValue)) ?? undefined : undefined}
             />
           );
         }}
@@ -132,7 +138,7 @@ export function DealsKanban() {
         )}
         emptyState={(col) => (
           <div className="kanban-empty">
-            <div className="icon">📭</div>
+            <div className="icon"><Icon name="inbox" size={18} /></div>
             <p>No deals in this stage</p>
             <button className="btn secondary" onClick={() => setFormState({ defaultStageId: col.id })}>+ Add deal</button>
           </div>
@@ -158,13 +164,13 @@ export function DealsKanban() {
             <Link to={`/deals/${deal.id}`}>
               <div className="kanban-card-title">{deal.name}</div>
               {deal.account?.name && <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 2 }}>{deal.account.name}</div>}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
                 {formatValue(deal.amount) ? <span className="chip">{formatValue(deal.amount)}</span> : <span />}
                 {deal.owner && <div className="avatar avatar-sm" title={deal.owner.fullName}>{initials(deal.owner.fullName)}</div>}
               </div>
               <div className="kanban-card-footer">
                 <span className="kanban-card-badge">
-                  📅 {deal.closeDate ? `Closes ${new Date(deal.closeDate).toLocaleDateString()}` : `Updated ${new Date(deal.updatedAt).toLocaleDateString()}`}
+                  <Icon name="calendar" size={11} /> {deal.closeDate ? `Closes ${new Date(deal.closeDate).toLocaleDateString()}` : `Updated ${new Date(deal.updatedAt).toLocaleDateString()}`}
                 </span>
               </div>
             </Link>
@@ -173,18 +179,18 @@ export function DealsKanban() {
                 title="View"
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate(`/deals/${deal.id}`); }}
-              >👁</button>
+              ><Icon name="eye" size={13} /></button>
               <button
                 title="Edit"
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); setFormState({ deal }); }}
-              >✎</button>
+              ><Icon name="edit" size={13} /></button>
               <button
                 className="danger"
                 title="Delete"
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDelete(deal); }}
-              >🗑</button>
+              ><Icon name="trash" size={13} /></button>
             </div>
           </>
         )}

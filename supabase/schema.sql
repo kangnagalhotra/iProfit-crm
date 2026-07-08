@@ -39,6 +39,8 @@ create type task_priority as enum ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL');
 
 create type deal_type as enum ('NEW_BUSINESS', 'EXISTING_BUSINESS', 'RENEWAL');
 
+create type deal_priority as enum ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL');
+
 create type notification_type as enum (
   'RECORD_ASSIGNED', 'TASK_DUE', 'STAGE_CHANGED', 'MENTION', 'LEAD_INACTIVE', 'DEAL_INACTIVE', 'ACCOUNT_INACTIVE'
 );
@@ -122,7 +124,6 @@ create table accounts (
   city varchar(120),
   state varchar(120),
   country varchar(120),
-  company_type varchar(80),
   email varchar(255) check (email is null or email ~* '^[^@\s]+@[^@\s]+\.[^@\s]+$'),
   phone varchar(40) check (phone is null or phone ~ '^\+?[0-9]{10}$'),
   address varchar(255),
@@ -272,6 +273,7 @@ create table opportunities (
   amount numeric(15, 2) check (amount is null or amount >= 0),
   close_date timestamptz,
   deal_type deal_type not null default 'NEW_BUSINESS',
+  priority deal_priority not null default 'MEDIUM',
   description text,
   source varchar(80),
   pipeline_id uuid not null references pipelines(id) on delete restrict,

@@ -4,6 +4,8 @@ import type { DealStage, Lead, LeadStage, Opportunity } from '../api/types';
 import { listLeads } from '../api/leads';
 import { listDeals } from '../api/deals';
 import { listStages } from '../api/stages';
+import { Icon } from '../components/Icon';
+import { SkeletonKanban } from '../components/Skeleton';
 
 async function loadAllLeads(): Promise<Lead[]> {
   let page = 1;
@@ -66,7 +68,7 @@ export function PipelineBoard() {
     }).finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <p>Loading…</p>;
+  if (loading) return <SkeletonKanban />;
 
   const openDealStages = dealStages.filter((s) => !s.isClosedWon && !s.isClosedLost);
   const wonDeals = deals.filter((d) => d.stage.isClosedWon);
@@ -107,7 +109,12 @@ export function PipelineBoard() {
                 <h4>{col.label} <span className="count">({count})</span></h4>
               </div>
               <div className="kanban-col-cards">
-                {count === 0 && <p className="kanban-empty-text">No records</p>}
+                {count === 0 && (
+                  <div className="kanban-empty">
+                    <div className="icon"><Icon name="inbox" size={18} /></div>
+                    <p>No records in this stage</p>
+                  </div>
+                )}
                 {col.leads?.map((lead) => {
                   const name = lead.leadName || [lead.firstName, lead.lastName].filter(Boolean).join(' ') || lead.email || 'Untitled lead';
                   return (

@@ -12,10 +12,41 @@ import type { ListView } from '../components/ViewToggle';
 import { ExportMenu } from '../components/ExportMenu';
 import type { ExportColumn } from '../components/ExportMenu';
 import { InlineCell } from '../components/InlineCell';
+import { ColumnVisibilityMenu } from '../components/ColumnVisibilityMenu';
+import type { ColumnDef } from '../components/ColumnVisibilityMenu';
+import { FilterBar } from '../components/FilterBar';
+import type { FilterField } from '../components/FilterBar';
+import { SavedViewsBar } from '../components/SavedViewsBar';
+import { useSavedViews } from '../hooks/useSavedViews';
+import { SkeletonTable } from '../components/Skeleton';
+import { EmptyState } from '../components/EmptyState';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 
 type SortBy = 'name' | 'annualRevenue' | 'updatedAt' | 'createdAt';
+
+const INDUSTRY_OPTIONS = [
+  'Technology', 'Finance', 'Healthcare', 'Retail', 'Manufacturing', 'Education', 'Real Estate', 'Hospitality',
+  'Telecommunications', 'Media & Entertainment', 'Transportation & Logistics', 'Construction', 'Energy',
+  'Agriculture', 'Government', 'Non-profit', 'Consulting', 'Other',
+].map((v) => ({ value: v, label: v }));
+
+interface CompanyFilters { [key: string]: string; stageId: string; ownerId: string; industry: string; }
+
+const EMPTY_COMPANY_FILTERS: CompanyFilters = { stageId: '', ownerId: '', industry: '' };
+
+const COMPANY_COLUMNS: ColumnDef[] = [
+  { key: 'name', label: 'Name', required: true },
+  { key: 'domain', label: 'Domain' },
+  { key: 'industry', label: 'Industry' },
+  { key: 'stage', label: 'Lifecycle Stage' },
+  { key: 'owner', label: 'Owner' },
+  { key: 'revenue', label: 'Revenue' },
+  { key: 'employees', label: 'Employees' },
+  { key: 'created', label: 'Created' },
+  { key: 'lastActivity', label: 'Last Activity' },
+];
+const ALL_COMPANY_COLUMN_KEYS = COMPANY_COLUMNS.map((c) => c.key);
 
 function formatRevenue(value?: string) {
   if (!value) return '—';
@@ -28,7 +59,7 @@ const EXPORT_COLUMNS: ExportColumn<Account>[] = [
   { label: 'Name', get: (a) => a.name },
   { label: 'Domain', get: (a) => a.domain ?? '' },
   { label: 'Industry', get: (a) => a.industry ?? '' },
-  { label: 'Stage', get: (a) => a.stage.name },
+  { label: 'Lifecycle Stage', get: (a) => a.stage.name },
   { label: 'Owner', get: (a) => a.owner?.fullName ?? '' },
   { label: 'Revenue', get: (a) => a.annualRevenue ?? '' },
   { label: 'Employees', get: (a) => a.sizeBucket ?? '' },
@@ -69,6 +100,38 @@ export function CompaniesList() {
   const [stages, setStages] = useState<AccountStage[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [editingCell, setEditingCell] = useState<{ id: string; field: 'stage' | 'owner' } | null>(null);
+  const [filters, setFilters] = useState<CompanyFilters>(EMPTY_COMPANY_FILTERS);
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(ALL_COMPANY_COLUMN_KEYS);
+  const {
+    views, activeView, activeViewId, setActiveViewId, saveView, updateView, deleteView,
+  } = useSavedViews<CompanyFilters>('companies');
+
+  useEffect(() => {
+    if (activeView) {
+      setFilters(activeView.filters);
+      setVisibleColumns(activeView.visibleColumns ?? ALL_COMPANY_COLUMN_KEYS);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeView?.id]);
+
+  function selectView(id: string | null) {
+    setActiveViewId(id);
+    if (id === null) {
+      setFilters(EMPTY_COMPANY_FILTERS);
+      setVisibleColumns(ALL_COMPANY_COLUMN_KEYS);
+    }
+  }
+
+  const isViewDirty = !!activeView && (
+    JSON.stringify(filters) !== JSON.stringify(activeView.filters)
+    || JSON.stringify(visibleColumns) !== JSON.stringify(activeView.visibleColumns ?? ALL_COMPANY_COLUMN_KEYS)
+  );
+
+  const COMPANY_FILTER_FIELDS: FilterField[] = [
+    { key: 'stageId', label: 'Lifecycle Stage', options: stages.map((s) => ({ value: s.id, label: s.name })) },
+    { key: 'ownerId', label: 'Owner', options: users.map((u) => ({ value: u.id, label: u.fullName })) },
+    { key: 'industry', label: 'Industry', options: INDUSTRY_OPTIONS },
+  ];
 
   useEffect(() => {
     Promise.all([listStages('account_stages'), listUsers()])
@@ -78,14 +141,22 @@ export function CompaniesList() {
   const load = useCallback(() => {
     setLoading(true);
     listAccounts({
-      search: search || undefined, includeArchived, page, pageSize, sortBy, sortDir,
+      search: search || undefined,
+      includeArchived,
+      page,
+      pageSize,
+      sortBy,
+      sortDir,
+      stageId: filters.stageId || undefined,
+      ownerId: filters.ownerId || undefined,
+      industry: filters.industry || undefined,
     })
       .then((data) => { setAccounts(data.data); setTotal(data.total); setSelected(new Set()); })
       .finally(() => setLoading(false));
-  }, [search, includeArchived, page, pageSize, sortBy, sortDir]);
+  }, [search, includeArchived, page, pageSize, sortBy, sortDir, filters]);
 
   useEffect(() => { if (view === 'board') load(); }, [load, view]);
-  useEffect(() => { setPage(1); }, [search, includeArchived]);
+  useEffect(() => { setPage(1); }, [search, includeArchived, filters]);
 
   function toggleSort(field: SortBy) {
     if (sortBy === field) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
@@ -148,6 +219,7 @@ export function CompaniesList() {
                 getSelected={() => accounts.filter((a) => selected.has(a.id))}
                 selectedCount={selected.size}
               />
+              <ColumnVisibilityMenu columns={COMPANY_COLUMNS} visible={visibleColumns} onChange={setVisibleColumns} />
             </>
           )}
           {/* Add Company and Import are always separate, visible buttons in both views. */}
@@ -157,19 +229,36 @@ export function CompaniesList() {
       </div>
 
       {view === 'board' && (
-        <div className="quick-filter-chips">
-          <button
-            className={`chip-filter${includeArchived ? ' active' : ''}`}
-            onClick={() => setIncludeArchived((v) => !v)}
-          >
-            Show archived
-          </button>
-        </div>
+        <>
+          <SavedViewsBar
+            views={views}
+            activeViewId={activeViewId}
+            isDirty={isViewDirty}
+            onSelect={selectView}
+            onSave={(name) => saveView(name, { filters, visibleColumns })}
+            onUpdate={() => activeViewId && updateView(activeViewId, { filters, visibleColumns })}
+            onDelete={(id) => deleteView(id)}
+          />
+          <FilterBar fields={COMPANY_FILTER_FIELDS} values={filters} onChange={(v) => setFilters(v as CompanyFilters)} />
+          <div className="quick-filter-chips">
+            <button
+              className={`chip-filter${includeArchived ? ' active' : ''}`}
+              onClick={() => setIncludeArchived((v) => !v)}
+            >
+              Show archived
+            </button>
+          </div>
+        </>
       )}
 
       {view === 'board' ? (
-        loading ? <p>Loading…</p> : accounts.length === 0 ? (
-          <p style={{ color: 'var(--muted)' }}>No companies yet. Create your first one.</p>
+        loading ? <SkeletonTable columns={10} /> : accounts.length === 0 ? (
+          <EmptyState
+            icon="inbox"
+            title="No companies yet"
+            description="Create your first company to start organizing accounts."
+            action={{ label: '+ Add company', onClick: () => setShowForm(true) }}
+          />
         ) : (
           <>
             {selected.size > 0 && (
@@ -185,14 +274,14 @@ export function CompaniesList() {
                     <input type="checkbox" checked={selected.size === accounts.length && accounts.length > 0} onChange={toggleSelectAll} />
                   </th>
                   <th className="sortable" onClick={() => toggleSort('name')}>Name{sortArrow('name')}</th>
-                  <th>Owner</th>
-                  <th>Industry</th>
-                  <th>Stage</th>
-                  <th className="sortable" onClick={() => toggleSort('annualRevenue')}>Revenue{sortArrow('annualRevenue')}</th>
-                  <th>Employees</th>
-                  <th>Website</th>
-                  <th className="sortable" onClick={() => toggleSort('createdAt')}>Created{sortArrow('createdAt')}</th>
-                  <th className="sortable" onClick={() => toggleSort('updatedAt')}>Last Activity{sortArrow('updatedAt')}</th>
+                  {visibleColumns.includes('owner') && <th>Owner</th>}
+                  {visibleColumns.includes('industry') && <th>Industry</th>}
+                  {visibleColumns.includes('stage') && <th>Lifecycle Stage</th>}
+                  {visibleColumns.includes('revenue') && <th className="sortable" onClick={() => toggleSort('annualRevenue')}>Revenue{sortArrow('annualRevenue')}</th>}
+                  {visibleColumns.includes('employees') && <th>Employees</th>}
+                  {visibleColumns.includes('domain') && <th>Website</th>}
+                  {visibleColumns.includes('created') && <th className="sortable" onClick={() => toggleSort('createdAt')}>Created{sortArrow('createdAt')}</th>}
+                  {visibleColumns.includes('lastActivity') && <th className="sortable" onClick={() => toggleSort('updatedAt')}>Last Activity{sortArrow('updatedAt')}</th>}
                 </tr>
               </thead>
               <tbody>
@@ -200,44 +289,48 @@ export function CompaniesList() {
                   <tr key={a.id}>
                     <td><input type="checkbox" checked={selected.has(a.id)} onChange={() => toggleSelect(a.id)} /></td>
                     <td><Link to={`/companies/${a.id}`}>{a.name}</Link></td>
-                    <td>
-                      <InlineCell
-                        display={a.owner?.fullName ?? '—'}
-                        editing={editingCell?.id === a.id && editingCell.field === 'owner'}
-                        onStartEdit={() => setEditingCell({ id: a.id, field: 'owner' })}
-                      >
-                        <select
-                          autoFocus
-                          defaultValue={a.owner?.id ?? ''}
-                          onBlur={() => setEditingCell(null)}
-                          onChange={(e) => { inlineUpdate(a, { ownerId: e.target.value }); setEditingCell(null); }}
+                    {visibleColumns.includes('owner') && (
+                      <td>
+                        <InlineCell
+                          display={a.owner?.fullName ?? '—'}
+                          editing={editingCell?.id === a.id && editingCell.field === 'owner'}
+                          onStartEdit={() => setEditingCell({ id: a.id, field: 'owner' })}
                         >
-                          {users.map((u) => <option key={u.id} value={u.id}>{u.fullName}</option>)}
-                        </select>
-                      </InlineCell>
-                    </td>
-                    <td>{a.industry ?? '—'}</td>
-                    <td>
-                      <InlineCell
-                        display={<span className="chip" style={{ background: a.stage.color + '22', color: a.stage.color }}>{a.stage.name}</span>}
-                        editing={editingCell?.id === a.id && editingCell.field === 'stage'}
-                        onStartEdit={() => setEditingCell({ id: a.id, field: 'stage' })}
-                      >
-                        <select
-                          autoFocus
-                          defaultValue={a.stage.id}
-                          onBlur={() => setEditingCell(null)}
-                          onChange={(e) => { inlineUpdate(a, { stageId: e.target.value }); setEditingCell(null); }}
+                          <select
+                            autoFocus
+                            defaultValue={a.owner?.id ?? ''}
+                            onBlur={() => setEditingCell(null)}
+                            onChange={(e) => { inlineUpdate(a, { ownerId: e.target.value }); setEditingCell(null); }}
+                          >
+                            {users.map((u) => <option key={u.id} value={u.id}>{u.fullName}</option>)}
+                          </select>
+                        </InlineCell>
+                      </td>
+                    )}
+                    {visibleColumns.includes('industry') && <td>{a.industry ?? '—'}</td>}
+                    {visibleColumns.includes('stage') && (
+                      <td>
+                        <InlineCell
+                          display={<span className="chip" style={{ background: a.stage.color + '22', color: a.stage.color }}>{a.stage.name}</span>}
+                          editing={editingCell?.id === a.id && editingCell.field === 'stage'}
+                          onStartEdit={() => setEditingCell({ id: a.id, field: 'stage' })}
                         >
-                          {stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                        </select>
-                      </InlineCell>
-                    </td>
-                    <td>{formatRevenue(a.annualRevenue)}</td>
-                    <td>{a.sizeBucket ?? '—'}</td>
-                    <td>{a.domain ?? '—'}</td>
-                    <td>{new Date(a.createdAt).toLocaleDateString()}</td>
-                    <td>{new Date(a.updatedAt).toLocaleDateString()}</td>
+                          <select
+                            autoFocus
+                            defaultValue={a.stage.id}
+                            onBlur={() => setEditingCell(null)}
+                            onChange={(e) => { inlineUpdate(a, { stageId: e.target.value }); setEditingCell(null); }}
+                          >
+                            {stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                          </select>
+                        </InlineCell>
+                      </td>
+                    )}
+                    {visibleColumns.includes('revenue') && <td>{formatRevenue(a.annualRevenue)}</td>}
+                    {visibleColumns.includes('employees') && <td>{a.sizeBucket ?? '—'}</td>}
+                    {visibleColumns.includes('domain') && <td>{a.domain ?? '—'}</td>}
+                    {visibleColumns.includes('created') && <td>{new Date(a.createdAt).toLocaleDateString()}</td>}
+                    {visibleColumns.includes('lastActivity') && <td>{new Date(a.updatedAt).toLocaleDateString()}</td>}
                   </tr>
                 ))}
               </tbody>

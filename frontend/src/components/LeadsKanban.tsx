@@ -8,6 +8,8 @@ import type { KanbanColumn } from './kanban/Kanban';
 import { StageColumnHeader } from './kanban/StageColumnHeader';
 import { LeadForm } from './LeadForm';
 import { ConvertToDealModal } from './ConvertToDealModal';
+import { Icon } from './Icon';
+import { SkeletonKanban } from './Skeleton';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
@@ -97,7 +99,7 @@ export function LeadsKanban() {
     }
   }
 
-  if (loading) return <p>Loading…</p>;
+  if (loading) return <SkeletonKanban columns={stages.length || 4} />;
 
   const stageIds = stages.map((s) => s.id);
   const columns: KanbanColumn<Lead>[] = stages.map((stage) => ({
@@ -134,7 +136,7 @@ export function LeadsKanban() {
         )}
         emptyState={(col) => (
           <div className="kanban-empty">
-            <div className="icon">📭</div>
+            <div className="icon"><Icon name="inbox" size={18} /></div>
             <p>No leads in this stage</p>
             <button className="btn secondary" onClick={() => setFormState({ defaultStageId: col.id })}>+ Add lead</button>
           </div>
@@ -167,7 +169,7 @@ export function LeadsKanban() {
                   {lead.owner && <div className="avatar avatar-sm" title={lead.owner.fullName}>{initials(lead.owner.fullName)}</div>}
                 </div>
                 <div className="kanban-card-footer">
-                  <span className="kanban-card-badge">🕐 Updated {new Date(lead.updatedAt).toLocaleDateString()}</span>
+                  <span className="kanban-card-badge"><Icon name="clock" size={11} /> Updated {new Date(lead.updatedAt).toLocaleDateString()}</span>
                 </div>
               </Link>
               <div className="kanban-card-actions">
@@ -176,24 +178,24 @@ export function LeadsKanban() {
                     title="Convert to Deal"
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); setConvertingLead(lead); }}
-                  >✔</button>
+                  ><Icon name="check" size={13} /></button>
                 )}
                 <button
                   title="View"
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate(`/leads/${lead.id}`); }}
-                >👁</button>
+                ><Icon name="eye" size={13} /></button>
                 <button
                   title="Edit"
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); setFormState({ lead }); }}
-                >✎</button>
+                ><Icon name="edit" size={13} /></button>
                 <button
                   className="danger"
                   title="Delete"
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDelete(lead); }}
-                >🗑</button>
+                ><Icon name="trash" size={13} /></button>
               </div>
             </>
           );

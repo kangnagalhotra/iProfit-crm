@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import type {
-  Opportunity, DealStage, User,
+  Opportunity, DealStage, DealPriority, User,
 } from '../api/types';
 import { listDeals, updateDeal, bulkDeleteDeals } from '../api/deals';
 import { listStages } from '../api/stages';
@@ -15,10 +15,44 @@ import type { ListView } from '../components/ViewToggle';
 import { ExportMenu } from '../components/ExportMenu';
 import type { ExportColumn } from '../components/ExportMenu';
 import { InlineCell } from '../components/InlineCell';
+import { ColumnVisibilityMenu } from '../components/ColumnVisibilityMenu';
+import type { ColumnDef } from '../components/ColumnVisibilityMenu';
+import { FilterBar } from '../components/FilterBar';
+import type { FilterField } from '../components/FilterBar';
+import { SavedViewsBar } from '../components/SavedViewsBar';
+import { useSavedViews } from '../hooks/useSavedViews';
+import { SkeletonTable } from '../components/Skeleton';
+import { EmptyState } from '../components/EmptyState';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 
 type SortBy = 'name' | 'amount' | 'closeDate' | 'stage' | 'updatedAt' | 'createdAt';
+
+interface DealFilters { [key: string]: string; stageId: string; ownerId: string; priority: string; }
+
+const EMPTY_DEAL_FILTERS: DealFilters = { stageId: '', ownerId: '', priority: '' };
+
+const DEAL_COLUMNS: ColumnDef[] = [
+  { key: 'name', label: 'Name', required: true },
+  { key: 'company', label: 'Company' },
+  { key: 'contact', label: 'Contact' },
+  { key: 'owner', label: 'Owner' },
+  { key: 'priority', label: 'Priority' },
+  { key: 'value', label: 'Value' },
+  { key: 'pipeline', label: 'Pipeline' },
+  { key: 'stage', label: 'Stage' },
+  { key: 'probability', label: 'Probability' },
+  { key: 'closingDate', label: 'Closing Date' },
+  { key: 'created', label: 'Created' },
+];
+const ALL_DEAL_COLUMN_KEYS = DEAL_COLUMNS.map((c) => c.key);
+
+const DEAL_PRIORITY_OPTIONS: { value: DealPriority; label: string }[] = [
+  { value: 'LOW', label: 'Low' },
+  { value: 'MEDIUM', label: 'Medium' },
+  { value: 'HIGH', label: 'High' },
+  { value: 'CRITICAL', label: 'Critical' },
+];
 
 function formatValue(value?: string) {
   if (!value) return '—';
@@ -34,11 +68,16 @@ function contactName(deal: Opportunity) {
     : (deal.contact.email ?? '');
 }
 
+function priorityColor(p: Opportunity['priority']) {
+  return p === 'CRITICAL' ? '#991B1B' : p === 'HIGH' ? '#DC2626' : p === 'MEDIUM' ? '#F59E0B' : '#6B7280';
+}
+
 const EXPORT_COLUMNS: ExportColumn<Opportunity>[] = [
   { label: 'Deal Name', get: (d) => d.name },
   { label: 'Company', get: (d) => d.account?.name ?? '' },
   { label: 'Contact', get: (d) => contactName(d) },
   { label: 'Owner', get: (d) => d.owner?.fullName ?? '' },
+  { label: 'Priority', get: (d) => d.priority },
   { label: 'Value', get: (d) => d.amount ?? '' },
   { label: 'Pipeline', get: (d) => d.pipeline.name },
   { label: 'Stage', get: (d) => d.stage.name },
@@ -80,6 +119,38 @@ export function DealsList() {
   const [stages, setStages] = useState<DealStage[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [editingCell, setEditingCell] = useState<{ id: string; field: 'stage' | 'owner' } | null>(null);
+  const [filters, setFilters] = useState<DealFilters>(EMPTY_DEAL_FILTERS);
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(ALL_DEAL_COLUMN_KEYS);
+  const {
+    views, activeView, activeViewId, setActiveViewId, saveView, updateView, deleteView,
+  } = useSavedViews<DealFilters>('deals');
+
+  useEffect(() => {
+    if (activeView) {
+      setFilters(activeView.filters);
+      setVisibleColumns(activeView.visibleColumns ?? ALL_DEAL_COLUMN_KEYS);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeView?.id]);
+
+  function selectView(id: string | null) {
+    setActiveViewId(id);
+    if (id === null) {
+      setFilters(EMPTY_DEAL_FILTERS);
+      setVisibleColumns(ALL_DEAL_COLUMN_KEYS);
+    }
+  }
+
+  const isViewDirty = !!activeView && (
+    JSON.stringify(filters) !== JSON.stringify(activeView.filters)
+    || JSON.stringify(visibleColumns) !== JSON.stringify(activeView.visibleColumns ?? ALL_DEAL_COLUMN_KEYS)
+  );
+
+  const DEAL_FILTER_FIELDS: FilterField[] = [
+    { key: 'stageId', label: 'Stage', options: stages.map((s) => ({ value: s.id, label: s.name })) },
+    { key: 'ownerId', label: 'Owner', options: users.map((u) => ({ value: u.id, label: u.fullName })) },
+    { key: 'priority', label: 'Priority', options: DEAL_PRIORITY_OPTIONS },
+  ];
 
   useEffect(() => {
     Promise.all([listStages('deal_stages'), listUsers()])
@@ -89,14 +160,22 @@ export function DealsList() {
   const load = useCallback(() => {
     setLoading(true);
     listDeals({
-      search: search || undefined, includeArchived, page, pageSize, sortBy, sortDir,
+      search: search || undefined,
+      includeArchived,
+      page,
+      pageSize,
+      sortBy,
+      sortDir,
+      stageId: filters.stageId || undefined,
+      ownerId: filters.ownerId || undefined,
+      priority: (filters.priority || undefined) as DealPriority | undefined,
     })
       .then((data) => { setDeals(data.data); setTotal(data.total); setSelected(new Set()); })
       .finally(() => setLoading(false));
-  }, [search, includeArchived, page, pageSize, sortBy, sortDir]);
+  }, [search, includeArchived, page, pageSize, sortBy, sortDir, filters]);
 
   useEffect(() => { if (view === 'board') load(); }, [load, view]);
-  useEffect(() => { setPage(1); }, [search, includeArchived]);
+  useEffect(() => { setPage(1); }, [search, includeArchived, filters]);
 
   function toggleSort(field: SortBy) {
     if (sortBy === field) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
@@ -159,6 +238,7 @@ export function DealsList() {
                 getSelected={() => deals.filter((d) => selected.has(d.id))}
                 selectedCount={selected.size}
               />
+              <ColumnVisibilityMenu columns={DEAL_COLUMNS} visible={visibleColumns} onChange={setVisibleColumns} />
             </>
           )}
           <AddContactsMenu label="Add deal" onCreateNew={() => setShowForm(true)} onImport={() => setShowImport(true)} />
@@ -166,19 +246,36 @@ export function DealsList() {
       </div>
 
       {view === 'board' && (
-        <div className="quick-filter-chips">
-          <button
-            className={`chip-filter${includeArchived ? ' active' : ''}`}
-            onClick={() => setIncludeArchived((v) => !v)}
-          >
-            Show archived
-          </button>
-        </div>
+        <>
+          <SavedViewsBar
+            views={views}
+            activeViewId={activeViewId}
+            isDirty={isViewDirty}
+            onSelect={selectView}
+            onSave={(name) => saveView(name, { filters, visibleColumns })}
+            onUpdate={() => activeViewId && updateView(activeViewId, { filters, visibleColumns })}
+            onDelete={(id) => deleteView(id)}
+          />
+          <FilterBar fields={DEAL_FILTER_FIELDS} values={filters} onChange={(v) => setFilters(v as DealFilters)} />
+          <div className="quick-filter-chips">
+            <button
+              className={`chip-filter${includeArchived ? ' active' : ''}`}
+              onClick={() => setIncludeArchived((v) => !v)}
+            >
+              Show archived
+            </button>
+          </div>
+        </>
       )}
 
       {view === 'board' ? (
-        loading ? <p>Loading…</p> : deals.length === 0 ? (
-          <p style={{ color: 'var(--muted)' }}>No deals yet. Create your first one.</p>
+        loading ? <SkeletonTable columns={12} /> : deals.length === 0 ? (
+          <EmptyState
+            icon="inbox"
+            title="No deals yet"
+            description="Create your first deal to start tracking pipeline."
+            action={{ label: '+ Create deal', onClick: () => setShowForm(true) }}
+          />
         ) : (
           <>
             {selected.size > 0 && (
@@ -194,15 +291,16 @@ export function DealsList() {
                     <input type="checkbox" checked={selected.size === deals.length && deals.length > 0} onChange={toggleSelectAll} />
                   </th>
                   <th className="sortable" onClick={() => toggleSort('name')}>Deal Name{sortArrow('name')}</th>
-                  <th>Company</th>
-                  <th>Contact</th>
-                  <th>Owner</th>
-                  <th className="sortable" onClick={() => toggleSort('amount')}>Value{sortArrow('amount')}</th>
-                  <th>Pipeline</th>
-                  <th className="sortable" onClick={() => toggleSort('stage')}>Stage{sortArrow('stage')}</th>
-                  <th>Probability</th>
-                  <th className="sortable" onClick={() => toggleSort('closeDate')}>Closing Date{sortArrow('closeDate')}</th>
-                  <th className="sortable" onClick={() => toggleSort('createdAt')}>Created{sortArrow('createdAt')}</th>
+                  {visibleColumns.includes('company') && <th>Company</th>}
+                  {visibleColumns.includes('contact') && <th>Contact</th>}
+                  {visibleColumns.includes('owner') && <th>Owner</th>}
+                  {visibleColumns.includes('priority') && <th>Priority</th>}
+                  {visibleColumns.includes('value') && <th className="sortable" onClick={() => toggleSort('amount')}>Value{sortArrow('amount')}</th>}
+                  {visibleColumns.includes('pipeline') && <th>Pipeline</th>}
+                  {visibleColumns.includes('stage') && <th className="sortable" onClick={() => toggleSort('stage')}>Stage{sortArrow('stage')}</th>}
+                  {visibleColumns.includes('probability') && <th>Probability</th>}
+                  {visibleColumns.includes('closingDate') && <th className="sortable" onClick={() => toggleSort('closeDate')}>Closing Date{sortArrow('closeDate')}</th>}
+                  {visibleColumns.includes('created') && <th className="sortable" onClick={() => toggleSort('createdAt')}>Created{sortArrow('createdAt')}</th>}
                 </tr>
               </thead>
               <tbody>
@@ -210,45 +308,50 @@ export function DealsList() {
                   <tr key={d.id}>
                     <td><input type="checkbox" checked={selected.has(d.id)} onChange={() => toggleSelect(d.id)} /></td>
                     <td><Link to={`/deals/${d.id}`}>{d.name}</Link></td>
-                    <td>{d.account ? <Link to={`/companies/${d.account.id}`}>{d.account.name}</Link> : '—'}</td>
-                    <td>{contactName(d) || '—'}</td>
-                    <td>
-                      <InlineCell
-                        display={d.owner?.fullName ?? '—'}
-                        editing={editingCell?.id === d.id && editingCell.field === 'owner'}
-                        onStartEdit={() => setEditingCell({ id: d.id, field: 'owner' })}
-                      >
-                        <select
-                          autoFocus
-                          defaultValue={d.owner?.id ?? ''}
-                          onBlur={() => setEditingCell(null)}
-                          onChange={(e) => { inlineUpdate(d, { ownerId: e.target.value }); setEditingCell(null); }}
+                    {visibleColumns.includes('company') && <td>{d.account ? <Link to={`/companies/${d.account.id}`}>{d.account.name}</Link> : '—'}</td>}
+                    {visibleColumns.includes('contact') && <td>{contactName(d) || '—'}</td>}
+                    {visibleColumns.includes('owner') && (
+                      <td>
+                        <InlineCell
+                          display={d.owner?.fullName ?? '—'}
+                          editing={editingCell?.id === d.id && editingCell.field === 'owner'}
+                          onStartEdit={() => setEditingCell({ id: d.id, field: 'owner' })}
                         >
-                          {users.map((u) => <option key={u.id} value={u.id}>{u.fullName}</option>)}
-                        </select>
-                      </InlineCell>
-                    </td>
-                    <td>{formatValue(d.amount)}</td>
-                    <td>{d.pipeline.name}</td>
-                    <td>
-                      <InlineCell
-                        display={<span className="chip" style={{ background: d.stage.color + '22', color: d.stage.color }}>{d.stage.name}</span>}
-                        editing={editingCell?.id === d.id && editingCell.field === 'stage'}
-                        onStartEdit={() => setEditingCell({ id: d.id, field: 'stage' })}
-                      >
-                        <select
-                          autoFocus
-                          defaultValue={d.stage.id}
-                          onBlur={() => setEditingCell(null)}
-                          onChange={(e) => { inlineUpdate(d, { stageId: e.target.value }); setEditingCell(null); }}
+                          <select
+                            autoFocus
+                            defaultValue={d.owner?.id ?? ''}
+                            onBlur={() => setEditingCell(null)}
+                            onChange={(e) => { inlineUpdate(d, { ownerId: e.target.value }); setEditingCell(null); }}
+                          >
+                            {users.map((u) => <option key={u.id} value={u.id}>{u.fullName}</option>)}
+                          </select>
+                        </InlineCell>
+                      </td>
+                    )}
+                    {visibleColumns.includes('priority') && <td><span className="chip" style={{ background: priorityColor(d.priority) + '22', color: priorityColor(d.priority) }}>{d.priority}</span></td>}
+                    {visibleColumns.includes('value') && <td>{formatValue(d.amount)}</td>}
+                    {visibleColumns.includes('pipeline') && <td>{d.pipeline.name}</td>}
+                    {visibleColumns.includes('stage') && (
+                      <td>
+                        <InlineCell
+                          display={<span className="chip" style={{ background: d.stage.color + '22', color: d.stage.color }}>{d.stage.name}</span>}
+                          editing={editingCell?.id === d.id && editingCell.field === 'stage'}
+                          onStartEdit={() => setEditingCell({ id: d.id, field: 'stage' })}
                         >
-                          {stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                        </select>
-                      </InlineCell>
-                    </td>
-                    <td>{d.stage.winProbability}%</td>
-                    <td>{d.closeDate ? new Date(d.closeDate).toLocaleDateString() : '—'}</td>
-                    <td>{new Date(d.createdAt).toLocaleDateString()}</td>
+                          <select
+                            autoFocus
+                            defaultValue={d.stage.id}
+                            onBlur={() => setEditingCell(null)}
+                            onChange={(e) => { inlineUpdate(d, { stageId: e.target.value }); setEditingCell(null); }}
+                          >
+                            {stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                          </select>
+                        </InlineCell>
+                      </td>
+                    )}
+                    {visibleColumns.includes('probability') && <td>{d.stage.winProbability}%</td>}
+                    {visibleColumns.includes('closingDate') && <td>{d.closeDate ? new Date(d.closeDate).toLocaleDateString() : '—'}</td>}
+                    {visibleColumns.includes('created') && <td>{new Date(d.createdAt).toLocaleDateString()}</td>}
                   </tr>
                 ))}
               </tbody>

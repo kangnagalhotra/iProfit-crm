@@ -4,6 +4,8 @@ import type { SupportTicket, TicketPriority, TicketStatus, User } from '../api/t
 import { listTickets, getTicketSummary } from '../api/supportTickets';
 import { listUsers } from '../api/users';
 import { SupportTicketForm } from '../components/SupportTicketForm';
+import { SkeletonTable } from '../components/Skeleton';
+import { EmptyState } from '../components/EmptyState';
 
 type SortBy = 'subject' | 'priority' | 'status' | 'dueAt' | 'createdAt' | 'updatedAt';
 
@@ -96,8 +98,13 @@ export function SupportTicketsList() {
         </div>
       )}
 
-      {loading ? <p>Loading…</p> : tickets.length === 0 ? (
-        <p style={{ color: 'var(--muted)' }}>No support tickets match these filters.</p>
+      {loading ? <SkeletonTable columns={7} /> : tickets.length === 0 ? (
+        <EmptyState
+          icon="inbox"
+          title="No matching tickets"
+          description="No support tickets match these filters — try adjusting them, or create a new ticket."
+          action={{ label: '+ New ticket', onClick: () => setShowForm(true) }}
+        />
       ) : (
         <>
           <table>

@@ -6,6 +6,8 @@ import { Kanban } from './kanban/Kanban';
 import type { KanbanColumn } from './kanban/Kanban';
 import { StageColumnHeader } from './kanban/StageColumnHeader';
 import { TaskForm } from './TaskForm';
+import { Icon } from './Icon';
+import { SkeletonKanban } from './Skeleton';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 
@@ -88,7 +90,7 @@ export function TasksKanban() {
     }
   }
 
-  if (loading) return <p>Loading…</p>;
+  if (loading) return <SkeletonKanban columns={STATUS_COLUMNS.length} />;
 
   const statusIds = STATUS_COLUMNS.map((s) => s.id);
   const columns: KanbanColumn<Task>[] = STATUS_COLUMNS.map((col) => ({
@@ -126,7 +128,7 @@ export function TasksKanban() {
         )}
         emptyState={(col) => (
           <div className="kanban-empty">
-            <div className="icon">📭</div>
+            <div className="icon"><Icon name="inbox" size={18} /></div>
             <p>No tasks in this status</p>
             <button className="btn secondary" onClick={() => setFormState({ defaultStatus: col.id as TaskStatus })}>+ Add task</button>
           </div>
@@ -136,8 +138,8 @@ export function TasksKanban() {
           return (
             <>
               <Link to={`/tasks/${task.id}`}>
-                <div className="kanban-card-title">
-                  {isOverdue(task) && <span title="Overdue" style={{ color: '#DC2626', marginRight: 4 }}>⚠</span>}
+                <div className="kanban-card-title" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  {isOverdue(task) && <span title="Overdue" style={{ color: '#DC2626', display: 'flex' }}><Icon name="alert" size={12} /></span>}
                   {task.title}
                 </div>
                 {related && <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 2 }}>{related.label}</div>}
@@ -149,7 +151,7 @@ export function TasksKanban() {
                 </div>
                 <div className="kanban-card-footer">
                   <span className={`kanban-card-badge${isOverdue(task) ? ' overdue' : ''}`}>
-                    🕐 Due {new Date(task.dueAt).toLocaleDateString()}
+                    <Icon name="clock" size={11} /> Due {new Date(task.dueAt).toLocaleDateString()}
                   </span>
                 </div>
               </Link>
@@ -158,18 +160,18 @@ export function TasksKanban() {
                   title="View"
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate(`/tasks/${task.id}`); }}
-                >👁</button>
+                ><Icon name="eye" size={13} /></button>
                 <button
                   title="Edit"
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); setFormState({ task }); }}
-                >✎</button>
+                ><Icon name="edit" size={13} /></button>
                 <button
                   className="danger"
                   title="Delete"
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDelete(task); }}
-                >🗑</button>
+                ><Icon name="trash" size={13} /></button>
               </div>
             </>
           );

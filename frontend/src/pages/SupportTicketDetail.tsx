@@ -4,6 +4,7 @@ import type { SupportTicket } from '../api/types';
 import { getTicket, updateTicket, deleteTicket } from '../api/supportTickets';
 import { SupportTicketForm } from '../components/SupportTicketForm';
 import { Icon } from '../components/Icon';
+import { SkeletonDetailPage } from '../components/Skeleton';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 
@@ -44,7 +45,7 @@ export function SupportTicketDetail() {
 
   useEffect(() => { load(); }, [id]);
 
-  if (!ticket) return <p>Loading…</p>;
+  if (!ticket) return <SkeletonDetailPage />;
 
   async function resolve() {
     try {

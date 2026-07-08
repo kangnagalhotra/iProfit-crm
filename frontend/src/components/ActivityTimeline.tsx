@@ -3,6 +3,7 @@ import type { Activity, ActivityType } from '../api/types';
 import { listActivities } from '../api/activities';
 import { timeAgo } from '../utils/timeAgo';
 import { Icon } from './Icon';
+import { EmptyState } from './EmptyState';
 
 const ACTIVITY_ICONS: Record<ActivityType, 'phone' | 'mail' | 'calendar' | 'note' | 'edit'> = {
   CALL: 'phone',
@@ -48,10 +49,7 @@ export function ActivityTimeline({
           <div className="skeleton-row"><div className="skeleton-circle" /><div className="skeleton-lines"><div className="skeleton-line" /><div className="skeleton-line short" /></div></div>
         </>
       ) : activities.length === 0 ? (
-        <div className="empty-state">
-          <span className="icon"><Icon name="edit" size={18} /></span>
-          <p>No activity yet — updates will show up here.</p>
-        </div>
+        <EmptyState icon="edit" description="No activity yet — updates will show up here." size="sm" />
       ) : activities.map((a) => (
         <div key={a.id} className="activity-item">
           <div className="activity-icon" title={a.type}><Icon name={ACTIVITY_ICONS[a.type]} size={14} /></div>

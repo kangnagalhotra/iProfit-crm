@@ -59,6 +59,7 @@ export async function updateStage(table: StageTable, id: string, patch: Record<s
   if (patch.isWon !== undefined) dbPatch.is_won = patch.isWon;
   if (patch.isLost !== undefined) dbPatch.is_lost = patch.isLost;
   if (patch.isDefault !== undefined) dbPatch.is_default = patch.isDefault;
+  if (patch.winProbability !== undefined) dbPatch.win_probability = patch.winProbability;
   if (patch.isClosedWon !== undefined) dbPatch.is_closed_won = patch.isClosedWon;
   if (patch.isClosedLost !== undefined) dbPatch.is_closed_lost = patch.isClosedLost;
   if (patch.isCustomerStage !== undefined) dbPatch.is_customer_stage = patch.isCustomerStage;

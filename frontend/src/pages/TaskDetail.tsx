@@ -6,6 +6,7 @@ import { createActivity } from '../api/activities';
 import { TaskForm } from '../components/TaskForm';
 import { ActivityTimeline } from '../components/ActivityTimeline';
 import { Icon } from '../components/Icon';
+import { SkeletonDetailPage } from '../components/Skeleton';
 import { useToast } from '../context/ToastContext';
 
 const textareaStyle = {
@@ -54,7 +55,7 @@ export function TaskDetail() {
 
   useEffect(() => { load(); }, [id]);
 
-  if (!task) return <p>Loading…</p>;
+  if (!task) return <SkeletonDetailPage />;
 
   const related = relatedRecord(task);
 
