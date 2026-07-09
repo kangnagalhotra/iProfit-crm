@@ -174,12 +174,16 @@ tr.clickable-row:hover td { background: var(--pale); }
 .file-upload-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .duplicate-warning {
-  display: flex; align-items: center; gap: 8px;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
   background: #FEF3C7; border: 1px solid #FDE68A; color: #92400E;
   border-radius: var(--radius-sm); padding: 8px 12px; font-size: 13px; margin: 4px 0 14px;
 }
 .duplicate-warning a { color: #92400E; text-decoration: underline; font-weight: 600; }
 .duplicate-warning button { margin-left: auto; background: none; border: none; color: #92400E; cursor: pointer; font-size: 15px; line-height: 1; padding: 0; }
+.duplicate-warning.blocking {
+  background: #FEE2E2; border-color: #FECACA; color: #991B1B;
+}
+.duplicate-warning.blocking a, .duplicate-warning.blocking button { color: #991B1B; }
 
 .lead-locked-badge { background: #F3F4F6; color: var(--muted); }
 .file-upload-size { color: var(--muted); }

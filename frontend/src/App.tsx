@@ -7,8 +7,11 @@ import { LeadsList } from './pages/LeadsList';
 import { LeadDetail } from './pages/LeadDetail';
 import { CompaniesList } from './pages/CompaniesList';
 import { CompanyDetail } from './pages/CompanyDetail';
+import { ContactsList } from './pages/ContactsList';
+import { ContactDetail } from './pages/ContactDetail';
 import { DealsList } from './pages/DealsList';
 import { DealDetail } from './pages/DealDetail';
+import { ProductsList } from './pages/ProductsList';
 import { PipelineBoard } from './pages/PipelineBoard';
 import { CustomerSuccessBoard } from './pages/CustomerSuccessBoard';
 import { SupportTicketsList } from './pages/SupportTicketsList';
@@ -25,7 +28,9 @@ const NAV_LINKS: { to: string; label: string; icon: IconName; end?: boolean }[] 
   { to: '/', label: 'Home', icon: 'home', end: true },
   { to: '/leads', label: 'Leads', icon: 'person' },
   { to: '/companies', label: 'Companies', icon: 'building' },
+  { to: '/contacts', label: 'Contacts', icon: 'person' },
   { to: '/deals', label: 'Deals', icon: 'dollar' },
+  { to: '/products', label: 'Products', icon: 'inbox' },
   { to: '/pipeline', label: 'Pipeline', icon: 'columns' },
   { to: '/customer-success', label: 'Customer Success', icon: 'headset' },
   { to: '/support-tickets', label: 'Support Tickets', icon: 'ticket' },
@@ -86,8 +91,11 @@ export function App() {
       <Route path="/leads/:id" element={<Protected><LeadDetail /></Protected>} />
       <Route path="/companies" element={<Protected><CompaniesList /></Protected>} />
       <Route path="/companies/:id" element={<Protected><CompanyDetail /></Protected>} />
+      <Route path="/contacts" element={<Protected><ContactsList /></Protected>} />
+      <Route path="/contacts/:id" element={<Protected><ContactDetail /></Protected>} />
       <Route path="/deals" element={<Protected><DealsList /></Protected>} />
       <Route path="/deals/:id" element={<Protected><DealDetail /></Protected>} />
+      <Route path="/products" element={<Protected><ProductsList /></Protected>} />
       <Route path="/pipeline" element={<Protected><PipelineBoard /></Protected>} />
       <Route path="/customer-success" element={<Protected><CustomerSuccessBoard /></Protected>} />
       <Route path="/support-tickets" element={<Protected><SupportTicketsList /></Protected>} />

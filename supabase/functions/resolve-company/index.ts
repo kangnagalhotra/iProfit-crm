@@ -40,7 +40,11 @@ Deno.serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   );
 
-  const { data: existing } = await admin.from('accounts').select('id').eq('name', companyName).maybeSingle();
+  // Case-insensitive match — "acme corp" and "Acme Corp" should resolve to the
+  // same company. Only name is available here (callers pass a typed company
+  // name, not a domain); CompanyForm's own create flow does the fuller
+  // name-and-domain duplicate check since it has both fields to compare.
+  const { data: existing } = await admin.from('accounts').select('id').ilike('name', companyName).maybeSingle();
   if (existing) {
     return new Response(JSON.stringify({ id: existing.id }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

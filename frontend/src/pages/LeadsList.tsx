@@ -68,7 +68,7 @@ function formatValue(value?: string) {
 const EXPORT_COLUMNS: ExportColumn<Lead>[] = [
   { label: 'Name', get: (l) => l.leadName || [l.firstName, l.lastName].filter(Boolean).join(' ') },
   { label: 'Email', get: (l) => l.email ?? '' },
-  { label: 'Phone', get: (l) => l.phone ?? '' },
+  { label: 'Mobile Number', get: (l) => l.mobile ?? '' },
   { label: 'Stage', get: (l) => l.stage.name },
   { label: 'Owner', get: (l) => l.owner?.fullName ?? '' },
   { label: 'Company', get: (l) => l.account?.name ?? '' },

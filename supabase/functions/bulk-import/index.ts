@@ -68,7 +68,7 @@ Deno.serve(async (req) => {
           first_name: row.firstName,
           last_name: row.lastName,
           email: row.email,
-          phone: row.phone,
+          mobile: row.mobile,
           job_title: row.jobTitle,
           stage_id: stageId,
           source: 'IMPORT',
@@ -112,34 +112,13 @@ Deno.serve(async (req) => {
       }
     }
   } else if (entity === 'deals') {
-    const { data: pipeline } = await admin.from('pipelines').select('id').eq('is_default', true).single();
-    const { data: stages } = await admin.from('deal_stages').select('id, name, is_default').eq('pipeline_id', pipeline!.id);
-    const stageByName = new Map((stages ?? []).map((s: any) => [s.name.toLowerCase(), s.id]));
-    const defaultStageId = (stages ?? []).find((s: any) => s.is_default)?.id ?? stages?.[0]?.id;
-
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      try {
-        const stageId = (row.stageName && stageByName.get(row.stageName.toLowerCase())) || defaultStageId;
-        if (!stageId) throw new Error('No deal stages configured');
-        let accountId: string | undefined;
-        if (row.companyName) {
-          const { data: resolved, error: resolveError } = await admin.functions.invoke('resolve-company', {
-            headers: { Authorization: authHeader }, body: { companyName: row.companyName, ownerId: user.id },
-          });
-          if (resolveError) throw new Error(resolveError.message);
-          accountId = resolved.id;
-        }
-        const { data: deal, error } = await admin.from('opportunities').insert({
-          name: row.name, amount: row.amount, stage_id: stageId, pipeline_id: pipeline!.id, owner_id: user.id, account_id: accountId,
-          close_date: row.closeDate ? new Date(row.closeDate).toISOString() : undefined,
-        }).select().single();
-        if (error) throw new Error(error.message);
-        created.push(deal);
-      } catch (e: any) {
-        errors.push({ row: i + 1, name: row.name, message: e.message ?? 'Unknown error' });
-      }
-    }
+    // Deals can only be created by converting a Qualified lead (see
+    // convertLeadToDeal() in api/leads.ts and the DB-level
+    // guard_deal_creation trigger) — bulk CSV import of deals is
+    // intentionally not supported.
+    return new Response(JSON.stringify({ error: 'Deals cannot be bulk-imported — they can only be created by converting a Qualified lead.' }), {
+      status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   } else if (entity === 'tasks') {
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];

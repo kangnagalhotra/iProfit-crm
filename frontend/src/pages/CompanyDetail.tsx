@@ -19,6 +19,7 @@ import { EditableRow } from '../components/EditableRow';
 import { SearchSelect } from '../components/SearchSelect';
 import { CompanyForm } from '../components/CompanyForm';
 import { ContactForm } from '../components/ContactForm';
+import { MergeCompanyModal } from '../components/MergeCompanyModal';
 import { AddActivityModal } from '../components/AddActivityModal';
 import { Icon } from '../components/Icon';
 import { CollapsibleCard } from '../components/CollapsibleCard';
@@ -108,6 +109,7 @@ export function CompanyDetail() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showAddActivity, setShowAddActivity] = useState(false);
   const [showContactForm, setShowContactForm] = useState(false);
+  const [showMergeModal, setShowMergeModal] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [activityKey, setActivityKey] = useState(0);
   const moreRef = useRef<HTMLDivElement>(null);
@@ -273,6 +275,9 @@ export function CompanyDetail() {
                   <button onClick={() => { setMoreOpen(false); setShowAddActivity(true); }}>Add Activity</button>
                   <button disabled title="Coming soon — Meeting scheduling not built yet">Schedule Meeting</button>
                   <button onClick={() => { setMoreOpen(false); duplicateRecord(); }}>Duplicate Record</button>
+                  {canManageStatus && (
+                    <button onClick={() => { setMoreOpen(false); setShowMergeModal(true); }}>Merge into…</button>
+                  )}
                   <button onClick={() => { setMoreOpen(false); saveField({ archivedAt: account.archivedAt ? null : new Date().toISOString() }); }}>
                     {account.archivedAt ? 'Unarchive Record' : 'Archive Record'}
                   </button>
@@ -432,7 +437,7 @@ export function CompanyDetail() {
               { header: 'Owner', render: (l: Lead) => l.owner?.fullName ?? '—' },
               { header: 'Stage', render: (l: Lead) => <span className="chip" style={{ background: l.stage.color + '22', color: l.stage.color }}>{l.stage.name}</span> },
               { header: 'Email', render: (l: Lead) => l.email ?? '—' },
-              { header: 'Phone', render: (l: Lead) => l.phone ?? '—' },
+              { header: 'Mobile Number', render: (l: Lead) => l.mobile ?? '—' },
               { header: 'Last Activity', render: (l: Lead) => (l.lastActivityAt ? new Date(l.lastActivityAt).toLocaleDateString() : '—') },
             ],
           },
@@ -502,6 +507,18 @@ export function CompanyDetail() {
           accountId={account.id}
           onClose={() => setShowContactForm(false)}
           onSaved={() => { setShowContactForm(false); loadAssociatedContacts(); toast.success('Contact added'); }}
+        />
+      )}
+
+      {showMergeModal && (
+        <MergeCompanyModal
+          source={account}
+          onClose={() => setShowMergeModal(false)}
+          onMerged={(targetId) => {
+            setShowMergeModal(false);
+            toast.success('Companies merged');
+            navigate(`/companies/${targetId}`);
+          }}
         />
       )}
     </div>

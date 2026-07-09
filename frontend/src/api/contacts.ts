@@ -2,7 +2,7 @@ import { supabase } from '../lib/supabase';
 import type { Contact, Paginated } from './types';
 
 const SELECT = `*, account:accounts(id, name, stage:account_stages(name, color)),
-  lead:leads(id), owner:profiles(id, full_name)`;
+  lead_contacts(lead:leads(id, first_name, last_name, email)), owner:profiles(id, full_name)`;
 
 const SORT_COLUMN: Record<string, string> = {
   firstName: 'first_name', lastName: 'last_name', updatedAt: 'updated_at', createdAt: 'created_at',
@@ -15,12 +15,17 @@ function mapContact(row: any): Contact {
     lastName: row.last_name ?? undefined,
     email: row.email ?? undefined,
     phone: row.phone ?? undefined,
+    mobile: row.mobile ?? undefined,
     jobTitle: row.job_title ?? undefined,
+    department: row.department ?? undefined,
+    notes: row.notes ?? undefined,
     account: row.account ? {
       id: row.account.id, name: row.account.name,
       stage: row.account.stage ? { name: row.account.stage.name, color: row.account.stage.color } : undefined,
     } : undefined,
-    lead: row.lead ? { id: row.lead.id } : undefined,
+    leads: (row.lead_contacts ?? []).filter((lc: any) => lc.lead).map((lc: any) => ({
+      id: lc.lead.id, firstName: lc.lead.first_name ?? undefined, lastName: lc.lead.last_name ?? undefined, email: lc.lead.email ?? undefined,
+    })),
     owner: row.owner ? { id: row.owner.id, fullName: row.owner.full_name } : undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -64,27 +69,41 @@ export async function getContact(id: string): Promise<Contact> {
 function toRow(input: Record<string, any>) {
   const row: Record<string, any> = {
     first_name: input.firstName, last_name: input.lastName, email: input.email, phone: input.phone,
-    job_title: input.jobTitle, account_id: input.accountId, lead_id: input.leadId, owner_id: input.ownerId,
+    mobile: input.mobile, job_title: input.jobTitle, department: input.department, notes: input.notes,
+    account_id: input.accountId, owner_id: input.ownerId,
   };
   Object.keys(row).forEach((k) => { if (row[k] === undefined) delete row[k]; });
   return row;
+}
+
+async function replaceContactLeads(contactId: string, leadIds: string[]): Promise<void> {
+  const { error: deleteError } = await supabase.from('lead_contacts').delete().eq('contact_id', contactId);
+  if (deleteError) throw deleteError;
+  if (leadIds.length === 0) return;
+  const { error: insertError } = await supabase.from('lead_contacts').insert(
+    leadIds.map((leadId) => ({ lead_id: leadId, contact_id: contactId })),
+  );
+  if (insertError) throw insertError;
 }
 
 export async function createContact(input: Record<string, any>): Promise<Contact> {
   const currentUser = (await supabase.auth.getUser()).data.user;
   const row = toRow(input);
   row.owner_id = row.owner_id ?? currentUser?.id;
+  if (!row.account_id) throw new Error('Company is required for a contact.');
 
   const { data, error } = await supabase.from('contacts').insert(row).select(SELECT).single();
   if (error) throw new Error(error.message);
-  return mapContact(data);
+  if (input.leadIds) await replaceContactLeads(data.id, input.leadIds);
+  return getContact(data.id);
 }
 
 export async function updateContact(id: string, input: Record<string, any>): Promise<Contact> {
   const row = toRow(input);
   const { data, error } = await supabase.from('contacts').update(row).eq('id', id).select(SELECT).single();
   if (error) throw new Error(error.message);
-  return mapContact(data);
+  if (input.leadIds) await replaceContactLeads(data.id, input.leadIds);
+  return getContact(data.id);
 }
 
 export async function deleteContact(id: string): Promise<void> {

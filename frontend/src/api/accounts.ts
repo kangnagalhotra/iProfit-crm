@@ -81,6 +81,65 @@ export async function getAccount(id: string): Promise<Account> {
   return mapAccount(data);
 }
 
+export interface DuplicateAccountMatch { id: string; name: string; domain?: string; matchType: 'name' | 'domain'; }
+
+// Mirrors the DB's normalize_domain() (schema.sql) so the client can preview
+// the same collision the accounts_domain_normalized_uidx constraint enforces.
+export function normalizeDomain(input: string): string {
+  return input.trim().replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/.*$/, '').toLowerCase();
+}
+
+const COMPANY_SUFFIX_RE = /\b(pvt\.?\s*ltd\.?|private\s+limited|llc|inc\.?|ltd\.?|limited|corp\.?|corporation|co\.?)\b/gi;
+
+// Ignores case, punctuation, and common legal suffixes so "WeExcel Pvt Ltd"
+// and "WeExcel LLC" are treated as the same name for the soft dup-check.
+function normalizeCompanyName(input: string): string {
+  return input.toLowerCase().replace(COMPANY_SUFFIX_RE, '').replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+export interface DuplicateCheckResult {
+  // Domain collisions are a hard signal (DB-enforced) — the caller should block creation.
+  domainMatch?: DuplicateAccountMatch;
+  // Name collisions can be legitimate different companies — advisory only.
+  nameMatch?: DuplicateAccountMatch;
+}
+
+// HubSpot-style duplicate check, run before creating a company: domain and
+// name are checked independently. Domain match = hard block (same site can't
+// be two companies); name match = soft warning requiring explicit confirmation.
+export async function checkDuplicateAccount(params: {
+  name?: string; domain?: string; excludeId?: string;
+}): Promise<DuplicateCheckResult> {
+  const { name, domain, excludeId } = params;
+  const result: DuplicateCheckResult = {};
+
+  if (domain?.trim()) {
+    const normalized = normalizeDomain(domain);
+    if (normalized) {
+      let q = supabase.from('accounts').select('id, name, domain').eq('domain_normalized', normalized).limit(1);
+      if (excludeId) q = q.neq('id', excludeId);
+      const { data } = await q.maybeSingle();
+      if (data) result.domainMatch = { id: data.id, name: data.name, domain: data.domain ?? undefined, matchType: 'domain' };
+    }
+  }
+
+  if (name?.trim()) {
+    const normalizedTarget = normalizeCompanyName(name);
+    const firstWord = normalizedTarget.split(' ')[0];
+    if (normalizedTarget && firstWord) {
+      let q = supabase.from('accounts').select('id, name, domain').ilike('name', `%${firstWord}%`).limit(20);
+      if (excludeId) q = q.neq('id', excludeId);
+      const { data } = await q;
+      const match = (data ?? []).find((a) => normalizeCompanyName(a.name) === normalizedTarget);
+      if (match && match.id !== result.domainMatch?.id) {
+        result.nameMatch = { id: match.id, name: match.name, domain: match.domain ?? undefined, matchType: 'name' };
+      }
+    }
+  }
+
+  return result;
+}
+
 async function defaultAccountStageId(): Promise<string> {
   const { data, error } = await supabase.from('account_stages').select('id').eq('is_default', true).single();
   if (error) throw error;
@@ -132,6 +191,11 @@ export async function bulkUpdateAccountStage(ids: string[], stageId: string) {
   const { error, count } = await supabase.from('accounts').update({ stage_id: stageId }, { count: 'exact' }).in('id', ids);
   if (error) return { succeeded: 0, failed: ids.length, total: ids.length };
   return { succeeded: count ?? 0, failed: ids.length - (count ?? 0), total: ids.length };
+}
+
+export async function mergeAccounts(sourceId: string, targetId: string): Promise<void> {
+  const { error } = await supabase.rpc('merge_accounts', { source_id: sourceId, target_id: targetId });
+  if (error) throw new Error(error.message);
 }
 
 export async function bulkUpdateAccountOwner(ids: string[], ownerId: string) {

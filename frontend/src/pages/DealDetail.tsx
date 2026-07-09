@@ -26,6 +26,7 @@ import { StageHistoryCard } from '../components/StageHistoryCard';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 import { timeAgo } from '../utils/timeAgo';
+import { closedWonHandoverMessage } from '../utils/dealAutomation';
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -128,12 +129,15 @@ export function DealDetail() {
   if (!deal) return <SkeletonDetailPage />;
 
   async function saveField(data: Record<string, any>) {
+    const prevStage = deal!.stage;
     try {
       const updated = await updateDeal(deal!.id, data);
       setDeal(updated);
       setEditingField(null);
       setActivityKey((k) => k + 1);
       toast.success('Deal updated');
+      const handoverMsg = closedWonHandoverMessage(prevStage, updated.stage);
+      if (handoverMsg) toast.success(handoverMsg);
     } catch (e: any) {
       toast.error(e.message ?? 'Could not update deal');
     }
@@ -428,6 +432,8 @@ export function DealDetail() {
           onClose={() => setShowEditModal(false)}
           onSaved={(updated) => {
             setDeal(updated); setShowEditModal(false); setActivityKey((k) => k + 1); toast.success('Deal updated');
+            const handoverMsg = closedWonHandoverMessage(deal.stage, updated.stage);
+            if (handoverMsg) toast.success(handoverMsg);
           }}
         />
       )}

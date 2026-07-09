@@ -12,6 +12,7 @@ import { SkeletonKanban } from './Skeleton';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
+import { closedWonHandoverMessage } from '../utils/dealAutomation';
 
 async function loadAllDeals(): Promise<Opportunity[]> {
   let page = 1;
@@ -50,7 +51,7 @@ export function DealsKanban() {
   const [error, setError] = useState('');
   const [addingStage, setAddingStage] = useState(false);
   const [newStageName, setNewStageName] = useState('');
-  const [formState, setFormState] = useState<{ deal?: Opportunity; defaultStageId?: string } | null>(null);
+  const [editingDeal, setEditingDeal] = useState<Opportunity | null>(null);
 
   useEffect(() => {
     Promise.all([loadAllDeals(), listStages('deal_stages')])
@@ -60,13 +61,18 @@ export function DealsKanban() {
 
   const handleDrop = useCallback((dealId: string, _from: string, toStageId: string) => {
     const prev = deals;
-    setDeals((ds) => ds.map((d) => (d.id === dealId ? { ...d, stage: stages.find((s) => s.id === toStageId)! } : d)));
+    const prevStage = prev.find((d) => d.id === dealId)?.stage;
+    const newStage = stages.find((s) => s.id === toStageId)!;
+    setDeals((ds) => ds.map((d) => (d.id === dealId ? { ...d, stage: newStage } : d)));
     setError('');
-    updateDeal(dealId, { stageId: toStageId }).catch((e) => {
+    updateDeal(dealId, { stageId: toStageId }).then(() => {
+      const msg = closedWonHandoverMessage(prevStage, newStage);
+      if (msg) toast.success(msg);
+    }).catch((e) => {
       setDeals(prev);
       setError(e.message ?? 'Could not update deal stage');
     });
-  }, [deals, stages]);
+  }, [deals, stages, toast]);
 
   async function handleDelete(deal: Opportunity) {
     const ok = await confirm(`Delete "${deal.name}"? This cannot be undone.`, { title: 'Delete deal' });
@@ -133,14 +139,10 @@ export function DealsKanban() {
             />
           );
         }}
-        renderColumnActions={(col) => (
-          <button className="kanban-add-btn" onClick={() => setFormState({ defaultStageId: col.id })}>+ Add deal</button>
-        )}
-        emptyState={(col) => (
+        emptyState={() => (
           <div className="kanban-empty">
             <div className="icon"><Icon name="inbox" size={18} /></div>
             <p>No deals in this stage</p>
-            <button className="btn secondary" onClick={() => setFormState({ defaultStageId: col.id })}>+ Add deal</button>
           </div>
         )}
         extraColumn={canManageStages ? (
@@ -183,7 +185,7 @@ export function DealsKanban() {
               <button
                 title="Edit"
                 onPointerDown={(e) => e.stopPropagation()}
-                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setFormState({ deal }); }}
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingDeal(deal); }}
               ><Icon name="edit" size={13} /></button>
               <button
                 className="danger"
@@ -196,15 +198,16 @@ export function DealsKanban() {
         )}
       />
 
-      {formState && (
+      {editingDeal && (
         <DealForm
-          deal={formState.deal}
-          defaultStageId={formState.defaultStageId}
-          onClose={() => setFormState(null)}
+          deal={editingDeal}
+          onClose={() => setEditingDeal(null)}
           onSaved={(saved) => {
-            setFormState(null);
-            setDeals((ds) => (ds.some((d) => d.id === saved.id) ? ds.map((d) => (d.id === saved.id ? saved : d)) : [...ds, saved]));
-            toast.success(formState.deal ? 'Deal updated' : 'Deal created');
+            setEditingDeal(null);
+            setDeals((ds) => ds.map((d) => (d.id === saved.id ? saved : d)));
+            toast.success('Deal updated');
+            const handoverMsg = closedWonHandoverMessage(editingDeal.stage, saved.stage);
+            if (handoverMsg) toast.success(handoverMsg);
           }}
         />
       )}

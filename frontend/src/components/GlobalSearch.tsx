@@ -41,7 +41,7 @@ export function GlobalSearch() {
           .or(`first_name.ilike.${term},last_name.ilike.${term},email.ilike.${term}`).limit(5),
         supabase.from('accounts').select('id, name').ilike('name', term).limit(5),
         supabase.from('opportunities').select('id, name').ilike('name', term).limit(5),
-        supabase.from('contacts').select('id, first_name, last_name, email, account_id').or(`first_name.ilike.${term},last_name.ilike.${term},email.ilike.${term}`).limit(5),
+        supabase.from('contacts').select('id, first_name, last_name, email').or(`first_name.ilike.${term},last_name.ilike.${term},email.ilike.${term}`).limit(5),
       ]);
       setGroups([
         { key: 'leads', label: 'Leads', results: (leads.data ?? []).map((r) => ({ id: r.id, label: leadLabel(r), to: `/leads/${r.id}` })) },
@@ -50,9 +50,7 @@ export function GlobalSearch() {
         {
           key: 'contacts',
           label: 'Contacts',
-          results: (contacts.data ?? []).filter((r) => r.account_id).map((r) => ({
-            id: r.id, label: contactLabel(r), sublabel: 'View company', to: `/companies/${r.account_id}`,
-          })),
+          results: (contacts.data ?? []).map((r) => ({ id: r.id, label: contactLabel(r), to: `/contacts/${r.id}` })),
         },
       ]);
       setLoading(false);

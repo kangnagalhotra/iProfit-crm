@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import type { Lead, LeadStage, User } from '../api/types';
+import type { Contact, Lead, LeadStage, User } from '../api/types';
 import {
   getLead, updateLead, createLead, deleteLead, getConvertedDeal,
 } from '../api/leads';
+import { listLeadContacts, replaceLeadContacts } from '../api/leadContacts';
 import { listStages } from '../api/stages';
 import { listUsers } from '../api/users';
 import { NotesSection } from '../components/NotesSection';
@@ -15,6 +16,7 @@ import { LeadForm } from '../components/LeadForm';
 import { AddActivityModal } from '../components/AddActivityModal';
 import { LeadQualificationCard } from '../components/LeadQualificationCard';
 import { ConvertToDealModal } from '../components/ConvertToDealModal';
+import { LinkContactsModal } from '../components/LinkContactsModal';
 import { Icon } from '../components/Icon';
 import { CollapsibleCard } from '../components/CollapsibleCard';
 import { AssociationsPanel } from '../components/AssociationsPanel';
@@ -93,16 +95,24 @@ export function LeadDetail() {
   const [showConvertModal, setShowConvertModal] = useState(false);
   const [showQualifiedPrompt, setShowQualifiedPrompt] = useState(false);
   const [convertedDeal, setConvertedDeal] = useState<{ id: string; name: string } | null>(null);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [showLinkContacts, setShowLinkContacts] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [activityKey, setActivityKey] = useState(0);
   const [overrideEdit, setOverrideEdit] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
   const canOverride = currentUser?.role === 'ADMIN' || currentUser?.role === 'SALES_MANAGER';
 
+  function loadContacts() {
+    if (!id) return;
+    listLeadContacts(id).then(setContacts).catch(() => {});
+  }
+
   function load() {
     if (!id) return;
     getLead(id).then(setLead).catch(() => {});
     getConvertedDeal(id).then(setConvertedDeal).catch(() => {});
+    loadContacts();
   }
 
   useEffect(() => {
@@ -157,7 +167,7 @@ export function LeadDetail() {
       const payload: Record<string, any> = {
         firstName: lead!.firstName,
         lastName: lead!.lastName,
-        phone: lead!.phone,
+        mobile: lead!.mobile,
         companyName: lead!.account?.name,
         jobTitle: lead!.jobTitle,
         city: lead!.city,
@@ -228,8 +238,14 @@ export function LeadDetail() {
             {canEdit && (
               <button className="btn btn-icon" onClick={() => setShowEditModal(true)}><Icon name="edit" size={14} /> Edit Details</button>
             )}
-            {lead.stage.isWon && !lead.convertedAt && (
-              <button className="btn btn-icon" style={{ background: '#16A34A' }} onClick={() => setShowConvertModal(true)}>
+            {!lead.convertedAt && (
+              <button
+                className="btn btn-icon"
+                style={{ background: lead.stage.isWon ? '#16A34A' : undefined }}
+                onClick={() => setShowConvertModal(true)}
+                disabled={!lead.stage.isWon}
+                title={lead.stage.isWon ? undefined : 'Available once this lead is marked Qualified'}
+              >
                 <Icon name="check" size={14} /> Convert to Deal
               </button>
             )}
@@ -268,11 +284,11 @@ export function LeadDetail() {
             <span className="icon"><Icon name="mail" size={18} /></span>Email
           </a>
           <a
-            className={`quick-action${lead.phone ? '' : ' disabled'}`}
-            href={lead.phone ? `tel:${lead.phone}` : undefined}
-            aria-disabled={!lead.phone}
-            tabIndex={lead.phone ? 0 : -1}
-            title={lead.phone ? `Call ${lead.phone}` : 'No phone number on file'}
+            className={`quick-action${lead.mobile ? '' : ' disabled'}`}
+            href={lead.mobile ? `tel:${lead.mobile}` : undefined}
+            aria-disabled={!lead.mobile}
+            tabIndex={lead.mobile ? 0 : -1}
+            title={lead.mobile ? `Call ${lead.mobile}` : 'No mobile number on file'}
           >
             <span className="icon"><Icon name="phone" size={18} /></span>Call
           </a>
@@ -306,7 +322,7 @@ export function LeadDetail() {
             />
           </EditableRow>
           <Row label="Job Title" value={lead.jobTitle} onEmptyClick={canEdit ? () => setShowEditModal(true) : undefined} />
-          <Row label="Phone Number" value={lead.phone} onEmptyClick={canEdit ? () => setShowEditModal(true) : undefined} />
+          <Row label="Mobile Number" value={lead.mobile} onEmptyClick={canEdit ? () => setShowEditModal(true) : undefined} />
           <Row label="Email" value={lead.email} onEmptyClick={canEdit ? () => setShowEditModal(true) : undefined} />
           <EditableRow
             label="Stage"
@@ -414,6 +430,20 @@ export function LeadDetail() {
               { header: 'Deal Name', render: (d: { id: string; name: string }) => <Link to={`/deals/${d.id}`} onClick={(e) => e.stopPropagation()}>{d.name}</Link> },
             ],
           },
+          {
+            key: 'contacts',
+            label: `Contacts (${contacts.length})`,
+            icon: 'person',
+            emptyLabel: 'No contacts linked to this lead yet.',
+            items: contacts,
+            addAction: { label: '+ Link Contact', onClick: () => setShowLinkContacts(true) },
+            onRowClick: (c: Contact) => navigate(`/contacts/${c.id}`),
+            columns: [
+              { header: 'Name', render: (c: Contact) => <Link to={`/contacts/${c.id}`} onClick={(e) => e.stopPropagation()}>{[c.firstName, c.lastName].filter(Boolean).join(' ') || c.email || 'Untitled contact'}</Link> },
+              { header: 'Email', render: (c: Contact) => c.email ?? '—' },
+              { header: 'Designation', render: (c: Contact) => c.jobTitle ?? '—' },
+            ],
+          },
         ] as AssociationGroup[]}
       />
       <ActivityTimeline key={activityKey} leadId={lead.id} />
@@ -448,6 +478,19 @@ export function LeadDetail() {
             setShowConvertModal(false);
             toast.success('Converted to Deal');
             navigate(`/deals/${deal.id}`);
+          }}
+        />
+      )}
+
+      {showLinkContacts && (
+        <LinkContactsModal
+          currentContactIds={contacts.map((c) => c.id)}
+          accountId={lead.account?.id}
+          onClose={() => setShowLinkContacts(false)}
+          onSave={async (contactIds) => {
+            await replaceLeadContacts(lead.id, contactIds);
+            loadContacts();
+            toast.success('Contacts updated');
           }}
         />
       )}

@@ -377,6 +377,96 @@ create trigger opportunities_set_closed_at
   for each row execute function set_deal_closed_at();
 
 -- ---------------------------------------------------------------------------
+-- DEAL CREATION LOCKDOWN — a Deal can only come into existence by converting
+-- a Qualified lead. auth.uid() is null only for trusted server-side inserts
+-- (service-role edge functions, seed scripts); every normal authenticated
+-- client insert must carry a lead_id pointing at a Qualified (is_won) lead.
+-- This is the backstop behind removing every "New Deal" UI entry point.
+-- ---------------------------------------------------------------------------
+
+create function guard_deal_creation() returns trigger as $$
+declare
+  lead_is_won boolean;
+begin
+  if auth.uid() is null then
+    return new;
+  end if;
+  if new.lead_id is null then
+    raise exception 'Deals can only be created by converting a Qualified lead.';
+  end if;
+  select ls.is_won into lead_is_won from leads l join lead_stages ls on ls.id = l.stage_id where l.id = new.lead_id;
+  if not coalesce(lead_is_won, false) then
+    raise exception 'Deals can only be created by converting a Qualified lead.';
+  end if;
+  return new;
+end;
+$$ language plpgsql security definer set search_path = public;
+
+create trigger opportunities_guard_creation
+  before insert on opportunities
+  for each row execute function guard_deal_creation();
+
+-- ---------------------------------------------------------------------------
+-- CLOSED WON -> PROJECT HANDOVER — automatic, event-driven. No project is
+-- created for a deal with no linked account (a project needs a company
+-- context — name/value/contacts are all read through it, not duplicated).
+-- ---------------------------------------------------------------------------
+
+create function create_project_on_closed_won() returns trigger as $$
+declare
+  won boolean;
+begin
+  select is_closed_won into won from deal_stages where id = new.stage_id;
+  if not coalesce(won, false) or new.account_id is null then
+    return new;
+  end if;
+  insert into projects (name, opportunity_id, account_id, value)
+  values (new.name, new.id, new.account_id, new.amount)
+  on conflict (opportunity_id) do nothing;
+  return new;
+end;
+$$ language plpgsql security definer set search_path = public;
+
+create trigger opportunities_create_project_ins
+  after insert on opportunities
+  for each row execute function create_project_on_closed_won();
+
+create trigger opportunities_create_project_upd
+  after update on opportunities
+  for each row
+  when (old.stage_id is distinct from new.stage_id)
+  execute function create_project_on_closed_won();
+
+-- ---------------------------------------------------------------------------
+-- LEAD QUALIFICATION GATE (MQL) — blocks a lead from entering a "won"
+-- (Qualified) stage unless ICP Match, Budget, and Authority are filled in.
+-- Enforces "Lead -> Contacts -> Company -> MQL -> Qualified" server-side so
+-- it can't be bypassed by going around the UI.
+-- ---------------------------------------------------------------------------
+
+create function guard_lead_qualification() returns trigger as $$
+declare
+  entering_won boolean;
+  was_won boolean;
+begin
+  select is_won into entering_won from lead_stages where id = new.stage_id;
+  select is_won into was_won from lead_stages where id = old.stage_id;
+  if coalesce(entering_won, false) and not coalesce(was_won, false) then
+    if not coalesce(new.icp_match, false) or new.budget_score is null or new.authority_score is null then
+      raise exception 'Cannot mark this lead Qualified — ICP Match, Budget, and Authority must be confirmed first (MQL validation).';
+    end if;
+  end if;
+  return new;
+end;
+$$ language plpgsql;
+
+create trigger leads_guard_qualification
+  before update on leads
+  for each row
+  when (old.stage_id is distinct from new.stage_id)
+  execute function guard_lead_qualification();
+
+-- ---------------------------------------------------------------------------
 -- AUTOMATION RULES (CRM workflow rebuild)
 -- ---------------------------------------------------------------------------
 

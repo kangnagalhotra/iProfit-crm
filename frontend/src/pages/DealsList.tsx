@@ -6,9 +6,6 @@ import type {
 import { listDeals, updateDeal, bulkDeleteDeals } from '../api/deals';
 import { listStages } from '../api/stages';
 import { listUsers } from '../api/users';
-import { DealForm } from '../components/DealForm';
-import { DealImport } from '../components/DealImport';
-import { AddContactsMenu } from '../components/AddContactsMenu';
 import { DealsKanban } from '../components/DealsKanban';
 import { ViewToggle } from '../components/ViewToggle';
 import type { ListView } from '../components/ViewToggle';
@@ -25,6 +22,7 @@ import { SkeletonTable } from '../components/Skeleton';
 import { EmptyState } from '../components/EmptyState';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
+import { closedWonHandoverMessage } from '../utils/dealAutomation';
 
 type SortBy = 'name' | 'amount' | 'closeDate' | 'stage' | 'updatedAt' | 'createdAt';
 
@@ -107,10 +105,7 @@ export function DealsList() {
   const [search, setSearch] = useState('');
   const [includeArchived, setIncludeArchived] = useState(false);
   const [view, setView] = useState<ListView>('board');
-  const [showForm, setShowForm] = useState(false);
-  const [showImport, setShowImport] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [kanbanKey, setKanbanKey] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [sortBy, setSortBy] = useState<SortBy>('updatedAt');
@@ -196,8 +191,10 @@ export function DealsList() {
 
   async function inlineUpdate(deal: Opportunity, data: Record<string, any>) {
     try {
-      await updateDeal(deal.id, data);
+      const updated = await updateDeal(deal.id, data);
       load();
+      const msg = closedWonHandoverMessage(deal.stage, updated.stage);
+      if (msg) toast.success(msg);
     } catch (e: any) {
       toast.error(e.message ?? 'Could not update deal');
     }
@@ -241,7 +238,6 @@ export function DealsList() {
               <ColumnVisibilityMenu columns={DEAL_COLUMNS} visible={visibleColumns} onChange={setVisibleColumns} />
             </>
           )}
-          <AddContactsMenu label="Add deal" onCreateNew={() => setShowForm(true)} onImport={() => setShowImport(true)} />
         </div>
       </div>
 
@@ -273,8 +269,8 @@ export function DealsList() {
           <EmptyState
             icon="inbox"
             title="No deals yet"
-            description="Create your first deal to start tracking pipeline."
-            action={{ label: '+ Create deal', onClick: () => setShowForm(true) }}
+            description="Deals are created by converting a Qualified lead — there's no direct way to create one."
+            action={{ label: 'Go to Leads', onClick: () => navigate('/leads') }}
           />
         ) : (
           <>
@@ -367,23 +363,7 @@ export function DealsList() {
           </>
         )
       ) : (
-        <DealsKanban key={kanbanKey} />
-      )}
-
-      {showForm && (
-        <DealForm
-          onClose={() => setShowForm(false)}
-          onSaved={(deal) => { setShowForm(false); toast.success('Deal created'); navigate(`/deals/${deal.id}`); }}
-        />
-      )}
-      {showImport && (
-        <DealImport
-          onClose={() => setShowImport(false)}
-          onImported={() => {
-            setShowImport(false);
-            if (view === 'board') load(); else setKanbanKey((k) => k + 1);
-          }}
-        />
+        <DealsKanban />
       )}
     </div>
   );

@@ -47,6 +47,7 @@ function mapLead(row: any): Lead {
     needScore: row.need_score ?? undefined,
     timelineScore: row.timeline_score ?? undefined,
     qualificationNotes: row.qualification_notes ?? undefined,
+    icpMatch: row.icp_match ?? undefined,
     convertedAt: row.converted_at ?? undefined,
     archivedAt: row.archived_at ?? undefined,
     createdAt: row.created_at,
@@ -265,7 +266,7 @@ export async function updateLead(id: string, input: Record<string, any>): Promis
     score: rest.score, rating: rest.rating, unqualified_reason: rest.unqualifiedReason, tags: rest.tags,
     account_id: accountId,
     budget_score: rest.budgetScore, authority_score: rest.authorityScore, need_score: rest.needScore,
-    timeline_score: rest.timelineScore, qualification_notes: rest.qualificationNotes,
+    timeline_score: rest.timelineScore, qualification_notes: rest.qualificationNotes, icp_match: rest.icpMatch,
     archived_at: rest.archivedAt,
   };
   Object.keys(row).forEach((k) => { if (row[k] === undefined) delete row[k]; });
@@ -321,20 +322,32 @@ export async function convertLeadToDeal(
   dealName: string,
   opts: { value?: string; stageId?: string; closeDate?: string } = {},
 ): Promise<Opportunity> {
-  // Auto-create the Contact (person record) — the account itself is already
-  // resolved on the lead (Company name is required on both lead forms, so
-  // lead.account is set by the time a lead exists), so conversion just
-  // carries it forward rather than re-resolving it.
-  const contact = await createContact({
-    firstName: lead.firstName,
-    lastName: lead.lastName,
-    email: lead.email,
-    phone: lead.phone,
-    jobTitle: lead.jobTitle,
-    accountId: lead.account?.id,
-    leadId: lead.id,
-    ownerId: lead.owner?.id,
-  });
+  // Deal inherits the Lead's Contacts (per the Lead<->Contact many-to-many in
+  // lead_contacts) — the account itself is already resolved on the lead
+  // (Company name is required on both lead forms), so conversion just
+  // carries both forward rather than re-resolving them. If the lead has no
+  // linked contacts yet (e.g. a lead created before this module existed),
+  // fall back to auto-creating one from the lead's own person fields, same
+  // as the original single-contact conversion behavior.
+  const { data: existingLinks } = await supabase
+    .from('lead_contacts')
+    .select('contact:contacts(id, first_name, last_name, email)')
+    .eq('lead_id', lead.id);
+  let contactIds = (existingLinks ?? []).map((r: any) => r.contact?.id).filter(Boolean) as string[];
+
+  if (contactIds.length === 0) {
+    const contact = await createContact({
+      firstName: lead.firstName,
+      lastName: lead.lastName,
+      email: lead.email,
+      mobile: lead.mobile,
+      jobTitle: lead.jobTitle,
+      accountId: lead.account?.id,
+      ownerId: lead.owner?.id,
+      leadIds: [lead.id],
+    });
+    contactIds = [contact.id];
+  }
 
   const deal = await createDeal({
     name: dealName,
@@ -342,11 +355,22 @@ export async function convertLeadToDeal(
     accountId: lead.account?.id,
     ownerId: lead.owner?.id,
     leadId: lead.id,
-    contactId: contact.id,
+    contactId: contactIds[0],
     description: lead.notes,
     stageId: opts.stageId,
     closeDate: opts.closeDate,
   });
+
+  // Carry every OTHER contact linked to the lead onto the deal too (the
+  // first is already the Primary Contact set above) — "Deal inherits
+  // associated Contacts from its source Lead" holds even when a lead has
+  // 3+ contacts.
+  const secondaryContactIds = contactIds.slice(1);
+  if (secondaryContactIds.length > 0) {
+    await supabase.from('deal_contacts').insert(
+      secondaryContactIds.map((contactId) => ({ opportunity_id: deal.id, contact_id: contactId, role: 'INFLUENCER' })),
+    );
+  }
 
   // Carry the lead's existing activity history onto the new deal too — both
   // FK columns on `activities` are independently nullable, so this is purely

@@ -5,7 +5,7 @@ import type { ImportLeadsResult } from '../api/types';
 import { downloadExcelTemplate } from '../utils/excelTemplate';
 import { isValidEmail, stripPhoneDigits, isValidPhone } from '../utils/validation';
 
-const TEMPLATE_HEADERS = ['First Name', 'Last Name', 'Email', 'Phone', 'Job Title', 'Stage'];
+const TEMPLATE_HEADERS = ['First Name', 'Last Name', 'Email', 'Mobile Number', 'Job Title', 'Stage'];
 const TEMPLATE_SAMPLE = ['Jane', 'Doe', 'jane.doe@example.com', '9876543210', 'Sales Manager', 'New'];
 
 const HEADER_MAP: Record<string, string> = {
@@ -14,8 +14,10 @@ const HEADER_MAP: Record<string, string> = {
   'last name': 'lastName',
   lastname: 'lastName',
   email: 'email',
-  phone: 'phone',
-  'phone number': 'phone',
+  mobile: 'mobile',
+  'mobile number': 'mobile',
+  phone: 'mobile',
+  'phone number': 'mobile',
   'job title': 'jobTitle',
   jobtitle: 'jobTitle',
   status: 'stageName',
@@ -26,7 +28,7 @@ interface PreviewRow {
   firstName?: string;
   lastName?: string;
   email?: string;
-  phone?: string;
+  mobile?: string;
   jobTitle?: string;
   stageName?: string;
   valid: boolean;
@@ -39,18 +41,18 @@ function mapRow(raw: Record<string, string>): PreviewRow {
     const field = HEADER_MAP[header];
     if (field && value?.trim()) mapped[field] = value.trim();
   }
-  if (mapped.phone) mapped.phone = stripPhoneDigits(mapped.phone);
+  if (mapped.mobile) mapped.mobile = stripPhoneDigits(mapped.mobile);
   if (mapped.email && !isValidEmail(mapped.email)) {
     return { ...mapped, valid: false, reason: 'Invalid email format' };
   }
-  if (mapped.phone && !isValidPhone(mapped.phone)) {
-    return { ...mapped, valid: false, reason: 'Invalid phone number (must be 10 digits)' };
+  if (mapped.mobile && !isValidPhone(mapped.mobile)) {
+    return { ...mapped, valid: false, reason: 'Invalid mobile number (must be 10 digits)' };
   }
   return {
     firstName: mapped.firstName,
     lastName: mapped.lastName,
     email: mapped.email,
-    phone: mapped.phone,
+    mobile: mapped.mobile,
     jobTitle: mapped.jobTitle,
     stageName: mapped.stageName,
     valid: true,
@@ -112,7 +114,7 @@ export function LeadImport({ onClose, onImported }: { onClose: () => void; onImp
         {!result && (
           <>
             <div className="field">
-              <label>CSV file (First Name, Last Name, Email, Phone, Job Title, Stage)</label>
+              <label>CSV file (First Name, Last Name, Email, Mobile Number, Job Title, Stage)</label>
               <input
                 type="file"
                 accept=".csv,text/csv"
@@ -133,7 +135,7 @@ export function LeadImport({ onClose, onImported }: { onClose: () => void; onImp
               <>
                 <p style={{ fontSize: 14, color: 'var(--muted)' }}>
                   {rows.length} row(s) found — {validRows.length} ready to import
-                  {invalidCount > 0 && `, ${invalidCount} skipped (invalid email/phone)`}.
+                  {invalidCount > 0 && `, ${invalidCount} skipped (invalid email/mobile number)`}.
                 </p>
                 <div style={{ maxHeight: 260, overflowY: 'auto', border: '1px solid var(--line)', borderRadius: 8 }}>
                   <table>

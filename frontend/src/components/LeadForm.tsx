@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type {
-  Account, Currency, Lead, LeadRating, LeadSource, LeadStage, LeadUnqualifiedReason, Salutation, User,
+  Account, Currency, Lead, LeadRating, LeadSource, LeadStage, LeadUnqualifiedReason, User,
 } from '../api/types';
 import {
   createLead, updateLead, checkDuplicateLead,
@@ -29,10 +29,6 @@ import {
 } from '../utils/validation';
 
 const SOURCES: LeadSource[] = ['WEBSITE', 'REFERRAL', 'COLD_CALL', 'EVENT', 'SOCIAL_MEDIA', 'ADVERTISEMENT', 'PARTNER', 'OTHER'];
-const SALUTATIONS: Salutation[] = ['MR', 'MS', 'MRS', 'DR', 'PROF'];
-const SALUTATION_LABELS: Record<Salutation, string> = {
-  MR: 'Mr', MS: 'Ms', MRS: 'Mrs', DR: 'Dr', PROF: 'Prof',
-};
 const RATINGS: LeadRating[] = ['HOT', 'WARM', 'COLD'];
 const CURRENCIES: Currency[] = ['USD', 'EUR', 'GBP', 'INR'];
 const UNQUALIFIED_REASONS: { value: LeadUnqualifiedReason; label: string }[] = [
@@ -53,12 +49,10 @@ function initials(name: string) {
 }
 
 interface LeadFormState {
-  salutation: Salutation | '';
   firstName: string;
   lastName: string;
   email: string;
   emailOptIn: boolean;
-  phone: string;
   mobile: string;
   jobTitle: string;
   linkedinUrl: string;
@@ -88,13 +82,11 @@ interface LeadFormState {
 
 function initialState(lead?: Lead, defaultStageId?: string): LeadFormState {
   return {
-    salutation: lead?.salutation ?? '',
     firstName: lead?.firstName ?? '',
     lastName: lead?.lastName ?? '',
     email: lead?.email ?? '',
     emailOptIn: lead?.emailOptIn ?? true,
-    phone: stripPhoneDigits(lead?.phone ?? ''),
-    mobile: stripPhoneDigits(lead?.mobile ?? ''),
+    mobile: stripPhoneDigits(lead?.mobile ?? lead?.phone ?? ''),
     jobTitle: lead?.jobTitle ?? '',
     linkedinUrl: lead?.linkedinUrl ?? '',
     accountId: lead?.account?.id ?? '',
@@ -139,7 +131,6 @@ export function LeadForm({
   const [users, setUsers] = useState<User[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [error, setError] = useState('');
-  const [phoneError, setPhoneError] = useState('');
   const [mobileError, setMobileError] = useState('');
   const [emailError, setEmailError] = useState('');
   const [linkedinError, setLinkedinError] = useState('');
@@ -179,12 +170,6 @@ export function LeadForm({
 
   function set<K extends keyof LeadFormState>(k: K, v: LeadFormState[K]) {
     setForm((f) => ({ ...f, [k]: v }));
-  }
-
-  function validatePhone(digits: string): boolean {
-    if (digits && !isValidPhone(digits)) { setPhoneError(PHONE_ERROR_MESSAGE); return false; }
-    setPhoneError('');
-    return true;
   }
 
   function validateMobile(digits: string): boolean {
@@ -244,8 +229,8 @@ export function LeadForm({
     if (!form.firstName.trim()) { setError('First name is required.'); return false; }
     if (!form.lastName.trim()) { setError('Last name is required.'); return false; }
     if (!form.accountId && !form.companyName.trim()) { setError('Company name is required.'); return false; }
-    if (!validatePhone(form.phone) || !validateMobile(form.mobile) || !validateEmail(trimmedEmail)) return false;
-    if (!trimmedEmail && !form.phone) { setError('Enter an email or a phone number.'); return false; }
+    if (!validateMobile(form.mobile) || !validateEmail(trimmedEmail)) return false;
+    if (!trimmedEmail && !form.mobile) { setError('Enter an email or a mobile number.'); return false; }
     if (form.linkedinUrl && !validateLinkedin(form.linkedinUrl)) { setExpanded(true); return false; }
     if (selectedStage?.isLost && !form.unqualifiedReason) {
       setExpanded(true);
@@ -279,12 +264,10 @@ export function LeadForm({
     );
 
     const payload: Record<string, any> = {
-      salutation: form.salutation || undefined,
       firstName: form.firstName,
       lastName: form.lastName,
       email: form.email || undefined,
       emailOptIn: form.emailOptIn,
-      phone: form.phone || undefined,
       mobile: form.mobile || undefined,
       jobTitle: form.jobTitle || undefined,
       linkedinUrl: form.linkedinUrl || undefined,
@@ -387,15 +370,15 @@ export function LeadForm({
               />
               {emailError && <div className="error" style={{ margin: '4px 0 0' }}>{emailError}</div>}
             </div>
-            <div className="field"><label>Phone</label>
+            <div className="field"><label>Mobile Number</label>
               <input
-                value={formatPhoneDisplay(form.phone)}
-                onChange={(e) => set('phone', stripPhoneDigits(e.target.value))}
-                onBlur={() => validatePhone(form.phone)}
+                value={formatPhoneDisplay(form.mobile)}
+                onChange={(e) => set('mobile', stripPhoneDigits(e.target.value))}
+                onBlur={() => validateMobile(form.mobile)}
                 placeholder="98765-43210"
                 inputMode="numeric"
               />
-              {phoneError && <div className="error" style={{ margin: '4px 0 0' }}>{phoneError}</div>}
+              {mobileError && <div className="error" style={{ margin: '4px 0 0' }}>{mobileError}</div>}
             </div>
             <div className="field"><label>Lead source*</label>
               <select value={form.source} onChange={(e) => set('source', e.target.value as LeadSource)}>
@@ -445,24 +428,8 @@ export function LeadForm({
             <>
               <FormSection title="Lead Information">
                 <div className="form-grid-2">
-                  <div className="field"><label>Salutation</label>
-                    <select value={form.salutation} onChange={(e) => set('salutation', e.target.value as Salutation | '')}>
-                      <option value="">—</option>
-                      {SALUTATIONS.map((s) => <option key={s} value={s}>{SALUTATION_LABELS[s]}</option>)}
-                    </select>
-                  </div>
                   <div className="field"><label>Job title</label>
                     <input value={form.jobTitle} onChange={(e) => set('jobTitle', e.target.value)} /></div>
-                  <div className="field"><label>Mobile</label>
-                    <input
-                      value={formatPhoneDisplay(form.mobile)}
-                      onChange={(e) => set('mobile', stripPhoneDigits(e.target.value))}
-                      onBlur={() => validateMobile(form.mobile)}
-                      placeholder="98765-43210"
-                      inputMode="numeric"
-                    />
-                    {mobileError && <div className="error" style={{ margin: '4px 0 0' }}>{mobileError}</div>}
-                  </div>
                   <div className="field"><label>LinkedIn URL</label>
                     <input
                       value={form.linkedinUrl}

@@ -71,6 +71,9 @@ export interface Lead {
   needScore?: number;
   timelineScore?: number;
   qualificationNotes?: string;
+  // MQL gate — required (with budgetScore/authorityScore) before a lead can
+  // enter a "won" (Qualified) stage; enforced server-side, see triggers.sql.
+  icpMatch?: boolean;
   convertedAt?: string;
   archivedAt?: string;
   createdAt: string;
@@ -83,9 +86,13 @@ export interface Contact {
   lastName?: string;
   email?: string;
   phone?: string;
-  jobTitle?: string;
+  mobile?: string;
+  jobTitle?: string; // shown as "Designation" in the Contacts UI
+  department?: string;
+  notes?: string;
   account?: { id: string; name: string; stage?: { name: string; color: string } };
-  lead?: { id: string };
+  // A Contact can be linked to multiple Leads (and vice versa) via lead_contacts.
+  leads?: { id: string; firstName?: string; lastName?: string; email?: string }[];
   owner?: { id: string; fullName: string };
   createdAt: string;
   updatedAt: string;
@@ -155,9 +162,25 @@ export interface DealStage extends Stage {
 
 export interface LineItem {
   id: string;
+  productId?: string;
   productName: string;
   quantity: string;
   unitPrice: string;
+}
+
+export type ProductSector = 'PRIVATE' | 'GOVERNMENT' | 'BOTH';
+
+export interface Product {
+  id: string;
+  name: string;
+  sku?: string;
+  category?: string;
+  sector: ProductSector;
+  unitPrice: string;
+  description?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface DealContact {

@@ -68,6 +68,10 @@ create type ticket_status as enum ('OPEN', 'IN_PROGRESS', 'WAITING_ON_CUSTOMER',
 -- is far more disruptive than keeping two small enums in sync today.
 create type ticket_priority as enum ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL');
 
+-- 'BOTH' lets a single catalog entry serve both sectors instead of forking
+-- into two parallel product lists — sector drives filtering/reporting only.
+create type product_sector as enum ('PRIVATE', 'GOVERNMENT', 'BOTH');
+
 -- Shared allowlist for all three stage tables' `color` column (see CRM
 -- Enhancements work: Blue/Green/Purple/Orange/Red/Gray only, going forward).
 create domain stage_color as varchar(20)
@@ -83,6 +87,15 @@ begin
   return new;
 end;
 $$ language plpgsql;
+
+-- Strips protocol/www/path/trailing-slash and lowercases, so "https://www.
+-- WeExcel.com/about" and "weexcel.com" resolve to the same company —
+-- backs the hard uniqueness constraint on accounts.domain_normalized below.
+create function normalize_domain(input text) returns text as $$
+  select case when input is null or trim(input) = '' then null else
+    lower(regexp_replace(regexp_replace(regexp_replace(trim(input), '^https?://', ''), '^www\.', ''), '/.*$', ''))
+  end;
+$$ language sql immutable;
 
 -- ---------------------------------------------------------------------------
 -- PROFILES (extends auth.users)
@@ -134,6 +147,7 @@ create table accounts (
   id uuid primary key default gen_random_uuid(),
   name varchar(200) not null,
   domain varchar(255),
+  domain_normalized text generated always as (normalize_domain(domain)) stored,
   industry varchar(120),
   size_bucket varchar(40),
   annual_revenue numeric(15, 2) check (annual_revenue is null or annual_revenue >= 0),
@@ -155,6 +169,9 @@ create table accounts (
   updated_at timestamptz not null default now()
 );
 create index accounts_domain_idx on accounts(domain);
+-- Company dedup: hard-blocks a second company with the same normalized
+-- domain (any URL format) at insert/update time.
+create unique index accounts_domain_normalized_uidx on accounts(domain_normalized) where domain_normalized is not null;
 create index accounts_owner_id_idx on accounts(owner_id);
 create index accounts_stage_id_idx on accounts(stage_id);
 create index accounts_customer_stage_id_idx on accounts(customer_stage_id);
@@ -211,6 +228,10 @@ create table leads (
   need_score smallint check (need_score is null or need_score between 0 and 10),
   timeline_score smallint check (timeline_score is null or timeline_score between 0 and 10),
   qualification_notes text,
+  -- MQL gate: must be true (alongside budget_score/authority_score being
+  -- filled in) before a lead can enter a "won" (Qualified) stage — enforced
+  -- by the guard_lead_qualification() trigger in triggers.sql, not just the UI.
+  icp_match boolean not null default false,
   -- Set once, on conversion — the authoritative "is this lead converted"
   -- flag, orthogonal to stage (mirrors Salesforce's IsConverted, not a status
   -- value) so a converted lead keeps showing "Qualified" as its stage.
@@ -238,10 +259,16 @@ create table contacts (
   last_name varchar(100),
   email varchar(255) check (email is null or email ~* '^[^@\s]+@[^@\s]+\.[^@\s]+$'),
   phone varchar(40) check (phone is null or phone ~ '^\+?[0-9]{10}$'),
-  job_title varchar(150),
-  account_id uuid references accounts(id) on delete set null,
-  lead_id uuid references leads(id) on delete set null, -- lineage: which Lead this was converted from, if any
-  owner_id uuid references profiles(id) on delete set null,
+  mobile varchar(40) check (mobile is null or mobile ~ '^\+?[0-9]{10}$'),
+  job_title varchar(150), -- shown as "Designation" in the Contacts UI
+  department varchar(120),
+  notes text,
+  -- Every Contact belongs to exactly one Company and has an internal owner —
+  -- enforced here, not just in the UI. lead_id is legacy (superseded by the
+  -- lead_contacts many-to-many table below) and stays nullable/unused.
+  account_id uuid not null references accounts(id) on delete restrict,
+  lead_id uuid references leads(id) on delete set null,
+  owner_id uuid not null references profiles(id) on delete restrict,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -249,6 +276,17 @@ create index contacts_account_id_idx on contacts(account_id);
 create index contacts_owner_id_idx on contacts(owner_id);
 create trigger contacts_set_updated_at before update on contacts
   for each row execute function set_updated_at();
+
+-- Lead <-> Contact many-to-many: a Lead can have multiple Contacts and a
+-- Contact can be associated with multiple Leads (e.g. multiple stakeholders
+-- from the same opportunity, or one stakeholder involved in two deals).
+create table lead_contacts (
+  lead_id uuid not null references leads(id) on delete cascade,
+  contact_id uuid not null references contacts(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (lead_id, contact_id)
+);
+create index lead_contacts_contact_id_idx on lead_contacts(contact_id);
 
 -- ---------------------------------------------------------------------------
 -- SUPPORT TICKETS
@@ -352,12 +390,32 @@ create table deal_contacts (
 create index deal_contacts_opportunity_id_idx on deal_contacts(opportunity_id);
 create index deal_contacts_contact_id_idx on deal_contacts(contact_id);
 
+-- Single product catalog (one list, not forked per sector — see
+-- product_sector above). Line items below may optionally link to a catalog
+-- entry; product_name stays free-text so ad hoc rows are still allowed.
+create table products (
+  id uuid primary key default gen_random_uuid(),
+  name varchar(200) not null,
+  sku varchar(80) unique,
+  category varchar(120),
+  sector product_sector not null default 'BOTH',
+  unit_price numeric(15, 2) not null default 0 check (unit_price >= 0),
+  description text,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index products_sector_idx on products(sector);
+create trigger products_set_updated_at before update on products
+  for each row execute function set_updated_at();
+
 -- Repeatable product/qty/price rows. No trigger syncs the sum into
 -- opportunities.amount — that's a frontend-only convenience so Value stays
 -- independently overridable.
 create table deal_line_items (
   id uuid primary key default gen_random_uuid(),
   opportunity_id uuid not null references opportunities(id) on delete cascade,
+  product_id uuid references products(id) on delete set null,
   product_name varchar(200) not null,
   quantity numeric(12, 2) not null default 1 check (quantity > 0),
   unit_price numeric(15, 2) not null default 0 check (unit_price >= 0),
@@ -404,6 +462,24 @@ create table stage_history (
   changed_at timestamptz not null default now()
 );
 create index stage_history_opportunity_id_idx on stage_history(opportunity_id);
+
+-- ---------------------------------------------------------------------------
+-- PROJECTS — automatic Closed Won handover. One row per opportunity, created
+-- exclusively by create_project_on_closed_won() (triggers.sql), never by a
+-- client insert. Company/Value/Contacts are read through opportunity_id
+-- rather than duplicated here.
+-- ---------------------------------------------------------------------------
+
+create table projects (
+  id uuid primary key default gen_random_uuid(),
+  name varchar(200) not null,
+  opportunity_id uuid not null unique references opportunities(id) on delete cascade,
+  account_id uuid references accounts(id) on delete set null,
+  value numeric(15, 2),
+  status varchar(30) not null default 'HANDOVER_PENDING',
+  created_at timestamptz not null default now()
+);
+create index projects_account_id_idx on projects(account_id);
 
 -- ---------------------------------------------------------------------------
 -- TASKS

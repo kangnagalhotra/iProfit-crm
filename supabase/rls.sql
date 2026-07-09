@@ -145,6 +145,33 @@ create policy "contacts_delete" on contacts for delete to authenticated
   using (is_manager_or_admin());
 
 -- ---------------------------------------------------------------------------
+-- LEAD_CONTACTS — many-to-many join; visibility/write inherit from the
+-- parent lead (identical shape to deal_contacts).
+-- ---------------------------------------------------------------------------
+
+alter table lead_contacts enable row level security;
+
+create policy "lead_contacts_select" on lead_contacts for select to authenticated
+  using (exists (select 1 from leads l where l.id = lead_contacts.lead_id and (is_manager_or_admin() or l.owner_id = auth.uid())));
+
+create policy "lead_contacts_insert" on lead_contacts for insert to authenticated
+  with check (exists (select 1 from leads l where l.id = lead_contacts.lead_id and (is_manager_or_admin() or l.owner_id = auth.uid())));
+
+create policy "lead_contacts_delete" on lead_contacts for delete to authenticated
+  using (exists (select 1 from leads l where l.id = lead_contacts.lead_id and (is_manager_or_admin() or l.owner_id = auth.uid())));
+
+-- ---------------------------------------------------------------------------
+-- PRODUCTS — single catalog, readable by anyone authenticated, writable only
+-- by ADMIN/SALES_MANAGER (same shape as the stage tables above).
+-- ---------------------------------------------------------------------------
+
+alter table products enable row level security;
+
+create policy "products_select_all" on products for select to authenticated using (true);
+create policy "products_write_managers" on products for all to authenticated
+  using (is_manager_or_admin()) with check (is_manager_or_admin());
+
+-- ---------------------------------------------------------------------------
 -- SUPPORT TICKETS — assignee_id is nullable (unassigned-inbox pattern), so
 -- visibility also extends to the linked account's owner: an AM should see
 -- tickets on their own customer even when a different support rep is
@@ -333,6 +360,16 @@ create policy "stage_history_select" on stage_history for select to authenticate
     or exists (select 1 from opportunities o where o.id = stage_history.opportunity_id and o.owner_id = auth.uid())
   );
 
+-- projects: system-authored only (see triggers.sql's create_project_on_closed_won()) —
+-- no insert/update/delete policy for clients.
+alter table projects enable row level security;
+
+create policy "projects_select" on projects for select to authenticated
+  using (
+    is_manager_or_admin()
+    or exists (select 1 from opportunities o where o.id = projects.opportunity_id and o.owner_id = auth.uid())
+  );
+
 -- ---------------------------------------------------------------------------
 -- TASKS
 -- SALES_REP: sees/manages only tasks assigned to them (canManage pattern).
@@ -484,3 +521,32 @@ create policy "lead_attachments_storage_delete" on storage.objects for delete to
   );
 
 alter table assignment_state enable row level security;
+
+-- ---------------------------------------------------------------------------
+-- MERGE ACCOUNTS (companies) — admin/manager only. Repoints every dependent
+-- row (leads, contacts, opportunities, tasks, activities, support tickets)
+-- from source to target, then deletes the source account. security definer
+-- so it can bypass each table's owner-scoped RLS for the repoint itself; the
+-- is_manager_or_admin() check inside is what actually gates who may call it.
+-- ---------------------------------------------------------------------------
+
+create or replace function merge_accounts(source_id uuid, target_id uuid) returns void as $$
+begin
+  if not is_manager_or_admin() then
+    raise exception 'Only an admin or sales manager can merge companies.';
+  end if;
+  if source_id = target_id then
+    raise exception 'Cannot merge a company into itself.';
+  end if;
+
+  update leads set account_id = target_id where account_id = source_id;
+  update contacts set account_id = target_id where account_id = source_id;
+  update opportunities set account_id = target_id where account_id = source_id;
+  update opportunities set partner_account_id = target_id where partner_account_id = source_id;
+  update tasks set account_id = target_id where account_id = source_id;
+  update activities set account_id = target_id where account_id = source_id;
+  update support_tickets set account_id = target_id where account_id = source_id;
+
+  delete from accounts where id = source_id;
+end;
+$$ language plpgsql security definer set search_path = public;

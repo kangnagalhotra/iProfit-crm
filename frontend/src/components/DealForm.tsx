@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import type {
-  Account, Contact, Currency, DealPriority, DealStage, DealType, DecisionTimeframe, LineItem, Opportunity, User,
+  Account, Contact, Currency, DealPriority, DealStage, DealType, DecisionTimeframe, LineItem, Opportunity, Product, User,
 } from '../api/types';
-import { createDeal, updateDeal } from '../api/deals';
+import { updateDeal } from '../api/deals';
 import { listStages } from '../api/stages';
 import { listUsers } from '../api/users';
 import { listAccounts } from '../api/accounts';
 import { listContacts } from '../api/contacts';
 import { listPipelines } from '../api/pipelines';
+import { listProducts } from '../api/products';
 import type { Pipeline } from '../api/pipelines';
 import { listDealContacts, replaceDealContacts } from '../api/dealContacts';
 import { listLineItems, replaceLineItems } from '../api/dealLineItems';
@@ -61,47 +62,47 @@ interface DealFormState {
   description: string;
 }
 
-function initialState(deal?: Opportunity, defaultStageId?: string): DealFormState {
+function initialState(deal: Opportunity): DealFormState {
   return {
-    name: deal?.name ?? '',
-    amount: deal?.amount ?? '',
-    accountId: deal?.account?.id ?? '',
-    contactId: deal?.contact?.id ?? '',
-    stageId: deal?.stage.id ?? defaultStageId ?? '',
-    closeDate: deal?.closeDate ? deal.closeDate.slice(0, 10) : '',
-    ownerId: deal?.owner?.id ?? '',
-    pipelineId: deal?.pipeline.id ?? '',
-    currency: deal?.currency ?? 'USD',
-    probability: deal?.probabilityOverride ?? deal?.stage.winProbability ?? '',
-    dealType: deal?.dealType ?? 'NEW_BUSINESS',
-    priority: (deal?.priority === 'CRITICAL' ? 'HIGH' : deal?.priority) ?? 'MEDIUM',
-    source: deal?.source ?? '',
+    name: deal.name ?? '',
+    amount: deal.amount ?? '',
+    accountId: deal.account?.id ?? '',
+    contactId: deal.contact?.id ?? '',
+    stageId: deal.stage.id ?? '',
+    closeDate: deal.closeDate ? deal.closeDate.slice(0, 10) : '',
+    ownerId: deal.owner?.id ?? '',
+    pipelineId: deal.pipeline.id ?? '',
+    currency: deal.currency ?? 'USD',
+    probability: deal.probabilityOverride ?? deal.stage.winProbability ?? '',
+    dealType: deal.dealType ?? 'NEW_BUSINESS',
+    priority: (deal.priority === 'CRITICAL' ? 'HIGH' : deal.priority) ?? 'MEDIUM',
+    source: deal.source ?? '',
     additionalContacts: [],
-    partnerAccountId: deal?.partnerAccount?.id ?? '',
-    nextStep: deal?.nextStep ?? '',
-    nextActivityDate: deal?.nextActivityDate ? deal.nextActivityDate.slice(0, 10) : '',
-    competitor: deal?.competitor ?? '',
-    lossReason: deal?.lossReason ?? '',
+    partnerAccountId: deal.partnerAccount?.id ?? '',
+    nextStep: deal.nextStep ?? '',
+    nextActivityDate: deal.nextActivityDate ? deal.nextActivityDate.slice(0, 10) : '',
+    competitor: deal.competitor ?? '',
+    lossReason: deal.lossReason ?? '',
     lineItems: [],
-    budgetConfirmed: deal?.budgetConfirmed === true ? 'YES' : deal?.budgetConfirmed === false ? 'NO' : '',
-    decisionTimeframe: deal?.decisionTimeframe ?? '',
-    painPoint: deal?.painPoint ?? '',
-    tags: deal?.tags ?? [],
-    description: deal?.description ?? '',
+    budgetConfirmed: deal.budgetConfirmed === true ? 'YES' : deal.budgetConfirmed === false ? 'NO' : '',
+    decisionTimeframe: deal.decisionTimeframe ?? '',
+    painPoint: deal.painPoint ?? '',
+    tags: deal.tags ?? [],
+    description: deal.description ?? '',
   };
 }
 
+// Deals can only be created by converting a Qualified lead (see
+// convertLeadToDeal() in api/leads.ts and the DB-level guard_deal_creation
+// trigger) — this form is edit-only, reachable only from an existing deal.
 export function DealForm({
-  deal, defaultStageId, onClose, onSaved,
+  deal, onClose, onSaved,
 }: {
-  deal?: Opportunity;
-  defaultStageId?: string;
+  deal: Opportunity;
   onClose: () => void;
   onSaved: (deal: Opportunity) => void;
 }) {
-  const isEdit = !!deal;
-  const [form, setForm] = useState<DealFormState>(() => initialState(deal, defaultStageId));
-  const [expanded, setExpanded] = useState(isEdit);
+  const [form, setForm] = useState<DealFormState>(() => initialState(deal));
   const [probabilityTouched, setProbabilityTouched] = useState(false);
   const [amountTouched, setAmountTouched] = useState(false);
   const [attachments, setAttachments] = useState<PendingOrUploadedFile[]>([]);
@@ -112,6 +113,7 @@ export function DealForm({
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -122,32 +124,24 @@ export function DealForm({
       listAccounts({ pageSize: 100 }),
       listContacts({ pageSize: 100 }),
       listPipelines(),
-    ]).then(([stageRes, userRes, accountRes, contactRes, pipelineRes]) => {
+      listProducts(),
+    ]).then(([stageRes, userRes, accountRes, contactRes, pipelineRes, productRes]) => {
       const stagesTyped = stageRes as DealStage[];
       setStages(stagesTyped);
       setUsers(userRes);
       setAccounts(accountRes.data);
+      setProducts(productRes);
       setContacts(contactRes.data);
       setPipelines(pipelineRes);
-      if (!isEdit && !defaultStageId) {
-        const defaultStage = stagesTyped.find((s) => s.isDefault) ?? stagesTyped[0];
-        if (defaultStage) set('stageId', defaultStage.id);
-      }
-      if (!isEdit) {
-        const defaultPipeline = pipelineRes.find((p) => p.isDefault) ?? pipelineRes[0];
-        if (defaultPipeline) set('pipelineId', defaultPipeline.id);
-      }
     });
-    if (isEdit && deal) {
-      Promise.all([listDealContacts(deal.id), listLineItems(deal.id), listAttachments(deal.id)]).then(
-        ([dealContacts, lineItems, files]) => {
-          set('additionalContacts', dealContacts.map((dc) => ({ contactId: dc.contactId, role: dc.role })));
-          set('lineItems', lineItems);
-          if (lineItems.length > 0) setAmountTouched(true);
-          setAttachments(files.map((f) => ({ kind: 'uploaded', id: f.id, fileName: f.fileName, fileSize: f.fileSize })));
-        },
-      );
-    }
+    Promise.all([listDealContacts(deal.id), listLineItems(deal.id), listAttachments(deal.id)]).then(
+      ([dealContacts, lineItems, files]) => {
+        set('additionalContacts', dealContacts.map((dc) => ({ contactId: dc.contactId, role: dc.role })));
+        set('lineItems', lineItems);
+        if (lineItems.length > 0) setAmountTouched(true);
+        setAttachments(files.map((f) => ({ kind: 'uploaded', id: f.id, fileName: f.fileName, fileSize: f.fileSize })));
+      },
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -181,7 +175,6 @@ export function DealForm({
     if (!form.name.trim()) { setError('Deal name is required.'); return; }
     if (Number(form.amount) < 0) { setError('Value cannot be negative.'); return; }
     if (selectedStage?.isClosedLost && !form.lossReason.trim()) {
-      setExpanded(true);
       setError('Lost reason is required for a closed-lost stage.');
       return;
     }
@@ -214,13 +207,11 @@ export function DealForm({
         description: form.description || undefined,
       };
 
-      const data = isEdit ? await updateDeal(deal!.id, payload) : await createDeal(payload);
+      const data = await updateDeal(deal.id, payload);
 
-      const pendingFiles = attachments.filter((f) => f.kind === 'pending');
       const results = await Promise.allSettled([
         replaceDealContacts(data.id, form.additionalContacts),
         replaceLineItems(data.id, form.lineItems),
-        ...(!isEdit ? pendingFiles.map((f: any) => uploadAttachment(data.id, f.file)) : []),
       ]);
       if (results.some((r) => r.status === 'rejected')) {
         // eslint-disable-next-line no-console
@@ -240,7 +231,7 @@ export function DealForm({
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal modal-wide" onClick={(e) => e.stopPropagation()}>
-        <h3 style={{ marginTop: 0 }}>{isEdit ? 'Edit deal' : 'Create deal'}</h3>
+        <h3 style={{ marginTop: 0 }}>Edit deal</h3>
 
         <div className="form-grid-2">
           <div className="field field-span-2"><label>Deal name*</label>
@@ -283,14 +274,7 @@ export function DealForm({
           </div>
         </div>
 
-        {!isEdit && (
-          <button type="button" className="link-btn" onClick={() => setExpanded((v) => !v)}>
-            {expanded ? 'Hide extra fields' : 'Show more fields'}
-          </button>
-        )}
-
-        {(isEdit || expanded) && (
-          <>
+        <>
             <FormSection title="Deal Basics">
               <div className="form-grid-2">
                 <div className="field"><label>Pipeline</label>
@@ -369,7 +353,7 @@ export function DealForm({
                 )}
               </div>
               <div className="field"><label>Products / line items</label>
-                <LineItemsEditor value={form.lineItems} onChange={(v) => set('lineItems', v)} />
+                <LineItemsEditor value={form.lineItems} onChange={(v) => set('lineItems', v)} products={products} />
               </div>
             </FormSection>
 
@@ -405,7 +389,7 @@ export function DealForm({
               </div>
               <div className="field"><label>Attachments</label>
                 <FileUploadList
-                  parentId={deal?.id}
+                  parentId={deal.id}
                   value={attachments}
                   onChange={setAttachments}
                   uploadFn={uploadAttachment}
@@ -413,13 +397,12 @@ export function DealForm({
                 />
               </div>
             </FormSection>
-          </>
-        )}
+        </>
 
         {error && <div className="error">{error}</div>}
         <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
           <button className="btn" onClick={submit} disabled={saving}>
-            {saving ? 'Saving…' : isEdit ? 'Save' : 'Create'}
+            {saving ? 'Saving…' : 'Save'}
           </button>
           <button className="btn secondary" onClick={onClose}>Cancel</button>
         </div>
