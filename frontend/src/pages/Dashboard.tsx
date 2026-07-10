@@ -89,6 +89,14 @@ export function Dashboard() {
   const [ticketSummary, setTicketSummary] = useState<TicketSummary | null>(null);
   const [overviewLoading, setOverviewLoading] = useState(true);
 
+  // Live clock so the greeting (morning/afternoon/evening) and the displayed
+  // time stay correct without a page refresh; minute granularity is enough.
+  const [clock, setClock] = useState(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setClock(new Date()), 60000);
+    return () => clearInterval(timer);
+  }, []);
+
   useEffect(() => {
     if (canFilterByOwner) listUsers().then(setUsers);
   }, [canFilterByOwner]);
@@ -149,8 +157,9 @@ export function Dashboard() {
   const stageColorByName = new Map(dealStages.map((s) => [s.name, s.color]));
 
   const delta = leads.length - prevLeadsCount;
-  const hour = new Date().getHours();
+  const hour = clock.getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  const greetingEmoji = hour < 12 ? '🌅' : hour < 18 ? '☀️' : '🌙';
 
   // Leads overview
   const qualifiedLeads = allLeads.filter((l) => l.stage.isWon);
@@ -179,7 +188,12 @@ export function Dashboard() {
 
   return (
     <div>
-      <h2 style={{ marginTop: 0 }}>{greeting}, {user?.fullName?.split(' ')[0]}</h2>
+      <h2 style={{ marginTop: 0, marginBottom: 4 }}>{greetingEmoji} {greeting}, {user?.fullName?.split(' ')[0]}</h2>
+      <div style={{ color: 'var(--muted)', fontSize: 14, marginBottom: 16 }}>
+        {clock.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+        {' · '}
+        {clock.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+      </div>
 
       <div className="dashboard-filter-bar">
         <select value={range} onChange={(e) => setRange(Number(e.target.value) as RangeOption)}>
