@@ -210,7 +210,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
 .search-select-clear:hover { color: var(--ink); }
 .search-select-caret { color: var(--muted); font-size: 11px; flex-shrink: 0; }
 .search-select-menu { position: absolute; left: 0; right: 0; top: calc(100% + 4px); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); box-shadow: var(--shadow-lg); max-height: 240px; overflow-y: auto; z-index: 30; }
-.search-select-option { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; padding: 9px 12px; border: none; background: none; font-size: 14px; cursor: pointer; }
+.search-select-option { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; padding: 9px 12px; border: none; background: none; color: var(--ink); font-size: 14px; cursor: pointer; }
 .search-select-option.highlight, .search-select-option:hover { background: var(--pale); }
 .search-select-option.selected { font-weight: 600; color: var(--blue); }
 .search-select-sublabel { margin-left: auto; font-size: 12px; color: var(--muted); }
@@ -271,7 +271,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
 .dropdown-wrap { position: relative; display: inline-block; }
 .dropdown-menu { position: absolute; right: 0; top: calc(100% + 6px); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); box-shadow: var(--shadow-lg); min-width: 180px; z-index: 20; overflow: hidden; }
 .stage-header-row .dropdown-menu { left: 0; right: auto; }
-.dropdown-menu button { display: block; width: 100%; text-align: left; padding: 10px 14px; border: none; background: none; font-size: 14px; cursor: pointer; transition: background-color .1s ease; }
+.dropdown-menu button { display: block; width: 100%; text-align: left; padding: 10px 14px; border: none; background: none; color: var(--ink); font-size: 14px; cursor: pointer; transition: background-color .1s ease; }
 .dropdown-menu button:hover { background: var(--pale); }
 .dropdown-menu button:focus-visible { outline: none; background: var(--pale); box-shadow: inset var(--focus-ring); }
 .dropdown-menu button:disabled { color: var(--muted); cursor: not-allowed; }
