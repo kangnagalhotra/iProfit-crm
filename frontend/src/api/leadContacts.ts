@@ -1,42 +1,44 @@
 import { supabase } from '../lib/supabase';
-import type { Contact } from './types';
+import type { Contact, DealContactRole } from './types';
 
-const SELECT = 'contact:contacts(id, first_name, last_name, email, job_title, created_at, updated_at)';
+const SELECT = 'role, contact:contacts(id, first_name, last_name, email, job_title, created_at, updated_at)';
 
-function mapContact(row: any): Contact {
+export interface LeadContact extends Contact { role: DealContactRole; }
+
+function mapLeadContact(row: any): LeadContact {
+  const c = row.contact;
   return {
-    id: row.id,
-    firstName: row.first_name ?? undefined,
-    lastName: row.last_name ?? undefined,
-    email: row.email ?? undefined,
-    jobTitle: row.job_title ?? undefined,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    id: c.id,
+    firstName: c.first_name ?? undefined,
+    lastName: c.last_name ?? undefined,
+    email: c.email ?? undefined,
+    jobTitle: c.job_title ?? undefined,
+    createdAt: c.created_at,
+    updatedAt: c.updated_at,
+    role: row.role ?? 'OTHER',
   };
 }
 
-export async function listLeadContacts(leadId: string): Promise<Contact[]> {
+export async function listLeadContacts(leadId: string): Promise<LeadContact[]> {
   const { data, error } = await supabase.from('lead_contacts').select(SELECT).eq('lead_id', leadId);
   if (error) throw error;
-  return (data ?? []).map((row: any) => mapContact(row.contact));
+  return (data ?? []).map(mapLeadContact);
 }
 
-export async function replaceLeadContacts(leadId: string, contactIds: string[]): Promise<void> {
+export async function replaceLeadContacts(
+  leadId: string,
+  rows: { contactId: string; role?: DealContactRole }[],
+): Promise<void> {
   const { error: deleteError } = await supabase.from('lead_contacts').delete().eq('lead_id', leadId);
   if (deleteError) throw deleteError;
-  if (contactIds.length === 0) return;
+  if (rows.length === 0) return;
   const { error: insertError } = await supabase.from('lead_contacts').insert(
-    contactIds.map((contactId) => ({ lead_id: leadId, contact_id: contactId })),
+    rows.map((r) => ({ lead_id: leadId, contact_id: r.contactId, role: r.role ?? 'OTHER' })),
   );
   if (insertError) throw insertError;
 }
 
-export async function addLeadContact(leadId: string, contactId: string): Promise<void> {
-  const { error } = await supabase.from('lead_contacts').insert({ lead_id: leadId, contact_id: contactId });
-  if (error) throw error;
-}
-
-export async function removeLeadContact(leadId: string, contactId: string): Promise<void> {
-  const { error } = await supabase.from('lead_contacts').delete().eq('lead_id', leadId).eq('contact_id', contactId);
+export async function setLeadContactRole(leadId: string, contactId: string, role: DealContactRole): Promise<void> {
+  const { error } = await supabase.from('lead_contacts').update({ role }).eq('lead_id', leadId).eq('contact_id', contactId);
   if (error) throw error;
 }

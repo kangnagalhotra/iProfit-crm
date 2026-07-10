@@ -151,7 +151,8 @@ export interface ImportAccountsResult {
 export type DealType = 'NEW_BUSINESS' | 'EXISTING_BUSINESS' | 'RENEWAL' | 'UPSELL';
 export type DealPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 export type Currency = 'USD' | 'EUR' | 'GBP' | 'INR';
-export type DealContactRole = 'CHAMPION' | 'DECISION_MAKER' | 'INFLUENCER' | 'BLOCKER';
+export type DealContactRole = 'CHAMPION' | 'DECISION_MAKER' | 'INFLUENCER' | 'BLOCKER' | 'OTHER';
+export type ForecastCategory = 'COMMIT' | 'BEST_CASE' | 'PIPELINE' | 'OMITTED';
 export type DecisionTimeframe = 'LESS_THAN_1_MONTH' | 'ONE_TO_3_MONTHS' | 'THREE_TO_6_MONTHS' | 'SIX_PLUS_MONTHS';
 
 export interface DealStage extends Stage {
@@ -181,6 +182,38 @@ export interface Product {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface DealProposal {
+  id: string;
+  version: number;
+  sentDate: string;
+  value?: string;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface StageAutomationRule {
+  id: string;
+  fromStage: { id: string; name: string };
+  toStage: { id: string; name: string };
+  requiresActivityType: ActivityType;
+  requiresField?: string;
+  enabled: boolean;
+}
+
+export type ProjectHealth = 'ON_TRACK' | 'AT_RISK' | 'DELAYED';
+
+export interface Project {
+  id: string;
+  name: string;
+  status: string;
+  health: ProjectHealth;
+  satisfaction?: number;
+  value?: string;
+  createdAt: string;
+  opportunity?: { id: string; name: string; renewalDate?: string; lastActivityAt?: string; owner?: { id: string; fullName: string } };
+  account?: { id: string; name: string };
 }
 
 export interface DealContact {
@@ -225,6 +258,14 @@ export interface Opportunity {
   painPoint?: string;
   tags: string[];
   partnerAccount?: { id: string; name: string };
+  // null/undefined = derive from stage; a stored value is a rep override.
+  forecastCategory?: ForecastCategory;
+  forecastJustification?: string;
+  // Computed engagement score (0-100) + last real-activity stamp — written
+  // by DB triggers, read-only in the UI.
+  score: number;
+  lastActivityAt?: string;
+  renewalDate?: string;
   pipeline: { id: string; name: string };
   stage: DealStage;
   owner?: { id: string; fullName: string };
@@ -234,8 +275,7 @@ export interface Opportunity {
   archivedAt?: string;
   createdAt: string;
   updatedAt: string;
-  // Detail-view-only extras, populated by getDeal() but not listDeals().
-  lastActivityAt?: string;
+  // Detail-view-only extra, populated by getDeal() but not listDeals().
   daysInCurrentStage?: number;
 }
 

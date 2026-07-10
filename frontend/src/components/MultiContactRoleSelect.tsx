@@ -2,7 +2,7 @@ import type { Contact, DealContactRole } from '../api/types';
 import { SearchSelect } from './SearchSelect';
 import { Icon } from './Icon';
 
-const CONTACT_ROLES: DealContactRole[] = ['CHAMPION', 'DECISION_MAKER', 'INFLUENCER', 'BLOCKER'];
+const CONTACT_ROLES: DealContactRole[] = ['CHAMPION', 'DECISION_MAKER', 'INFLUENCER', 'BLOCKER', 'OTHER'];
 
 function contactLabel(c: Contact) {
   return [c.firstName, c.lastName].filter(Boolean).join(' ') || c.email || 'Untitled contact';

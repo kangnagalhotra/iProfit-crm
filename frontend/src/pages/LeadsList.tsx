@@ -26,8 +26,24 @@ import { SkeletonTable } from '../components/Skeleton';
 import { EmptyState } from '../components/EmptyState';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
+import { leadNextBestAction } from '../utils/nextBestAction';
+import type { NextBestAction } from '../utils/nextBestAction';
 
-type SortBy = 'firstName' | 'value' | 'updatedAt' | 'createdAt';
+type SortBy = 'firstName' | 'value' | 'updatedAt' | 'createdAt' | 'score';
+
+const NBA_COLORS: Record<NextBestAction['tone'], string> = { hot: '#DC2626', warn: '#F97316', info: '#6B7280' };
+
+function nbaChip(action: NextBestAction) {
+  return (
+    <span className="chip" style={{ background: NBA_COLORS[action.tone] + '22', color: NBA_COLORS[action.tone] }}>
+      {action.label}
+    </span>
+  );
+}
+
+function scoreColor(score: number) {
+  return score >= 70 ? '#16A34A' : score >= 40 ? '#F97316' : '#6B7280';
+}
 
 interface LeadFilters { [key: string]: string; stageId: string; ownerId: string; source: string; }
 
@@ -37,6 +53,8 @@ const LEAD_COLUMNS: ColumnDef[] = [
   { key: 'name', label: 'Name', required: true },
   { key: 'email', label: 'Email' },
   { key: 'stage', label: 'Stage' },
+  { key: 'score', label: 'Score' },
+  { key: 'nextAction', label: 'Next Best Action' },
   { key: 'owner', label: 'Owner' },
   { key: 'company', label: 'Company' },
   { key: 'value', label: 'Value' },
@@ -112,6 +130,7 @@ export function LeadsList() {
   const [users, setUsers] = useState<User[]>([]);
   const [editingCell, setEditingCell] = useState<{ id: string; field: 'stage' | 'owner' } | null>(null);
   const [convertingLead, setConvertingLead] = useState<Lead | null>(null);
+  const [hotLeads, setHotLeads] = useState<Lead[]>([]);
   const [filters, setFilters] = useState<LeadFilters>(EMPTY_LEAD_FILTERS);
   const [visibleColumns, setVisibleColumns] = useState<string[]>(ALL_LEAD_COLUMN_KEYS);
   const {
@@ -148,6 +167,14 @@ export function LeadsList() {
   useEffect(() => {
     Promise.all([listStages('lead_stages'), listUsers()])
       .then(([stageRes, userRes]) => { setStages(stageRes as LeadStage[]); setUsers(userRes); });
+    // Hot Leads smart view: top 5 by engagement score with activity in the
+    // last 7 days (unconverted only).
+    const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
+    listLeads({ sortBy: 'score', sortDir: 'desc', pageSize: 25 }).then((res) => {
+      setHotLeads(res.data
+        .filter((l) => !l.convertedAt && l.score > 0 && l.lastActivityAt && l.lastActivityAt >= weekAgo)
+        .slice(0, 5));
+    }).catch(() => {});
   }, []);
 
   const load = useCallback(() => {
@@ -238,6 +265,21 @@ export function LeadsList() {
         </div>
       </div>
 
+      {view === 'board' && hotLeads.length > 0 && (
+        <div className="card" style={{ marginBottom: 14 }}>
+          <div className="label" style={{ marginBottom: 8 }}>🔥 Hot Leads — highest score, active in the last 7 days</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+            {hotLeads.map((l) => (
+              <Link key={l.id} to={`/leads/${l.id}`} className="chip" style={{ textDecoration: 'none' }}>
+                <span style={{ fontWeight: 700, color: scoreColor(l.score), marginRight: 6 }}>{l.score}</span>
+                {l.leadName || [l.firstName, l.lastName].filter(Boolean).join(' ') || l.email}
+                <span style={{ color: 'var(--muted)', marginLeft: 6, fontSize: 12 }}>{leadNextBestAction(l).label}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
       {view === 'board' && (
         <>
           <SavedViewsBar
@@ -286,6 +328,8 @@ export function LeadsList() {
                   <th className="sortable" onClick={() => toggleSort('firstName')}>Name{sortArrow('firstName')}</th>
                   {visibleColumns.includes('email') && <th>Email</th>}
                   {visibleColumns.includes('stage') && <th>Stage</th>}
+                  {visibleColumns.includes('score') && <th className="sortable" onClick={() => toggleSort('score')}>Score{sortArrow('score')}</th>}
+                  {visibleColumns.includes('nextAction') && <th>Next Best Action</th>}
                   {visibleColumns.includes('owner') && <th>Owner</th>}
                   {visibleColumns.includes('company') && <th>Company</th>}
                   {visibleColumns.includes('value') && <th className="sortable" onClick={() => toggleSort('value')}>Value{sortArrow('value')}</th>}
@@ -318,6 +362,10 @@ export function LeadsList() {
                         </InlineCell>
                       </td>
                     )}
+                    {visibleColumns.includes('score') && (
+                      <td><span style={{ fontWeight: 600, color: scoreColor(l.score) }}>{l.score}</span></td>
+                    )}
+                    {visibleColumns.includes('nextAction') && <td>{nbaChip(leadNextBestAction(l))}</td>}
                     {visibleColumns.includes('owner') && (
                       <td>
                         <InlineCell

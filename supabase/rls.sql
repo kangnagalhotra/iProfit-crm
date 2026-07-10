@@ -360,8 +360,8 @@ create policy "stage_history_select" on stage_history for select to authenticate
     or exists (select 1 from opportunities o where o.id = stage_history.opportunity_id and o.owner_id = auth.uid())
   );
 
--- projects: system-authored only (see triggers.sql's create_project_on_closed_won()) —
--- no insert/update/delete policy for clients.
+-- projects: created only by the Closed Won trigger; health/satisfaction/
+-- status are then maintained by the deal owner or managers.
 alter table projects enable row level security;
 
 create policy "projects_select" on projects for select to authenticated
@@ -369,6 +369,62 @@ create policy "projects_select" on projects for select to authenticated
     is_manager_or_admin()
     or exists (select 1 from opportunities o where o.id = projects.opportunity_id and o.owner_id = auth.uid())
   );
+
+create policy "projects_update" on projects for update to authenticated
+  using (
+    is_manager_or_admin()
+    or exists (select 1 from opportunities o where o.id = projects.opportunity_id and o.owner_id = auth.uid())
+  )
+  with check (
+    is_manager_or_admin()
+    or exists (select 1 from opportunities o where o.id = projects.opportunity_id and o.owner_id = auth.uid())
+  );
+
+-- ---------------------------------------------------------------------------
+-- DEAL_PROPOSALS — child rows of opportunities; access inherits from the
+-- parent deal (identical shape to deal_line_items).
+-- ---------------------------------------------------------------------------
+
+alter table deal_proposals enable row level security;
+
+create policy "deal_proposals_select" on deal_proposals for select to authenticated
+  using (exists (
+    select 1 from opportunities o where o.id = deal_proposals.opportunity_id
+      and (is_manager_or_admin() or o.owner_id = auth.uid())
+  ));
+
+create policy "deal_proposals_insert" on deal_proposals for insert to authenticated
+  with check (exists (
+    select 1 from opportunities o where o.id = deal_proposals.opportunity_id
+      and (is_manager_or_admin() or o.owner_id = auth.uid())
+  ));
+
+create policy "deal_proposals_update" on deal_proposals for update to authenticated
+  using (exists (
+    select 1 from opportunities o where o.id = deal_proposals.opportunity_id
+      and (is_manager_or_admin() or o.owner_id = auth.uid())
+  ))
+  with check (exists (
+    select 1 from opportunities o where o.id = deal_proposals.opportunity_id
+      and (is_manager_or_admin() or o.owner_id = auth.uid())
+  ));
+
+create policy "deal_proposals_delete" on deal_proposals for delete to authenticated
+  using (exists (
+    select 1 from opportunities o where o.id = deal_proposals.opportunity_id
+      and (is_manager_or_admin() or o.owner_id = auth.uid())
+  ));
+
+-- ---------------------------------------------------------------------------
+-- STAGE_AUTOMATION_RULES — readable by anyone authenticated, writable only
+-- by ADMIN/SALES_MANAGER (same shape as the stage tables).
+-- ---------------------------------------------------------------------------
+
+alter table stage_automation_rules enable row level security;
+
+create policy "stage_automation_rules_select" on stage_automation_rules for select to authenticated using (true);
+create policy "stage_automation_rules_write" on stage_automation_rules for all to authenticated
+  using (is_manager_or_admin()) with check (is_manager_or_admin());
 
 -- ---------------------------------------------------------------------------
 -- TASKS

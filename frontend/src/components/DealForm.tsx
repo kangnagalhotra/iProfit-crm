@@ -48,7 +48,7 @@ interface DealFormState {
   dealType: DealType;
   priority: DealPriority;
   source: string;
-  additionalContacts: { contactId: string; role: 'CHAMPION' | 'DECISION_MAKER' | 'INFLUENCER' | 'BLOCKER' }[];
+  additionalContacts: { contactId: string; role: import('../api/types').DealContactRole }[];
   partnerAccountId: string;
   nextStep: string;
   nextActivityDate: string;

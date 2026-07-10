@@ -51,7 +51,12 @@ create type deal_priority as enum ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL');
 
 create type currency_code as enum ('USD', 'EUR', 'GBP', 'INR');
 
-create type deal_contact_role as enum ('CHAMPION', 'DECISION_MAKER', 'INFLUENCER', 'BLOCKER');
+create type deal_contact_role as enum ('CHAMPION', 'DECISION_MAKER', 'INFLUENCER', 'BLOCKER', 'OTHER');
+
+-- Forecast category is deliberately separate from stage win-probability:
+-- null on a deal means "derive from stage"; a stored value is a rep override
+-- (with forecast_justification required by the UI when more optimistic).
+create type forecast_category as enum ('COMMIT', 'BEST_CASE', 'PIPELINE', 'OMITTED');
 
 create type deal_decision_timeframe as enum (
   'LESS_THAN_1_MONTH', 'ONE_TO_3_MONTHS', 'THREE_TO_6_MONTHS', 'SIX_PLUS_MONTHS'
@@ -283,6 +288,7 @@ create trigger contacts_set_updated_at before update on contacts
 create table lead_contacts (
   lead_id uuid not null references leads(id) on delete cascade,
   contact_id uuid not null references contacts(id) on delete cascade,
+  role deal_contact_role not null default 'OTHER',
   created_at timestamptz not null default now(),
   primary key (lead_id, contact_id)
 );
@@ -365,6 +371,17 @@ create table opportunities (
   pain_point text,
   tags text[] not null default '{}',
   partner_account_id uuid references accounts(id) on delete set null,
+  -- Forecasting: null forecast_category = derive from stage; override needs
+  -- justification (UI-enforced) when more optimistic than the derived value.
+  forecast_category forecast_category,
+  forecast_justification text,
+  -- Engagement scoring (computed — see refresh_engagement_on_activity()
+  -- and recompute_engagement_scores() in triggers.sql, never hand-edited).
+  score int not null default 0 check (score between 0 and 100),
+  last_activity_at timestamptz,
+  -- Renewal automation (check_renewals() cron in triggers.sql).
+  renewal_date date,
+  last_renewal_reminder_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -453,6 +470,33 @@ create table lead_attachments (
 create index lead_attachments_lead_id_idx on lead_attachments(lead_id);
 create index lead_attachments_uploaded_by_idx on lead_attachments(uploaded_by);
 
+-- Versioned proposals/quotes — one row per version sent, never overwritten,
+-- so "how the offer evolved" and proposal→close timing stay reportable.
+create table deal_proposals (
+  id uuid primary key default gen_random_uuid(),
+  opportunity_id uuid not null references opportunities(id) on delete cascade,
+  version int not null,
+  sent_date date not null,
+  value numeric(15, 2) check (value is null or value >= 0),
+  notes text,
+  created_at timestamptz not null default now(),
+  unique (opportunity_id, version)
+);
+create index deal_proposals_opportunity_id_idx on deal_proposals(opportunity_id);
+
+-- Activity-based stage advancement rules. Evaluated CLIENT-side after an
+-- activity is logged (so the rep gets a toast with Undo — never a silent
+-- server-side flip); this table is just the manager-editable config.
+create table stage_automation_rules (
+  id uuid primary key default gen_random_uuid(),
+  from_stage_id uuid not null references deal_stages(id) on delete cascade,
+  to_stage_id uuid not null references deal_stages(id) on delete cascade,
+  requires_activity_type activity_type not null,
+  requires_field varchar(60), -- optional: this opportunities column must be non-null (amount / next_step / close_date)
+  enabled boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
 create table stage_history (
   id uuid primary key default gen_random_uuid(),
   opportunity_id uuid not null references opportunities(id) on delete cascade,
@@ -477,6 +521,9 @@ create table projects (
   account_id uuid references accounts(id) on delete set null,
   value numeric(15, 2),
   status varchar(30) not null default 'HANDOVER_PENDING',
+  -- Post-sale client health (maintained by the deal owner / managers).
+  health varchar(20) not null default 'ON_TRACK' check (health in ('ON_TRACK', 'AT_RISK', 'DELAYED')),
+  satisfaction smallint check (satisfaction is null or satisfaction between 1 and 5),
   created_at timestamptz not null default now()
 );
 create index projects_account_id_idx on projects(account_id);

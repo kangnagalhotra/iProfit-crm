@@ -23,8 +23,16 @@ import { EmptyState } from '../components/EmptyState';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 import { closedWonHandoverMessage } from '../utils/dealAutomation';
+import { dealNextBestAction, isStalled } from '../utils/nextBestAction';
+import type { NextBestAction } from '../utils/nextBestAction';
 
-type SortBy = 'name' | 'amount' | 'closeDate' | 'stage' | 'updatedAt' | 'createdAt';
+type SortBy = 'name' | 'amount' | 'closeDate' | 'stage' | 'updatedAt' | 'createdAt' | 'score';
+
+const NBA_COLORS: Record<NextBestAction['tone'], string> = { hot: '#DC2626', warn: '#F97316', info: '#6B7280' };
+
+function scoreColor(score: number) {
+  return score >= 70 ? '#16A34A' : score >= 40 ? '#F97316' : '#6B7280';
+}
 
 interface DealFilters { [key: string]: string; stageId: string; ownerId: string; priority: string; }
 
@@ -37,6 +45,8 @@ const DEAL_COLUMNS: ColumnDef[] = [
   { key: 'owner', label: 'Owner' },
   { key: 'priority', label: 'Priority' },
   { key: 'value', label: 'Value' },
+  { key: 'score', label: 'Score' },
+  { key: 'nextAction', label: 'Next Best Action' },
   { key: 'pipeline', label: 'Pipeline' },
   { key: 'stage', label: 'Stage' },
   { key: 'probability', label: 'Probability' },
@@ -292,6 +302,8 @@ export function DealsList() {
                   {visibleColumns.includes('owner') && <th>Owner</th>}
                   {visibleColumns.includes('priority') && <th>Priority</th>}
                   {visibleColumns.includes('value') && <th className="sortable" onClick={() => toggleSort('amount')}>Value{sortArrow('amount')}</th>}
+                  {visibleColumns.includes('score') && <th className="sortable" onClick={() => toggleSort('score')}>Score{sortArrow('score')}</th>}
+                  {visibleColumns.includes('nextAction') && <th>Next Best Action</th>}
                   {visibleColumns.includes('pipeline') && <th>Pipeline</th>}
                   {visibleColumns.includes('stage') && <th className="sortable" onClick={() => toggleSort('stage')}>Stage{sortArrow('stage')}</th>}
                   {visibleColumns.includes('probability') && <th>Probability</th>}
@@ -326,6 +338,20 @@ export function DealsList() {
                     )}
                     {visibleColumns.includes('priority') && <td><span className="chip" style={{ background: priorityColor(d.priority) + '22', color: priorityColor(d.priority) }}>{d.priority}</span></td>}
                     {visibleColumns.includes('value') && <td>{formatValue(d.amount)}</td>}
+                    {visibleColumns.includes('score') && (
+                      <td>
+                        <span style={{ fontWeight: 600, color: scoreColor(d.score) }}>{d.score}</span>
+                        {isStalled(d) && <span className="chip" style={{ background: '#F9731622', color: '#F97316', marginLeft: 6 }}>Stalled</span>}
+                      </td>
+                    )}
+                    {visibleColumns.includes('nextAction') && (
+                      <td>
+                        {(() => {
+                          const nba = dealNextBestAction(d);
+                          return <span className="chip" style={{ background: NBA_COLORS[nba.tone] + '22', color: NBA_COLORS[nba.tone] }}>{nba.label}</span>;
+                        })()}
+                      </td>
+                    )}
                     {visibleColumns.includes('pipeline') && <td>{d.pipeline.name}</td>}
                     {visibleColumns.includes('stage') && (
                       <td>

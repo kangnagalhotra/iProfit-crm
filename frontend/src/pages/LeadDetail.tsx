@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import type { Contact, Lead, LeadStage, User } from '../api/types';
+import type { DealContactRole, Lead, LeadStage, User } from '../api/types';
 import {
   getLead, updateLead, createLead, deleteLead, getConvertedDeal,
 } from '../api/leads';
-import { listLeadContacts, replaceLeadContacts } from '../api/leadContacts';
+import {
+  listLeadContacts, replaceLeadContacts, setLeadContactRole,
+} from '../api/leadContacts';
+import type { LeadContact } from '../api/leadContacts';
 import { listStages } from '../api/stages';
 import { listUsers } from '../api/users';
 import { NotesSection } from '../components/NotesSection';
@@ -95,7 +98,7 @@ export function LeadDetail() {
   const [showConvertModal, setShowConvertModal] = useState(false);
   const [showQualifiedPrompt, setShowQualifiedPrompt] = useState(false);
   const [convertedDeal, setConvertedDeal] = useState<{ id: string; name: string } | null>(null);
-  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [contacts, setContacts] = useState<LeadContact[]>([]);
   const [showLinkContacts, setShowLinkContacts] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [activityKey, setActivityKey] = useState(0);
@@ -338,6 +341,7 @@ export function LeadDetail() {
               placeholder="Search stage…"
             />
           </EditableRow>
+          <Row label="Engagement Score" value={<span className="chip">{lead.score}/100</span>} />
           <Row label="Lead Source" value={lead.source} onEmptyClick={canEdit ? () => setShowEditModal(true) : undefined} />
           <Row label="Rating" value={lead.rating ? RATING_LABELS[lead.rating] : undefined} onEmptyClick={canEdit ? () => setShowEditModal(true) : undefined} />
           {lead.unqualifiedReason && (
@@ -437,11 +441,30 @@ export function LeadDetail() {
             emptyLabel: 'No contacts linked to this lead yet.',
             items: contacts,
             addAction: { label: '+ Link Contact', onClick: () => setShowLinkContacts(true) },
-            onRowClick: (c: Contact) => navigate(`/contacts/${c.id}`),
+            onRowClick: (c: LeadContact) => navigate(`/contacts/${c.id}`),
             columns: [
-              { header: 'Name', render: (c: Contact) => <Link to={`/contacts/${c.id}`} onClick={(e) => e.stopPropagation()}>{[c.firstName, c.lastName].filter(Boolean).join(' ') || c.email || 'Untitled contact'}</Link> },
-              { header: 'Email', render: (c: Contact) => c.email ?? '—' },
-              { header: 'Designation', render: (c: Contact) => c.jobTitle ?? '—' },
+              { header: 'Name', render: (c: LeadContact) => <Link to={`/contacts/${c.id}`} onClick={(e) => e.stopPropagation()}>{[c.firstName, c.lastName].filter(Boolean).join(' ') || c.email || 'Untitled contact'}</Link> },
+              { header: 'Email', render: (c: LeadContact) => c.email ?? '—' },
+              { header: 'Designation', render: (c: LeadContact) => c.jobTitle ?? '—' },
+              {
+                header: 'Role',
+                render: (c: LeadContact) => (
+                  <select
+                    value={c.role}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) => {
+                      const role = e.target.value as DealContactRole;
+                      setLeadContactRole(lead!.id, c.id, role)
+                        .then(() => { loadContacts(); toast.success('Contact role updated'); })
+                        .catch((err) => toast.error(err.message ?? 'Could not update role'));
+                    }}
+                  >
+                    {(['DECISION_MAKER', 'CHAMPION', 'INFLUENCER', 'BLOCKER', 'OTHER'] as DealContactRole[]).map((r) => (
+                      <option key={r} value={r}>{r.replace('_', ' ')}</option>
+                    ))}
+                  </select>
+                ),
+              },
             ],
           },
         ] as AssociationGroup[]}
@@ -488,7 +511,11 @@ export function LeadDetail() {
           accountId={lead.account?.id}
           onClose={() => setShowLinkContacts(false)}
           onSave={async (contactIds) => {
-            await replaceLeadContacts(lead.id, contactIds);
+            // Preserve roles already assigned; newly linked contacts start as OTHER.
+            const roleByContact = new Map(contacts.map((c) => [c.id, c.role]));
+            await replaceLeadContacts(lead.id, contactIds.map((contactId) => ({
+              contactId, role: roleByContact.get(contactId) ?? 'OTHER',
+            })));
             loadContacts();
             toast.success('Contacts updated');
           }}

@@ -12,6 +12,9 @@ import { ContactDetail } from './pages/ContactDetail';
 import { DealsList } from './pages/DealsList';
 import { DealDetail } from './pages/DealDetail';
 import { ProductsList } from './pages/ProductsList';
+import { Reports } from './pages/Reports';
+import { ClientHealth } from './pages/ClientHealth';
+import { SettingsAutomation } from './pages/SettingsAutomation';
 import { PipelineBoard } from './pages/PipelineBoard';
 import { CustomerSuccessBoard } from './pages/CustomerSuccessBoard';
 import { SupportTicketsList } from './pages/SupportTicketsList';
@@ -32,9 +35,12 @@ const NAV_LINKS: { to: string; label: string; icon: IconName; end?: boolean }[] 
   { to: '/deals', label: 'Deals', icon: 'dollar' },
   { to: '/products', label: 'Products', icon: 'inbox' },
   { to: '/pipeline', label: 'Pipeline', icon: 'columns' },
+  { to: '/reports', label: 'Reports', icon: 'filter' },
+  { to: '/client-health', label: 'Client Health', icon: 'headset' },
   { to: '/customer-success', label: 'Customer Success', icon: 'headset' },
   { to: '/support-tickets', label: 'Support Tickets', icon: 'ticket' },
   { to: '/tasks', label: 'Tasks', icon: 'checklist' },
+  { to: '/settings/automation', label: 'Automation', icon: 'sparkle' },
 ];
 
 function Shell({ children }: { children: ReactNode }) {
@@ -96,6 +102,9 @@ export function App() {
       <Route path="/deals" element={<Protected><DealsList /></Protected>} />
       <Route path="/deals/:id" element={<Protected><DealDetail /></Protected>} />
       <Route path="/products" element={<Protected><ProductsList /></Protected>} />
+      <Route path="/reports" element={<Protected><Reports /></Protected>} />
+      <Route path="/client-health" element={<Protected><ClientHealth /></Protected>} />
+      <Route path="/settings/automation" element={<Protected><SettingsAutomation /></Protected>} />
       <Route path="/pipeline" element={<Protected><PipelineBoard /></Protected>} />
       <Route path="/customer-success" element={<Protected><CustomerSuccessBoard /></Protected>} />
       <Route path="/support-tickets" element={<Protected><SupportTicketsList /></Protected>} />

@@ -72,7 +72,6 @@ interface LeadFormState {
   sourceDetails: string;
   ownerId: string;
   stageId: string;
-  score: string;
   rating: LeadRating | '';
   unqualifiedReason: LeadUnqualifiedReason | '';
   tags: string[];
@@ -105,7 +104,6 @@ function initialState(lead?: Lead, defaultStageId?: string): LeadFormState {
     sourceDetails: lead?.sourceDetails ?? '',
     ownerId: lead?.owner?.id ?? '',
     stageId: lead?.stage.id ?? defaultStageId ?? '',
-    score: lead?.score !== undefined && lead?.score !== null ? String(lead.score) : '',
     rating: lead?.rating ?? '',
     unqualifiedReason: lead?.unqualifiedReason ?? '',
     tags: lead?.tags ?? [],
@@ -238,11 +236,6 @@ export function LeadForm({
       return false;
     }
     if (form.value !== '' && Number(form.value) < 0) { setError('Lead value cannot be negative.'); return false; }
-    if (form.score !== '' && (Number(form.score) < 0 || Number(form.score) > 100)) {
-      setExpanded(true);
-      setError('Lead score must be between 0 and 100.');
-      return false;
-    }
     setError('');
     return true;
   }
@@ -278,7 +271,6 @@ export function LeadForm({
       sourceDetails: form.sourceDetails || undefined,
       ownerId: form.ownerId || undefined,
       stageId: form.stageId || undefined,
-      score: form.score !== '' ? Number(form.score) : undefined,
       rating: form.rating || undefined,
       unqualifiedReason: selectedStage?.isLost ? (form.unqualifiedReason || undefined) : undefined,
       tags: form.tags,
@@ -483,8 +475,6 @@ export function LeadForm({
 
               <FormSection title="Lead Details">
                 <div className="form-grid-2">
-                  <div className="field"><label>Lead score</label>
-                    <input type="number" min="0" max="100" value={form.score} onChange={(e) => set('score', e.target.value)} placeholder="0–100" /></div>
                   <div className="field"><label>Rating</label>
                     <select value={form.rating} onChange={(e) => set('rating', e.target.value as LeadRating | '')}>
                       <option value="">—</option>

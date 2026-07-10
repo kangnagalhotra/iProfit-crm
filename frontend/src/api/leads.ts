@@ -9,7 +9,7 @@ const SELECT = `*, stage:lead_stages(*), owner:profiles!leads_owner_id_fkey(id, 
   createdByProfile:profiles!leads_created_by_fkey(id, full_name), account:accounts(id, name)`;
 
 const SORT_COLUMN: Record<string, string> = {
-  firstName: 'first_name', lastName: 'last_name', value: 'value', updatedAt: 'updated_at', createdAt: 'created_at',
+  firstName: 'first_name', lastName: 'last_name', value: 'value', updatedAt: 'updated_at', createdAt: 'created_at', score: 'score',
 };
 
 function mapLead(row: any): Lead {
@@ -331,11 +331,13 @@ export async function convertLeadToDeal(
   // as the original single-contact conversion behavior.
   const { data: existingLinks } = await supabase
     .from('lead_contacts')
-    .select('contact:contacts(id, first_name, last_name, email)')
+    .select('role, contact:contacts(id, first_name, last_name, email)')
     .eq('lead_id', lead.id);
-  let contactIds = (existingLinks ?? []).map((r: any) => r.contact?.id).filter(Boolean) as string[];
+  let linkedContacts = (existingLinks ?? [])
+    .filter((r: any) => r.contact?.id)
+    .map((r: any) => ({ id: r.contact.id as string, role: (r.role ?? 'OTHER') as string }));
 
-  if (contactIds.length === 0) {
+  if (linkedContacts.length === 0) {
     const contact = await createContact({
       firstName: lead.firstName,
       lastName: lead.lastName,
@@ -346,8 +348,9 @@ export async function convertLeadToDeal(
       ownerId: lead.owner?.id,
       leadIds: [lead.id],
     });
-    contactIds = [contact.id];
+    linkedContacts = [{ id: contact.id, role: 'OTHER' }];
   }
+  const contactIds = linkedContacts.map((c) => c.id);
 
   const deal = await createDeal({
     name: dealName,
@@ -362,13 +365,13 @@ export async function convertLeadToDeal(
   });
 
   // Carry every OTHER contact linked to the lead onto the deal too (the
-  // first is already the Primary Contact set above) — "Deal inherits
-  // associated Contacts from its source Lead" holds even when a lead has
-  // 3+ contacts.
-  const secondaryContactIds = contactIds.slice(1);
-  if (secondaryContactIds.length > 0) {
+  // first is already the Primary Contact set above), preserving each
+  // contact's association role from the lead — "Deal inherits associated
+  // Contacts from its source Lead" holds even when a lead has 3+ contacts.
+  const secondaryContacts = linkedContacts.slice(1);
+  if (secondaryContacts.length > 0) {
     await supabase.from('deal_contacts').insert(
-      secondaryContactIds.map((contactId) => ({ opportunity_id: deal.id, contact_id: contactId, role: 'INFLUENCER' })),
+      secondaryContacts.map((c) => ({ opportunity_id: deal.id, contact_id: c.id, role: c.role })),
     );
   }
 

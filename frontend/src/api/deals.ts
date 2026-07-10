@@ -8,7 +8,7 @@ const SELECT = `*, pipeline:pipelines(id, name), stage:deal_stages(*), owner:pro
   partner_account:accounts!opportunities_partner_account_id_fkey(id, name)`;
 
 const SORT_COLUMN: Record<string, string> = {
-  name: 'name', amount: 'amount', closeDate: 'close_date', updatedAt: 'updated_at', createdAt: 'created_at',
+  name: 'name', amount: 'amount', closeDate: 'close_date', updatedAt: 'updated_at', createdAt: 'created_at', score: 'score',
 };
 
 function mapDeal(row: any): Opportunity {
@@ -33,6 +33,11 @@ function mapDeal(row: any): Opportunity {
     painPoint: row.pain_point ?? undefined,
     tags: row.tags ?? [],
     partnerAccount: row.partner_account ? { id: row.partner_account.id, name: row.partner_account.name } : undefined,
+    forecastCategory: row.forecast_category ?? undefined,
+    forecastJustification: row.forecast_justification ?? undefined,
+    score: row.score ?? 0,
+    lastActivityAt: row.last_activity_at ?? undefined,
+    renewalDate: row.renewal_date ?? undefined,
     pipeline: { id: row.pipeline.id, name: row.pipeline.name },
     stage: {
       id: row.stage.id, name: row.stage.name, order: row.stage.order, color: row.stage.color,
@@ -97,11 +102,9 @@ export async function getDeal(id: string): Promise<Opportunity> {
   if (error) throw error;
   const deal = mapDeal(data);
 
-  const [lastActivity, history] = await Promise.all([
-    supabase.from('activities').select('created_at').eq('opportunity_id', id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
-    listStageHistory(id),
-  ]);
-  deal.lastActivityAt = lastActivity.data?.created_at ?? undefined;
+  // lastActivityAt now comes straight off the row (opportunities.last_activity_at,
+  // maintained by the engagement trigger) — only stage history needs a lookup.
+  const history = await listStageHistory(id);
   if (history.length > 0) {
     deal.daysInCurrentStage = Math.floor((Date.now() - new Date(history[0].changedAt).getTime()) / 86400000);
   }
@@ -135,6 +138,8 @@ function toRow(input: Record<string, any>) {
     next_activity_date: input.nextActivityDate, competitor: input.competitor, budget_confirmed: input.budgetConfirmed,
     decision_timeframe: input.decisionTimeframe, pain_point: input.painPoint, tags: input.tags,
     partner_account_id: input.partnerAccountId,
+    forecast_category: input.forecastCategory, forecast_justification: input.forecastJustification,
+    renewal_date: input.renewalDate,
   };
   Object.keys(row).forEach((k) => { if (row[k] === undefined) delete row[k]; });
   return row;

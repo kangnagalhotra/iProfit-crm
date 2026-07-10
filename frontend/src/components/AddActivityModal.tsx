@@ -17,7 +17,10 @@ export function AddActivityModal({
   leadId, accountId, opportunityId, onClose, onSaved,
 }: {
   leadId?: string; accountId?: string; opportunityId?: string;
-  onClose: () => void; onSaved: () => void;
+  onClose: () => void;
+  // The logged activity type flows back so callers on a Deal can run
+  // stage-automation rules (see utils/stageAutomation.ts) with an Undo toast.
+  onSaved: (activityType: ActivityType) => void;
 }) {
   const [type, setType] = useState<ActivityType>('CALL');
   const [body, setBody] = useState('');
@@ -32,7 +35,7 @@ export function AddActivityModal({
       await createActivity({
         type, body: trimmed, leadId, accountId, opportunityId,
       });
-      onSaved();
+      onSaved(type);
     } catch (e: any) {
       setError(e.message ?? 'Could not add activity');
     } finally {
