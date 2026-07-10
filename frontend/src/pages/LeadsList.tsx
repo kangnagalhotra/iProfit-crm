@@ -329,7 +329,7 @@ export function LeadsList() {
                   {visibleColumns.includes('email') && <th>Email</th>}
                   {visibleColumns.includes('stage') && <th>Stage</th>}
                   {visibleColumns.includes('score') && <th className="sortable" onClick={() => toggleSort('score')}>Score{sortArrow('score')}</th>}
-                  {visibleColumns.includes('nextAction') && <th>Next Best Action</th>}
+                  {visibleColumns.includes('nextAction') && <th style={{ minWidth: 170 }}>Next Best Action</th>}
                   {visibleColumns.includes('owner') && <th>Owner</th>}
                   {visibleColumns.includes('company') && <th>Company</th>}
                   {visibleColumns.includes('value') && <th className="sortable" onClick={() => toggleSort('value')}>Value{sortArrow('value')}</th>}

@@ -303,7 +303,7 @@ export function DealsList() {
                   {visibleColumns.includes('priority') && <th>Priority</th>}
                   {visibleColumns.includes('value') && <th className="sortable" onClick={() => toggleSort('amount')}>Value{sortArrow('amount')}</th>}
                   {visibleColumns.includes('score') && <th className="sortable" onClick={() => toggleSort('score')}>Score{sortArrow('score')}</th>}
-                  {visibleColumns.includes('nextAction') && <th>Next Best Action</th>}
+                  {visibleColumns.includes('nextAction') && <th style={{ minWidth: 170 }}>Next Best Action</th>}
                   {visibleColumns.includes('pipeline') && <th>Pipeline</th>}
                   {visibleColumns.includes('stage') && <th className="sortable" onClick={() => toggleSort('stage')}>Stage{sortArrow('stage')}</th>}
                   {visibleColumns.includes('probability') && <th>Probability</th>}
