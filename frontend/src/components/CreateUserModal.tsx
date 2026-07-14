@@ -8,13 +8,25 @@ const ROLES: { value: Role; label: string }[] = [
   { value: 'SALES_MANAGER', label: 'Sales Manager' },
 ];
 
+// Owners are real CRM logins, so a password must exist — but the admin
+// shouldn't have to invent (or know) it. Generate a strong temporary one,
+// shown exactly once after creation for the admin to hand over; the teammate
+// changes it after first sign-in.
+function generateTempPassword(): string {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  const bytes = new Uint32Array(12);
+  crypto.getRandomValues(bytes);
+  const body = [...bytes].map((b) => alphabet[b % alphabet.length]).join('');
+  return `Tmp-${body}`; // guaranteed letter + number + 10+ chars
+}
+
 export function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreated: (user: User) => void }) {
-  const [form, setForm] = useState({
-    fullName: '', email: '', password: '', role: 'SALES_REP' as Role,
-  });
+  const [form, setForm] = useState({ fullName: '', email: '', role: 'SALES_REP' as Role });
   const [error, setError] = useState('');
   const [emailError, setEmailError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [created, setCreated] = useState<{ user: User; tempPassword: string } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   function set<K extends keyof typeof form>(k: K, v: (typeof form)[K]) {
     setForm((f) => ({ ...f, [k]: v }));
@@ -34,8 +46,11 @@ export function CreateUserModal({ onClose, onCreated }: { onClose: () => void; o
     if (!validateEmail(trimmedEmail)) return;
     setSaving(true);
     try {
-      const data = await createUser({ ...form, email: trimmedEmail } as { fullName: string; email: string; password: string; role: 'SALES_REP' | 'SALES_MANAGER' });
-      onCreated(data);
+      const tempPassword = generateTempPassword();
+      const data = await createUser({
+        fullName: form.fullName, email: trimmedEmail, password: tempPassword, role: form.role,
+      });
+      setCreated({ user: data, tempPassword });
     } catch (e: any) {
       setError(e.message ?? 'Could not create user');
     } finally {
@@ -43,12 +58,46 @@ export function CreateUserModal({ onClose, onCreated }: { onClose: () => void; o
     }
   }
 
-  const canSubmit = form.fullName.trim() && form.email.trim() && form.password.length >= 10;
+  function copyCredentials() {
+    if (!created) return;
+    navigator.clipboard.writeText(`Email: ${created.user.email}\nTemporary password: ${created.tempPassword}`);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+
+  const canSubmit = form.fullName.trim() && form.email.trim();
+
+  if (created) {
+    return (
+      <div className="modal-overlay" onClick={() => onCreated(created.user)}>
+        <div className="modal" onClick={(e) => e.stopPropagation()}>
+          <h3 style={{ marginTop: 0 }}>Owner created ✓</h3>
+          <p style={{ fontSize: 14, marginTop: 0 }}>
+            Share these sign-in details with <strong>{created.user.fullName}</strong> — the temporary
+            password is shown only once.
+          </p>
+          <div className="field"><label>Email</label>
+            <input value={created.user.email} readOnly /></div>
+          <div className="field"><label>Temporary password</label>
+            <input value={created.tempPassword} readOnly style={{ fontFamily: 'monospace' }} /></div>
+          <div className="helper-text">Ask them to change it after their first sign-in.</div>
+          <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
+            <button className="btn" onClick={copyCredentials}>{copied ? 'Copied ✓' : 'Copy credentials'}</button>
+            <button className="btn secondary" onClick={() => onCreated(created.user)}>Done</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h3 style={{ marginTop: 0 }}>Add new owner</h3>
+        <p className="helper-text" style={{ marginTop: 0 }}>
+          Creates a CRM login for a teammate. A temporary password is generated automatically and shown
+          to you after creation — no need to invent one.
+        </p>
         <div className="field"><label>Full name</label>
           <input value={form.fullName} onChange={(e) => set('fullName', e.target.value)} /></div>
         <div className="field"><label>Email</label>
@@ -63,10 +112,6 @@ export function CreateUserModal({ onClose, onCreated }: { onClose: () => void; o
             }}
           />
           {emailError && <div className="error" style={{ margin: '4px 0 0' }}>{emailError}</div>}
-        </div>
-        <div className="field"><label>Password</label>
-          <input type="password" value={form.password} onChange={(e) => set('password', e.target.value)} />
-          <div className="helper-text">At least 10 characters, with a letter and a number.</div>
         </div>
         <div className="field"><label>Role</label>
           <select value={form.role} onChange={(e) => set('role', e.target.value as Role)}>
