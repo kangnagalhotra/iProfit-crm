@@ -176,6 +176,20 @@ tr.clickable-row:hover td { background: var(--pale); }
 .chip-removable { display: inline-flex; align-items: center; gap: 5px; }
 .chip-removable button { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 14px; line-height: 1; padding: 0; }
 .chip-removable button:hover { color: #b91c1c; }
+
+/* Colored tag pills — hue is derived from the tag text (see tagColor()), so
+   the same tag looks identical everywhere without configuration. */
+.tag-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 600; line-height: 1.5;
+  padding: 3px 8px 3px 7px; border-radius: 999px; border: 1px solid;
+}
+.tag-chip-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.tag-chip button {
+  background: none; border: none; color: inherit; opacity: .55;
+  cursor: pointer; font-size: 14px; line-height: 1; padding: 0 0 0 2px;
+}
+.tag-chip button:hover { opacity: 1; }
 .tags-input-field { flex: 1; min-width: 80px; border: none; outline: none; font-size: 14px; padding: 3px 2px; background: none; color: var(--ink); }
 
 .file-upload-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
