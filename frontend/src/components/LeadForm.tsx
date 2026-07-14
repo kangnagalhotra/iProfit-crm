@@ -227,8 +227,8 @@ export function LeadForm({
     if (!form.firstName.trim()) { setError('First name is required.'); return false; }
     if (!form.lastName.trim()) { setError('Last name is required.'); return false; }
     if (!form.accountId && !form.companyName.trim()) { setError('Company name is required.'); return false; }
+    if (!form.mobile) { setError('Mobile number is required.'); return false; }
     if (!validateMobile(form.mobile) || !validateEmail(trimmedEmail)) return false;
-    if (!trimmedEmail && !form.mobile) { setError('Enter an email or a mobile number.'); return false; }
     if (form.linkedinUrl && !validateLinkedin(form.linkedinUrl)) { setExpanded(true); return false; }
     if (selectedStage?.isLost && !form.unqualifiedReason) {
       setExpanded(true);
@@ -362,7 +362,7 @@ export function LeadForm({
               />
               {emailError && <div className="error" style={{ margin: '4px 0 0' }}>{emailError}</div>}
             </div>
-            <div className="field"><label>Mobile Number</label>
+            <div className="field"><label>Mobile Number*</label>
               <input
                 value={formatPhoneDisplay(form.mobile)}
                 onChange={(e) => set('mobile', stripPhoneDigits(e.target.value))}
