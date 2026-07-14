@@ -3,7 +3,9 @@ import { createUser } from '../api/users';
 import type { Role, User } from '../api/types';
 import { stripEmailInput, isValidEmail, EMAIL_ERROR_MESSAGE } from '../utils/validation';
 
-const ROLES: { value: Role; label: string }[] = [
+type CreatableRole = Extract<Role, 'SALES_REP' | 'SALES_MANAGER'>;
+
+const ROLES: { value: CreatableRole; label: string }[] = [
   { value: 'SALES_REP', label: 'Sales Rep' },
   { value: 'SALES_MANAGER', label: 'Sales Manager' },
 ];
@@ -21,7 +23,7 @@ function generateTempPassword(): string {
 }
 
 export function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreated: (user: User) => void }) {
-  const [form, setForm] = useState({ fullName: '', email: '', role: 'SALES_REP' as Role });
+  const [form, setForm] = useState({ fullName: '', email: '', role: 'SALES_REP' as CreatableRole });
   const [error, setError] = useState('');
   const [emailError, setEmailError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -114,7 +116,7 @@ export function CreateUserModal({ onClose, onCreated }: { onClose: () => void; o
           {emailError && <div className="error" style={{ margin: '4px 0 0' }}>{emailError}</div>}
         </div>
         <div className="field"><label>Role</label>
-          <select value={form.role} onChange={(e) => set('role', e.target.value as Role)}>
+          <select value={form.role} onChange={(e) => set('role', e.target.value as CreatableRole)}>
             {ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
           </select>
         </div>
