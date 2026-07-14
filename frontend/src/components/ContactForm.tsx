@@ -1,16 +1,13 @@
 import { useEffect, useState } from 'react';
-import type { Account, Contact, User } from '../api/types';
+import type { Account, Contact } from '../api/types';
 import { createContact, updateContact } from '../api/contacts';
 import { listAccounts } from '../api/accounts';
 import { listLeads } from '../api/leads';
-import { listUsers } from '../api/users';
 import { SearchSelect } from './SearchSelect';
 import type { SearchSelectOption } from './SearchSelect';
 import { MultiEntitySelect } from './MultiEntitySelect';
 import { CompanyForm } from './CompanyForm';
 import { LeadForm } from './LeadForm';
-import { CreateUserModal } from './CreateUserModal';
-import { useAuth } from '../context/AuthContext';
 import {
   stripPhoneDigits, formatPhoneDisplay, isValidPhone, PHONE_ERROR_MESSAGE,
 } from '../utils/validation';
@@ -28,8 +25,6 @@ export function ContactForm({
   onClose: () => void;
   onSaved: (contact: Contact) => void;
 }) {
-  const { user: currentUser } = useAuth();
-  const canAddOwner = currentUser?.role === 'ADMIN' || currentUser?.role === 'SALES_MANAGER';
   const isEdit = !!contact;
   const isScoped = !!accountId;
   const isLeadScoped = !!leadId;
@@ -43,25 +38,21 @@ export function ContactForm({
     department: contact?.department ?? '',
     notes: contact?.notes ?? '',
     accountId: contact?.account?.id ?? accountId ?? '',
-    ownerId: contact?.owner?.id ?? '',
   });
   const [leadIds, setLeadIds] = useState<string[]>(
     contact?.leads?.map((l) => l.id) ?? (leadId ? [leadId] : []),
   );
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [leads, setLeads] = useState<{ id: string; firstName?: string; lastName?: string; email?: string }[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
   const [mobileError, setMobileError] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [showCreateCompany, setShowCreateCompany] = useState(false);
   const [showCreateLead, setShowCreateLead] = useState(false);
-  const [showCreateUser, setShowCreateUser] = useState(false);
 
   useEffect(() => {
     if (!isScoped) listAccounts({ pageSize: 100 }).then((res) => setAccounts(res.data));
     if (!isLeadScoped) listLeads({ pageSize: 100 }).then((res) => setLeads(res.data));
-    listUsers().then(setUsers);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -77,10 +68,6 @@ export function ContactForm({
 
   const accountOptions: SearchSelectOption[] = accounts.map((a) => ({ value: a.id, label: a.name }));
   const leadOptions: SearchSelectOption[] = leads.map((l) => ({ value: l.id, label: leadLabel(l), sublabel: l.email }));
-  const ownerOptions: SearchSelectOption[] = [
-    { value: '', label: 'Assign to me' },
-    ...users.map((u) => ({ value: u.id, label: u.fullName, sublabel: u.email })),
-  ];
 
   async function submit() {
     setError('');
@@ -151,16 +138,6 @@ export function ContactForm({
             />
           </div>
         )}
-        <div className="field"><label>Contact owner*</label>
-          <SearchSelect
-            options={ownerOptions}
-            value={form.ownerId}
-            onChange={(v) => set('ownerId', v)}
-            placeholder="Search owner…"
-            onCreateNew={canAddOwner ? () => setShowCreateUser(true) : undefined}
-            createNewLabel="+ Add new owner"
-          />
-        </div>
         <div className="field"><label>Notes</label>
           <textarea
             rows={3}
@@ -202,16 +179,6 @@ export function ContactForm({
       />
     )}
 
-    {showCreateUser && (
-      <CreateUserModal
-        onClose={() => setShowCreateUser(false)}
-        onCreated={(newUser) => {
-          setUsers((us) => [...us, newUser].sort((a, b) => a.fullName.localeCompare(b.fullName)));
-          set('ownerId', newUser.id);
-          setShowCreateUser(false);
-        }}
-      />
-    )}
     </>
   );
 }
