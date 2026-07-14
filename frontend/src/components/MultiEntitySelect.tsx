@@ -6,12 +6,14 @@ import { Icon } from './Icon';
 // button. Used for many-to-many associations (Lead<->Contact) that don't
 // need a per-row role, unlike MultiContactRoleSelect.
 export function MultiEntitySelect({
-  options, value, onChange, placeholder = 'Add…',
+  options, value, onChange, placeholder = 'Add…', onCreateNew, createNewLabel,
 }: {
   options: SearchSelectOption[];
   value: string[];
   onChange: (ids: string[]) => void;
   placeholder?: string;
+  onCreateNew?: () => void;
+  createNewLabel?: string;
 }) {
   const available = options.filter((o) => !value.includes(o.value));
 
@@ -25,7 +27,14 @@ export function MultiEntitySelect({
 
   return (
     <div>
-      <SearchSelect options={available} value="" onChange={add} placeholder={placeholder} />
+      <SearchSelect
+        options={available}
+        value=""
+        onChange={add}
+        placeholder={placeholder}
+        onCreateNew={onCreateNew}
+        createNewLabel={createNewLabel}
+      />
       {value.length > 0 && (
         <div className="multi-contact-rows">
           {value.map((id) => {

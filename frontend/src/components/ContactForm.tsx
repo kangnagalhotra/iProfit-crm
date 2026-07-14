@@ -7,6 +7,10 @@ import { listUsers } from '../api/users';
 import { SearchSelect } from './SearchSelect';
 import type { SearchSelectOption } from './SearchSelect';
 import { MultiEntitySelect } from './MultiEntitySelect';
+import { CompanyForm } from './CompanyForm';
+import { LeadForm } from './LeadForm';
+import { CreateUserModal } from './CreateUserModal';
+import { useAuth } from '../context/AuthContext';
 import {
   stripPhoneDigits, formatPhoneDisplay, isValidPhone, PHONE_ERROR_MESSAGE,
 } from '../utils/validation';
@@ -24,6 +28,8 @@ export function ContactForm({
   onClose: () => void;
   onSaved: (contact: Contact) => void;
 }) {
+  const { user: currentUser } = useAuth();
+  const canAddOwner = currentUser?.role === 'ADMIN' || currentUser?.role === 'SALES_MANAGER';
   const isEdit = !!contact;
   const isScoped = !!accountId;
   const isLeadScoped = !!leadId;
@@ -48,6 +54,9 @@ export function ContactForm({
   const [mobileError, setMobileError] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [showCreateCompany, setShowCreateCompany] = useState(false);
+  const [showCreateLead, setShowCreateLead] = useState(false);
+  const [showCreateUser, setShowCreateUser] = useState(false);
 
   useEffect(() => {
     if (!isScoped) listAccounts({ pageSize: 100 }).then((res) => setAccounts(res.data));
@@ -94,6 +103,7 @@ export function ContactForm({
   const canSubmit = (form.firstName.trim() || form.lastName.trim() || form.email.trim()) && !!form.accountId;
 
   return (
+    <>
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h3 style={{ marginTop: 0 }}>{isEdit ? 'Edit contact' : 'Add contact'}</h3>
@@ -119,16 +129,37 @@ export function ContactForm({
           <input value={form.department} onChange={(e) => set('department', e.target.value)} /></div>
         {!isScoped && (
           <div className="field"><label>Company*</label>
-            <SearchSelect options={accountOptions} value={form.accountId} onChange={(v) => set('accountId', v)} placeholder="Search company…" />
+            <SearchSelect
+              options={accountOptions}
+              value={form.accountId}
+              onChange={(v) => set('accountId', v)}
+              placeholder="Search company…"
+              onCreateNew={() => setShowCreateCompany(true)}
+              createNewLabel="+ Add new company"
+            />
           </div>
         )}
         {!isLeadScoped && (
           <div className="field"><label>Linked Leads</label>
-            <MultiEntitySelect options={leadOptions} value={leadIds} onChange={setLeadIds} placeholder="Add a lead…" />
+            <MultiEntitySelect
+              options={leadOptions}
+              value={leadIds}
+              onChange={setLeadIds}
+              placeholder="Add a lead…"
+              onCreateNew={() => setShowCreateLead(true)}
+              createNewLabel="+ Add new lead"
+            />
           </div>
         )}
         <div className="field"><label>Contact owner*</label>
-          <SearchSelect options={ownerOptions} value={form.ownerId} onChange={(v) => set('ownerId', v)} placeholder="Search owner…" />
+          <SearchSelect
+            options={ownerOptions}
+            value={form.ownerId}
+            onChange={(v) => set('ownerId', v)}
+            placeholder="Search owner…"
+            onCreateNew={canAddOwner ? () => setShowCreateUser(true) : undefined}
+            createNewLabel="+ Add new owner"
+          />
         </div>
         <div className="field"><label>Notes</label>
           <textarea
@@ -148,5 +179,39 @@ export function ContactForm({
         </div>
       </div>
     </div>
+
+    {showCreateCompany && (
+      <CompanyForm
+        onClose={() => setShowCreateCompany(false)}
+        onSaved={(newAccount) => {
+          setAccounts((as) => [...as, newAccount].sort((a, b) => a.name.localeCompare(b.name)));
+          set('accountId', newAccount.id);
+          setShowCreateCompany(false);
+        }}
+      />
+    )}
+
+    {showCreateLead && (
+      <LeadForm
+        onClose={() => setShowCreateLead(false)}
+        onSaved={(newLead) => {
+          setLeads((ls) => [newLead, ...ls]);
+          setLeadIds((ids) => (ids.includes(newLead.id) ? ids : [...ids, newLead.id]));
+          setShowCreateLead(false);
+        }}
+      />
+    )}
+
+    {showCreateUser && (
+      <CreateUserModal
+        onClose={() => setShowCreateUser(false)}
+        onCreated={(newUser) => {
+          setUsers((us) => [...us, newUser].sort((a, b) => a.fullName.localeCompare(b.fullName)));
+          set('ownerId', newUser.id);
+          setShowCreateUser(false);
+        }}
+      />
+    )}
+    </>
   );
 }
