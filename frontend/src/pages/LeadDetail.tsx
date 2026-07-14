@@ -29,6 +29,7 @@ import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 import { useAuth } from '../context/AuthContext';
 import { timeAgo } from '../utils/timeAgo';
+import { evaluateLeadAutomation } from '../utils/leadAutomation';
 
 const RATING_LABELS: Record<string, string> = { HOT: 'Hot', WARM: 'Warm', COLD: 'Cold' };
 const UNQUALIFIED_REASON_LABELS: Record<string, string> = {
@@ -162,6 +163,25 @@ export function LeadDetail() {
       toast.success('Lead updated');
     } catch (e: any) {
       toast.error(e.message ?? 'Could not update lead');
+    }
+  }
+
+  async function onActivityLogged(activityType: import('../api/types').ActivityType) {
+    setShowAddActivity(false);
+    setActivityKey((k) => k + 1);
+    toast.success('Activity added');
+    // Lead progression automation (New -> Attempted Contact -> Contacted) —
+    // toast with Undo, never silent; Qualified stays gated behind MQL.
+    const result = await evaluateLeadAutomation(lead!, activityType, stages);
+    const refreshed = await getLead(lead!.id).catch(() => null);
+    if (refreshed) setLead(refreshed);
+    if (result) {
+      toast.success(result.message, {
+        label: 'Undo',
+        onClick: () => {
+          result.undo().then(() => getLead(lead!.id).then(setLead)).catch(() => toast.error('Could not undo stage change'));
+        },
+      });
     }
   }
 
@@ -489,7 +509,7 @@ export function LeadDetail() {
         <AddActivityModal
           leadId={lead.id}
           onClose={() => setShowAddActivity(false)}
-          onSaved={() => { setShowAddActivity(false); setActivityKey((k) => k + 1); toast.success('Activity added'); }}
+          onSaved={onActivityLogged}
         />
       )}
 

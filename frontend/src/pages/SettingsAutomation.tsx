@@ -17,6 +17,47 @@ const ACTIVITY_OPTIONS: { value: ActivityType; label: string }[] = [
   { value: 'NOTE', label: 'Note logged' },
 ];
 
+// Plain-language catalog of every automation baked into the CRM, so the whole
+// story is visible in one place. These are built-in (triggers/cron in the
+// database or fixed client rules) — always on, not configurable here.
+const BUILT_IN_AUTOMATIONS: { group: string; items: { when: string; then: string }[] }[] = [
+  {
+    group: 'Lead progression',
+    items: [
+      { when: 'A call or email is logged on a lead in "New"', then: 'Lead moves to "Attempted Contact" (toast with Undo)' },
+      { when: 'A meeting is logged on a lead in "New" or "Attempted Contact"', then: 'Lead moves to "Contacted" (toast with Undo)' },
+      { when: 'A lead is moved to "Qualified"', then: 'Blocked unless ICP Match + Budget + Authority are filled (MQL gate) — qualification is never automated' },
+      { when: 'A lead becomes Qualified', then: 'Its owner gets a notification' },
+    ],
+  },
+  {
+    group: 'Deals',
+    items: [
+      { when: 'A deal is created', then: 'Only possible by converting a Qualified lead — direct creation is blocked at the database' },
+      { when: 'A deal changes stage', then: 'Probability updates from the stage; stage history is recorded for "days in stage" reporting' },
+      { when: 'A deal closes Won', then: 'A Project handover record is created automatically and the company is promoted to Customer' },
+      { when: 'A deal closes Lost', then: 'It archives itself automatically' },
+      { when: 'A deal sits untouched for 7+ days', then: 'Its owner gets an inactivity alert (daily check)' },
+    ],
+  },
+  {
+    group: 'Engagement & scoring',
+    items: [
+      { when: 'Any call/email/meeting/note is logged', then: 'The lead/deal engagement score (0–100) recalculates instantly' },
+      { when: 'Every night at 2:00', then: 'All open scores decay for recency, so cold records sink on their own' },
+      { when: 'A meeting is logged anywhere', then: 'A follow-up task is auto-created for 2 days later' },
+    ],
+  },
+  {
+    group: 'Post-sale & renewals',
+    items: [
+      { when: '30 and 7 days before a won deal’s renewal date', then: 'A reminder task + notification go to the deal owner (daily 8:30 check)' },
+      { when: 'A renewal date passes with no activity logged', then: 'The owner gets a one-time "renewal overdue — at risk" alert, and the client is flagged At Risk on Client Health' },
+      { when: 'A customer account shows no engagement for 180+ days', then: 'Its owner gets a recommendation to mark it Inactive' },
+    ],
+  },
+];
+
 export function SettingsAutomation() {
   const { user } = useAuth();
   const toast = useToast();
@@ -84,7 +125,13 @@ export function SettingsAutomation() {
 
   return (
     <div>
-      <h2 style={{ marginTop: 0 }}>Stage Automation</h2>
+      <h2 style={{ marginTop: 0 }}>Automation</h2>
+      <p className="helper-text" style={{ maxWidth: 640 }}>
+        Everything the CRM does on its own, in one place. Configurable deal-stage rules are at the top;
+        below them is the catalog of built-in automations that are always on.
+      </p>
+
+      <h3>Deal stage rules <span style={{ color: 'var(--muted)', fontWeight: 400, fontSize: 13 }}>(configurable)</span></h3>
       <p className="helper-text" style={{ maxWidth: 640 }}>
         When an activity of the chosen type is logged on a deal sitting in the "From" stage (and the optional
         field condition is met), the deal advances to the "To" stage automatically. The rep always sees a
@@ -146,6 +193,26 @@ export function SettingsAutomation() {
             </div>
             <button className="btn" onClick={addRule} disabled={saving}>{saving ? 'Saving…' : 'Add rule'}</button>
           </div>
+
+          <h3 style={{ marginTop: 32 }}>Built-in automations <span style={{ color: 'var(--muted)', fontWeight: 400, fontSize: 13 }}>(always on)</span></h3>
+          {BUILT_IN_AUTOMATIONS.map((section) => (
+            <div className="card" key={section.group} style={{ marginBottom: 14, maxWidth: 860 }}>
+              <h4 style={{ marginTop: 0, marginBottom: 10 }}>{section.group}</h4>
+              <table>
+                <thead>
+                  <tr><th style={{ width: '45%' }}>When…</th><th>Then…</th></tr>
+                </thead>
+                <tbody>
+                  {section.items.map((item) => (
+                    <tr key={item.when}>
+                      <td>{item.when}</td>
+                      <td>{item.then}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))}
         </>
       )}
     </div>
