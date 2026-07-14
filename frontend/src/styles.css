@@ -224,7 +224,8 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
 .search-select-option.selected { font-weight: 600; color: var(--blue); }
 .search-select-sublabel { margin-left: auto; font-size: 12px; color: var(--muted); }
 .search-select-empty { padding: 10px 12px; font-size: 13px; color: var(--muted); }
-.search-select-create { color: var(--blue); font-weight: 600; border-top: 1px solid var(--line); }
+/* Create-new row now sits at the TOP of the dropdown, above existing options. */
+.search-select-create { color: var(--blue); font-weight: 600; border-bottom: 1px solid var(--line); }
 
 .global-search-wrap { position: relative; width: 360px; max-width: 40vw; }
 .global-search-input { display: flex; align-items: center; gap: 8px; width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--muted); }

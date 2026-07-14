@@ -98,6 +98,16 @@ export function SearchSelect({
       </div>
       {open && (
         <div className="search-select-menu">
+          {onCreateNew && (
+            <button
+              type="button"
+              className="search-select-option search-select-create"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => { setOpen(false); setQuery(''); onCreateNew(); }}
+            >
+              {createNewLabel}
+            </button>
+          )}
           {filtered.map((o, i) => (
             <button
               type="button"
@@ -124,16 +134,6 @@ export function SearchSelect({
           )}
           {filtered.length === 0 && !customRowVisible && !onCreateNew && (
             <div className="search-select-empty">No matches</div>
-          )}
-          {onCreateNew && (
-            <button
-              type="button"
-              className="search-select-option search-select-create"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => { setOpen(false); setQuery(''); onCreateNew(); }}
-            >
-              {createNewLabel}
-            </button>
           )}
         </div>
       )}
