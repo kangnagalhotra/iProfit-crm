@@ -225,7 +225,6 @@ export function LeadForm({
     const trimmedEmail = form.email.trim();
     if (trimmedEmail !== form.email) set('email', trimmedEmail);
     if (!form.firstName.trim()) { setError('First name is required.'); return false; }
-    if (!form.lastName.trim()) { setError('Last name is required.'); return false; }
     if (!form.accountId && !form.companyName.trim()) { setError('Company name is required.'); return false; }
     if (!form.mobile) { setError('Mobile number is required.'); return false; }
     if (!validateMobile(form.mobile) || !validateEmail(trimmedEmail)) return false;
@@ -324,7 +323,7 @@ export function LeadForm({
           <div className="form-grid-2">
             <div className="field"><label>First name*</label>
               <input value={form.firstName} onChange={(e) => set('firstName', e.target.value)} /></div>
-            <div className="field"><label>Last name*</label>
+            <div className="field"><label>Last name</label>
               <input
                 value={form.lastName}
                 onChange={(e) => set('lastName', e.target.value)}
