@@ -472,14 +472,16 @@ export function CompanyDetail() {
         ] as AssociationGroup[]}
       />
 
+      {/* Distinct key prefixes — sibling components sharing the same key value
+          makes React reconciliation duplicate/omit cards on re-render. */}
       <ActivityTimeline
-        key={activityKey}
+        key={`activity-${activityKey}`}
         accountId={account.id}
         relatedLeadIds={associatedLeads.map((l) => l.id)}
         relatedOpportunityIds={associatedDeals.map((d) => d.id)}
       />
-      <TasksWidget key={activityKey} accountId={account.id} />
-      <SupportTicketsWidget key={activityKey} accountId={account.id} />
+      <TasksWidget key={`tasks-${activityKey}`} accountId={account.id} />
+      <SupportTicketsWidget key={`tickets-${activityKey}`} accountId={account.id} />
       <NotesSection accountId={account.id} />
       </div>
       </div>

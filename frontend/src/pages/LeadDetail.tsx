@@ -489,8 +489,10 @@ export function LeadDetail() {
           },
         ] as AssociationGroup[]}
       />
-      <ActivityTimeline key={activityKey} leadId={lead.id} />
-      <TasksWidget key={activityKey} leadId={lead.id} />
+      {/* Distinct key prefixes — sibling components sharing the same key value
+          makes React reconciliation duplicate/omit cards on re-render. */}
+      <ActivityTimeline key={`activity-${activityKey}`} leadId={lead.id} />
+      <TasksWidget key={`tasks-${activityKey}`} leadId={lead.id} />
       <NotesSection leadId={lead.id} />
       </div>
       </div>

@@ -528,8 +528,10 @@ export function DealDetail() {
       <ProposalsCard opportunityId={deal.id} />
       {deal.stage.isClosedWon && <HealthRenewalCard deal={deal} onDealUpdated={setDeal} />}
       <StageHistoryCard opportunityId={deal.id} />
-      <ActivityTimeline key={activityKey} opportunityId={deal.id} />
-      <TasksWidget key={activityKey} opportunityId={deal.id} />
+      {/* Distinct key prefixes — sibling components sharing the same key value
+          makes React reconciliation duplicate/omit cards on re-render. */}
+      <ActivityTimeline key={`activity-${activityKey}`} opportunityId={deal.id} />
+      <TasksWidget key={`tasks-${activityKey}`} opportunityId={deal.id} />
       <NotesSection opportunityId={deal.id} />
       </div>
       </div>
