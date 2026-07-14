@@ -1,8 +1,7 @@
-﻿-- ============================================================================
--- APPLY ALL PENDING PATCHES (phase-e + phase-f + phase-g), in order.
--- Generated as a convenience concatenation - the three source files remain
--- the authoritative individual patches. Idempotent; safe to re-run.
--- Run the WHOLE file top-to-bottom in one pass in the Supabase SQL Editor.
+-- ============================================================================
+-- STEP 2 of 2 - run AFTER apply-pending-patches-1of2.sql has succeeded.
+-- Concatenation of phase-e + phase-f + phase-g (minus the enum addition,
+-- which lives in step 1). Idempotent; safe to re-run.
 -- ============================================================================
 -- Phase E patch: Lead-to-Deal workflow enhancements.
 --   1. Leads: consolidate Phone/Mobile into a single "Mobile Number" field.
@@ -11,7 +10,7 @@
 --      Qualified / Unqualified).
 --   3. MQL gate: an `icp_match` flag plus a trigger that blocks a lead from
 --      entering a "won" (Qualified) stage unless ICP + Budget + Authority
---      are filled in â€” makes the qualification workflow unskippable from
+--      are filled in — makes the qualification workflow unskippable from
 --      any client, not just the UI.
 --   4. Contacts: add mobile / department / notes columns for the new
 --      standalone Contacts module.
@@ -21,13 +20,13 @@
 -- `supabase db push --linked --file`), same as phase-b/c/d.
 
 -- ---------------------------------------------------------------------------
--- 1. LEADS â€” Mobile Number consolidation
+-- 1. LEADS — Mobile Number consolidation
 -- ---------------------------------------------------------------------------
 
 update leads set mobile = phone where mobile is null and phone is not null;
 
 -- ---------------------------------------------------------------------------
--- 2. LEAD STAGES â€” rename to match the spec's stage list
+-- 2. LEAD STAGES — rename to match the spec's stage list
 -- ---------------------------------------------------------------------------
 
 update lead_stages set name = 'Attempted Contact', "order" = 2 where name = 'Working';
@@ -48,7 +47,7 @@ begin
   select is_won into was_won from lead_stages where id = old.stage_id;
   if coalesce(entering_won, false) and not coalesce(was_won, false) then
     if not coalesce(new.icp_match, false) or new.budget_score is null or new.authority_score is null then
-      raise exception 'Cannot mark this lead Qualified â€” ICP Match, Budget, and Authority must be confirmed first (MQL validation).';
+      raise exception 'Cannot mark this lead Qualified — ICP Match, Budget, and Authority must be confirmed first (MQL validation).';
     end if;
   end if;
   return new;
@@ -63,7 +62,7 @@ create trigger leads_guard_qualification
   execute function guard_lead_qualification();
 
 -- ---------------------------------------------------------------------------
--- 4. CONTACTS â€” new fields for the standalone Contacts module
+-- 4. CONTACTS — new fields for the standalone Contacts module
 -- ---------------------------------------------------------------------------
 
 alter table contacts
@@ -72,7 +71,7 @@ alter table contacts
   add column if not exists notes text;
 
 -- ---------------------------------------------------------------------------
--- 5. MERGE ACCOUNTS (companies) â€” admin/manager only. Repoints every
+-- 5. MERGE ACCOUNTS (companies) — admin/manager only. Repoints every
 -- dependent row from source to target, then deletes the source account.
 -- ---------------------------------------------------------------------------
 
@@ -106,12 +105,12 @@ $$ language plpgsql security definer set search_path = public;
 --
 -- Run AFTER phase-e-workflow-enhancements-patch.sql (independent of it, but
 -- keeping the same run order as they were written). Idempotent except where
--- noted â€” the two hard constraints (company domain uniqueness, contacts
+-- noted — the two hard constraints (company domain uniqueness, contacts
 -- required fields) will abort with a clear error if existing data violates
 -- them; see the comments directly above each for how to check/fix first.
 
 -- ---------------------------------------------------------------------------
--- 1. COMPANY â€” unique by normalized website domain (hard block)
+-- 1. COMPANY — unique by normalized website domain (hard block)
 -- ---------------------------------------------------------------------------
 
 create or replace function normalize_domain(input text) returns text as $$
@@ -167,9 +166,9 @@ create policy "lead_contacts_delete" on lead_contacts for delete to authenticate
   using (exists (select 1 from leads l where l.id = lead_contacts.lead_id and (is_manager_or_admin() or l.owner_id = auth.uid())));
 
 -- ---------------------------------------------------------------------------
--- 3. CONTACTS â€” Company and Contact Owner become required (data-layer, not
+-- 3. CONTACTS — Company and Contact Owner become required (data-layer, not
 -- just UI). owner_id is backfilled to an admin where missing so this never
--- fails; account_id has no safe default â€” if this fails, some contacts have
+-- fails; account_id has no safe default — if this fails, some contacts have
 -- no company and must be assigned one manually first:
 --   select id, first_name, last_name, email from contacts where account_id is null;
 -- ---------------------------------------------------------------------------
@@ -181,7 +180,7 @@ alter table contacts alter column owner_id set not null;
 alter table contacts alter column account_id set not null;
 
 -- ---------------------------------------------------------------------------
--- 4. DEAL STAGES â€” consolidate to Discovery / SQL / Closed Won / Closed Lost.
+-- 4. DEAL STAGES — consolidate to Discovery / SQL / Closed Won / Closed Lost.
 -- "SQL" absorbs the old Product Demo / Proposal Sent / Negotiation stages.
 -- ---------------------------------------------------------------------------
 
@@ -203,12 +202,12 @@ update deal_stages set "order" = 3 where name = 'Closed Won';
 update deal_stages set "order" = 4 where name = 'Closed Lost';
 
 -- ---------------------------------------------------------------------------
--- 5. DEAL CREATION LOCKDOWN â€” a Deal can only be inserted by converting a
+-- 5. DEAL CREATION LOCKDOWN — a Deal can only be inserted by converting a
 -- Qualified (is_won) lead. Bypassed only when auth.uid() is null (trusted
--- server-side inserts â€” service-role edge functions, seed scripts); every
+-- server-side inserts — service-role edge functions, seed scripts); every
 -- normal authenticated client insert must carry a lead_id pointing at a
 -- Qualified lead. This is the DB-level backstop behind removing every "New
--- Deal" UI entry point â€” it can't be bypassed via devtools/direct API calls.
+-- Deal" UI entry point — it can't be bypassed via devtools/direct API calls.
 -- ---------------------------------------------------------------------------
 
 create or replace function guard_deal_creation() returns trigger as $$
@@ -235,7 +234,7 @@ create trigger opportunities_guard_creation
   for each row execute function guard_deal_creation();
 
 -- ---------------------------------------------------------------------------
--- 6. CLOSED WON -> PROJECT HANDOVER â€” automatic, event-driven. A project
+-- 6. CLOSED WON -> PROJECT HANDOVER — automatic, event-driven. A project
 -- needs a company context (name/value/contacts all read through it), so no
 -- project is created for a deal with no linked account.
 -- ---------------------------------------------------------------------------
@@ -259,7 +258,7 @@ create policy "projects_select" on projects for select to authenticated
     is_manager_or_admin()
     or exists (select 1 from opportunities o where o.id = projects.opportunity_id and o.owner_id = auth.uid())
   );
--- No client insert/update/delete policy â€” projects are created exclusively
+-- No client insert/update/delete policy — projects are created exclusively
 -- by the trigger below (security definer, bypasses RLS for its own insert).
 
 create or replace function create_project_on_closed_won() returns trigger as $$
@@ -290,7 +289,7 @@ create trigger opportunities_create_project_upd
   execute function create_project_on_closed_won();
 
 -- ---------------------------------------------------------------------------
--- 7. PRODUCT CATALOG â€” single list, Sector attribute (Private / Government /
+-- 7. PRODUCT CATALOG — single list, Sector attribute (Private / Government /
 -- Both) drives filtering rather than forking into separate catalogs.
 -- ---------------------------------------------------------------------------
 
@@ -347,7 +346,6 @@ alter table deal_line_items add column if not exists product_id uuid references 
 -- references 'OTHER'. Run top-to-bottom in one pass (SQL Editor), same as
 -- the phase-c/d/e/f patches. Idempotent throughout.
 
-alter type deal_contact_role add value if not exists 'OTHER';
 
 -- ---------------------------------------------------------------------------
 -- 1. LEAD-SIDE CONTACT ROLES
@@ -552,7 +550,7 @@ select recompute_engagement_scores();
 
 -- ---------------------------------------------------------------------------
 -- 5. STAGE AUTOMATION RULES (evaluated client-side so the rep gets a toast
--- with Undo â€” never a silent server-side stage flip)
+-- with Undo — never a silent server-side stage flip)
 -- ---------------------------------------------------------------------------
 
 create table if not exists stage_automation_rules (
@@ -645,7 +643,7 @@ begin
        and (r.last_activity_at is null or r.last_activity_at::date <= r.renewal_date)
        and (r.last_renewal_reminder_at is null or r.last_renewal_reminder_at::date <= r.renewal_date) then
       insert into notifications (user_id, type, message, link_url)
-      values (r.owner_id, 'DEAL_INACTIVE', 'Renewal overdue â€” "' || r.name || '" is at risk (no renewal activity logged)', '/deals/' || r.id);
+      values (r.owner_id, 'DEAL_INACTIVE', 'Renewal overdue — "' || r.name || '" is at risk (no renewal activity logged)', '/deals/' || r.id);
       update opportunities set last_renewal_reminder_at = now() where id = r.id;
     end if;
   end loop;
@@ -653,4 +651,3 @@ end;
 $$ language plpgsql security definer set search_path = public;
 
 select cron.schedule('check-renewals', '30 8 * * *', 'select check_renewals();');
-
