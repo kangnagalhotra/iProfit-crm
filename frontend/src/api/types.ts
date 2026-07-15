@@ -261,6 +261,8 @@ export interface Opportunity {
   // null/undefined = derive from stage; a stored value is a rep override.
   forecastCategory?: ForecastCategory;
   forecastJustification?: string;
+  // null/undefined = auto (Value x Probability); set = rep/manager override.
+  expectedRevenue?: string;
   // Computed engagement score (0-100) + last real-activity stamp — written
   // by DB triggers, read-only in the UI.
   score: number;

@@ -363,6 +363,16 @@ export function DealDetail() {
             />
           </EditableRow>
           <Row label="Probability" value={`${deal.stage.winProbability}%`} />
+          <Row
+            label="Expected Revenue"
+            value={(
+              <span>
+                {formatValue(deal.expectedRevenue
+                  ?? String((Number(deal.amount) || 0) * (deal.probabilityOverride ?? deal.stage.winProbability) / 100))}
+                {!deal.expectedRevenue && <span style={{ color: 'var(--muted)', fontSize: 12 }}> (auto)</span>}
+              </span>
+            )}
+          />
           <Row label="Engagement Score" value={<span className="chip">{deal.score}/100</span>} />
           <EditableRow
             label="Forecast Category"

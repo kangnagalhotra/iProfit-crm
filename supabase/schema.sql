@@ -375,6 +375,8 @@ create table opportunities (
   -- justification (UI-enforced) when more optimistic than the derived value.
   forecast_category forecast_category,
   forecast_justification text,
+  -- null = auto-calculated (Value x Probability); set = rep/manager override.
+  expected_revenue numeric(15, 2) check (expected_revenue is null or expected_revenue >= 0),
   -- Engagement scoring (computed — see refresh_engagement_on_activity()
   -- and recompute_engagement_scores() in triggers.sql, never hand-edited).
   score int not null default 0 check (score between 0 and 100),

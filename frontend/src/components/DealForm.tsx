@@ -60,6 +60,7 @@ interface DealFormState {
   painPoint: string;
   tags: string[];
   description: string;
+  expectedRevenue: string;
 }
 
 function initialState(deal: Opportunity): DealFormState {
@@ -89,6 +90,7 @@ function initialState(deal: Opportunity): DealFormState {
     painPoint: deal.painPoint ?? '',
     tags: deal.tags ?? [],
     description: deal.description ?? '',
+    expectedRevenue: deal.expectedRevenue ?? '',
   };
 }
 
@@ -105,6 +107,8 @@ export function DealForm({
   const [form, setForm] = useState<DealFormState>(() => initialState(deal));
   const [probabilityTouched, setProbabilityTouched] = useState(false);
   const [amountTouched, setAmountTouched] = useState(false);
+  // A stored override means the rep already customized it — never auto-overwrite.
+  const [expectedRevenueTouched, setExpectedRevenueTouched] = useState(deal.expectedRevenue != null);
   const [attachments, setAttachments] = useState<PendingOrUploadedFile[]>([]);
   const [showCreateCompany, setShowCreateCompany] = useState(false);
 
@@ -168,12 +172,21 @@ export function DealForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.lineItems]);
 
-  const expectedRevenue = (Number(form.amount) || 0) * (Number(form.probability) || 0) / 100;
+  // Auto-sync Expected Revenue from Value x Probability, unless the rep has
+  // customized it (same one-way-latch pattern; a stored override never
+  // auto-updates). Clearing the field re-enables auto-calculation.
+  const autoExpectedRevenue = (Number(form.amount) || 0) * (Number(form.probability) || 0) / 100;
+  useEffect(() => {
+    if (expectedRevenueTouched) return;
+    set('expectedRevenue', autoExpectedRevenue ? String(Math.round(autoExpectedRevenue * 100) / 100) : '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.amount, form.probability]);
 
   async function submit() {
     setError('');
     if (!form.name.trim()) { setError('Deal name is required.'); return; }
     if (Number(form.amount) < 0) { setError('Value cannot be negative.'); return; }
+    if (form.expectedRevenue !== '' && Number(form.expectedRevenue) < 0) { setError('Expected revenue cannot be negative.'); return; }
     if (selectedStage?.isClosedLost && !form.lossReason.trim()) {
       setError('Lost reason is required for a closed-lost stage.');
       return;
@@ -205,6 +218,9 @@ export function DealForm({
         painPoint: form.painPoint || undefined,
         tags: form.tags,
         description: form.description || undefined,
+        // Override stored only when the rep customized it; empty/untouched
+        // means auto-calculated (null in the DB).
+        expectedRevenue: expectedRevenueTouched && form.expectedRevenue !== '' ? form.expectedRevenue : null,
       };
 
       const data = await updateDeal(deal.id, payload);
@@ -295,7 +311,19 @@ export function DealForm({
                   />
                 </div>
                 <div className="field"><label>Expected revenue</label>
-                  <input value={expectedRevenue.toLocaleString(undefined, { style: 'currency', currency: form.currency })} disabled />
+                  <input
+                    type="number"
+                    min="0"
+                    value={form.expectedRevenue}
+                    placeholder="0.00"
+                    onChange={(e) => { setExpectedRevenueTouched(true); set('expectedRevenue', e.target.value); }}
+                    onBlur={(e) => { if (e.target.value === '') setExpectedRevenueTouched(false); }}
+                  />
+                  <div className="helper-text">
+                    {expectedRevenueTouched && form.expectedRevenue !== ''
+                      ? `Custom estimate (auto would be ${autoExpectedRevenue.toLocaleString(undefined, { style: 'currency', currency: form.currency })}) — clear the field to go back to auto.`
+                      : 'Auto-calculated: Value × Probability. Type your own estimate to override.'}
+                  </div>
                 </div>
                 <div className="field"><label>Deal type</label>
                   <select value={form.dealType} onChange={(e) => set('dealType', e.target.value as DealType)}>

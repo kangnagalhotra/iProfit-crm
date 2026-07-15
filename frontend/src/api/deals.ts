@@ -35,6 +35,7 @@ function mapDeal(row: any): Opportunity {
     partnerAccount: row.partner_account ? { id: row.partner_account.id, name: row.partner_account.name } : undefined,
     forecastCategory: row.forecast_category ?? undefined,
     forecastJustification: row.forecast_justification ?? undefined,
+    expectedRevenue: row.expected_revenue !== null && row.expected_revenue !== undefined ? String(row.expected_revenue) : undefined,
     score: row.score ?? 0,
     lastActivityAt: row.last_activity_at ?? undefined,
     renewalDate: row.renewal_date ?? undefined,
@@ -139,6 +140,7 @@ function toRow(input: Record<string, any>) {
     decision_timeframe: input.decisionTimeframe, pain_point: input.painPoint, tags: input.tags,
     partner_account_id: input.partnerAccountId,
     forecast_category: input.forecastCategory, forecast_justification: input.forecastJustification,
+    expected_revenue: input.expectedRevenue,
     renewal_date: input.renewalDate,
   };
   Object.keys(row).forEach((k) => { if (row[k] === undefined) delete row[k]; });
