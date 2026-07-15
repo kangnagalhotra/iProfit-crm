@@ -117,6 +117,12 @@ async function defaultLeadStageId(): Promise<string> {
   return data.id;
 }
 
+// 'COLD_CALL' -> 'Cold Call', 'WEBSITE' -> 'Website', etc.
+export function humanizeLeadSource(source?: LeadSource): string | undefined {
+  if (!source) return undefined;
+  return source.toLowerCase().split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
 function translateError(error: any): never {
   if (error.code === '23505' && error.message?.includes('leads_email_key')) {
     throw new Error('Lead with this email exists');
@@ -362,6 +368,9 @@ export async function convertLeadToDeal(
     description: lead.notes,
     stageId: opts.stageId,
     closeDate: opts.closeDate,
+    // Source is inherited from the originating lead, never hand-picked on a
+    // deal — keeps channel reporting honest.
+    source: humanizeLeadSource(lead.source),
   });
 
   // Carry every OTHER contact linked to the lead onto the deal too (the

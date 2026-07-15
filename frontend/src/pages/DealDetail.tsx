@@ -451,7 +451,7 @@ export function DealDetail() {
               />
             </EditableRow>
           )}
-          <Row label="Source" value={deal.source} onEmptyClick={() => setShowEditModal(true)} />
+          <Row label="Source" value={deal.source} />
           <Row
             label="Closing date"
             value={deal.closeDate ? new Date(deal.closeDate).toLocaleDateString() : undefined}

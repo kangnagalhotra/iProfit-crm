@@ -25,7 +25,6 @@ import type { PendingOrUploadedFile } from './FileUploadList';
 const DEAL_TYPES: DealType[] = ['NEW_BUSINESS', 'EXISTING_BUSINESS', 'RENEWAL', 'UPSELL'];
 const DEAL_PRIORITIES: DealPriority[] = ['LOW', 'MEDIUM', 'HIGH'];
 const CURRENCIES: Currency[] = ['USD', 'EUR', 'GBP', 'INR'];
-const SOURCES = ['Website', 'Referral', 'Cold Outreach', 'Event', 'Partner', 'Other'];
 const LOST_REASONS = ['Price', 'Competitor', 'No Budget', 'Bad Timing', 'No Decision'];
 const DECISION_TIMEFRAMES: { value: DecisionTimeframe; label: string }[] = [
   { value: 'LESS_THAN_1_MONTH', label: '< 1 month' },
@@ -336,10 +335,8 @@ export function DealForm({
                   </select>
                 </div>
                 <div className="field"><label>Source</label>
-                  <select value={form.source} onChange={(e) => set('source', e.target.value)}>
-                    <option value="">—</option>
-                    {SOURCES.map((s) => <option key={s} value={s}>{s}</option>)}
-                  </select>
+                  <input value={form.source || '—'} disabled />
+                  <div className="helper-text">Inherited from the originating lead — edit the source on the lead, not the deal.</div>
                 </div>
               </div>
             </FormSection>
