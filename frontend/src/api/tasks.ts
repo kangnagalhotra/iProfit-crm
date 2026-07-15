@@ -3,8 +3,8 @@ import type {
   Paginated, Task, TaskStatus, TaskSummary,
 } from './types';
 
-const SELECT = `*, assignee:profiles(id, full_name), lead:leads(id, first_name, last_name, email),
-  account:accounts(id, name), opportunity:opportunities(id, name)`;
+const SELECT = `*, assignee:profiles(id, full_name), lead:leads(id, first_name, last_name, email, mobile),
+  account:accounts(id, name, phone, email), opportunity:opportunities(id, name, contact:contacts(id, first_name, last_name, email, mobile))`;
 
 const SORT_COLUMN: Record<string, string> = {
   title: 'title', dueAt: 'due_at', priority: 'priority', status: 'status', createdAt: 'created_at', updatedAt: 'updated_at',
@@ -24,10 +24,25 @@ function mapTask(row: any): Task {
     reminderAt: row.reminder_at ?? undefined,
     assignee: row.assignee ? { id: row.assignee.id, fullName: row.assignee.full_name } : undefined,
     lead: row.lead ? {
-      id: row.lead.id, firstName: row.lead.first_name ?? undefined, lastName: row.lead.last_name ?? undefined, email: row.lead.email ?? undefined,
+      id: row.lead.id,
+      firstName: row.lead.first_name ?? undefined,
+      lastName: row.lead.last_name ?? undefined,
+      email: row.lead.email ?? undefined,
+      mobile: row.lead.mobile ?? undefined,
     } : undefined,
-    account: row.account ? { id: row.account.id, name: row.account.name } : undefined,
-    opportunity: row.opportunity ? { id: row.opportunity.id, name: row.opportunity.name } : undefined,
+    account: row.account ? {
+      id: row.account.id, name: row.account.name, phone: row.account.phone ?? undefined, email: row.account.email ?? undefined,
+    } : undefined,
+    opportunity: row.opportunity ? {
+      id: row.opportunity.id,
+      name: row.opportunity.name,
+      contact: row.opportunity.contact ? {
+        firstName: row.opportunity.contact.first_name ?? undefined,
+        lastName: row.opportunity.contact.last_name ?? undefined,
+        email: row.opportunity.contact.email ?? undefined,
+        mobile: row.opportunity.contact.mobile ?? undefined,
+      } : undefined,
+    } : undefined,
     completedAt: row.completed_at ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

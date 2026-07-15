@@ -414,6 +414,16 @@ td select { padding: 5px 8px; border: 1px solid var(--line); border-radius: 5px;
   background: rgba(255,255,255,.15); color: #fff; font-size: 13px; font-weight: 600; cursor: pointer;
 }
 .toast-action:hover { background: rgba(255,255,255,.28); }
+
+/* "My Actions" panel on the Tasks page — one row per call/email/follow-up
+   due today or overdue, with contact shortcuts inline. */
+.my-action-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); flex-wrap: wrap; }
+.my-action-row:first-of-type { border-top: none; }
+.my-action-icon { display: inline-flex; flex-shrink: 0; }
+.my-action-text { flex: 1; min-width: 220px; font-size: 14px; }
+.my-action-title { color: var(--muted); }
+.my-action-buttons { display: inline-flex; gap: 6px; }
+.my-action-buttons .btn { padding: 5px 10px; font-size: 12px; text-decoration: none; }
 @keyframes toast-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 
 .confirm-modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 400px; height: auto; border-radius: var(--radius-lg); box-shadow: var(--shadow-xl); }

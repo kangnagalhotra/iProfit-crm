@@ -302,9 +302,9 @@ export interface Task {
   notes?: string;
   reminderAt?: string;
   assignee?: { id: string; fullName: string };
-  lead?: { id: string; firstName?: string; lastName?: string; email?: string };
-  account?: { id: string; name: string };
-  opportunity?: { id: string; name: string };
+  lead?: { id: string; firstName?: string; lastName?: string; email?: string; mobile?: string };
+  account?: { id: string; name: string; phone?: string; email?: string };
+  opportunity?: { id: string; name: string; contact?: { firstName?: string; lastName?: string; email?: string; mobile?: string } };
   completedAt?: string;
   createdAt: string;
   updatedAt: string;

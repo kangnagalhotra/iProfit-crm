@@ -10,6 +10,7 @@ import {
 import { listUsers } from '../api/users';
 import { TaskForm } from '../components/TaskForm';
 import { TaskImport } from '../components/TaskImport';
+import { MyActionsPanel } from '../components/MyActionsPanel';
 import { AddContactsMenu } from '../components/AddContactsMenu';
 import { TasksKanban } from '../components/TasksKanban';
 import { ViewToggle } from '../components/ViewToggle';
@@ -99,6 +100,7 @@ export function TasksPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [users, setUsers] = useState<User[]>([]);
   const [editingCell, setEditingCell] = useState<{ id: string; field: 'owner' | 'status' } | null>(null);
+  const [actionsKey, setActionsKey] = useState(0);
 
   useEffect(() => {
     listUsers().then(setUsers);
@@ -149,6 +151,7 @@ export function TasksPage() {
   function refreshAfterChange() {
     load();
     loadSummary();
+    setActionsKey((k) => k + 1);
   }
 
   async function bulkChangeStatus(status: string) {
@@ -244,6 +247,8 @@ export function TasksPage() {
           <AddContactsMenu label="Add task" onCreateNew={() => setShowForm(true)} onImport={() => setShowImport(true)} />
         </div>
       </div>
+
+      <MyActionsPanel key={actionsKey} onChanged={() => { load(); loadSummary(); }} />
 
       {summary && (
         <div className="metric-cards">
