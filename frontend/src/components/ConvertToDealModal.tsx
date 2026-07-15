@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { DealStage, Lead } from '../api/types';
 import { convertLeadToDeal } from '../api/leads';
 import { listStages } from '../api/stages';
+import { celebrate } from '../utils/celebrate';
 
 export function ConvertToDealModal({
   lead, onClose, onConverted,
@@ -34,6 +35,7 @@ export function ConvertToDealModal({
         stageId: stageId || undefined,
         closeDate: closeDate || undefined,
       });
+      celebrate(); // a lead becoming a deal is worth a party popper
       onConverted(deal);
     } catch (e: any) {
       setError(e.message ?? 'Could not convert lead');
