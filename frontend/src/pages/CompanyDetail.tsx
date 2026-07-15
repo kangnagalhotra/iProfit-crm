@@ -21,6 +21,7 @@ import { CompanyForm } from '../components/CompanyForm';
 import { ContactForm } from '../components/ContactForm';
 import { MergeCompanyModal } from '../components/MergeCompanyModal';
 import { AddActivityModal } from '../components/AddActivityModal';
+import { ScheduleMeetingModal } from '../components/ScheduleMeetingModal';
 import { Icon } from '../components/Icon';
 import { CollapsibleCard } from '../components/CollapsibleCard';
 import { AssociationsPanel } from '../components/AssociationsPanel';
@@ -109,6 +110,7 @@ export function CompanyDetail() {
   const [editingField, setEditingField] = useState<string | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showAddActivity, setShowAddActivity] = useState(false);
+  const [showScheduleMeeting, setShowScheduleMeeting] = useState(false);
   const [showContactForm, setShowContactForm] = useState(false);
   const [showMergeModal, setShowMergeModal] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -262,7 +264,7 @@ export function CompanyDetail() {
           <div className="detail-header-actions">
             <button className="btn btn-icon" onClick={() => setShowEditModal(true)}><Icon name="edit" size={14} /> Edit Details</button>
             <button className="btn secondary btn-icon" onClick={scrollToTasks}><Icon name="check" size={14} /> Add Task</button>
-            <button className="btn secondary btn-icon" disabled title="Coming soon — Meeting scheduling not built yet"><Icon name="calendar" size={14} /> Schedule Meeting</button>
+            <button className="btn secondary btn-icon" onClick={() => setShowScheduleMeeting(true)}><Icon name="calendar" size={14} /> Schedule Meeting</button>
             <div className="dropdown-wrap" ref={moreRef}>
               <button className="btn secondary btn-icon" onClick={() => setMoreOpen((o) => !o)}><Icon name="dots" size={14} /> More Actions</button>
               {moreOpen && (
@@ -276,7 +278,7 @@ export function CompanyDetail() {
                   <button onClick={() => { setMoreOpen(false); scrollToNotes(); }}>Add Note</button>
                   <button onClick={() => { setMoreOpen(false); scrollToTasks(); }}>Add Task</button>
                   <button onClick={() => { setMoreOpen(false); setShowAddActivity(true); }}>Add Activity</button>
-                  <button disabled title="Coming soon — Meeting scheduling not built yet">Schedule Meeting</button>
+                  <button onClick={() => { setMoreOpen(false); setShowScheduleMeeting(true); }}>Schedule Meeting</button>
                   <button onClick={() => { setMoreOpen(false); duplicateRecord(); }}>Duplicate Record</button>
                   {canManageStatus && (
                     <button onClick={() => { setMoreOpen(false); setShowMergeModal(true); }}>Merge into…</button>
@@ -316,7 +318,7 @@ export function CompanyDetail() {
           <button className="quick-action" onClick={scrollToTasks}>
             <span className="icon"><Icon name="check" size={18} /></span>Task
           </button>
-          <button className="quick-action" disabled title="Coming soon — Meeting scheduling not built yet">
+          <button className="quick-action" onClick={() => setShowScheduleMeeting(true)}>
             <span className="icon"><Icon name="calendar" size={18} /></span>Meeting
           </button>
         </div>
@@ -504,6 +506,21 @@ export function CompanyDetail() {
           accountId={account.id}
           onClose={() => setShowAddActivity(false)}
           onSaved={() => { setShowAddActivity(false); setActivityKey((k) => k + 1); toast.success('Activity added'); }}
+        />
+      )}
+
+      {showScheduleMeeting && (
+        <ScheduleMeetingModal
+          accountId={account.id}
+          defaultTitle={`Meeting with ${account.name}`}
+          attendeeName={account.name}
+          attendeeEmail={account.email}
+          onClose={() => setShowScheduleMeeting(false)}
+          onScheduled={() => {
+            setShowScheduleMeeting(false);
+            setActivityKey((k) => k + 1);
+            toast.success('Meeting scheduled — invite downloaded');
+          }}
         />
       )}
 

@@ -288,7 +288,7 @@ export interface ImportOpportunitiesResult {
   summary: { total: number; createdCount: number; errorCount: number };
 }
 
-export type TaskType = 'TODO' | 'CALL' | 'EMAIL' | 'FOLLOW_UP';
+export type TaskType = 'TODO' | 'CALL' | 'EMAIL' | 'FOLLOW_UP' | 'MEETING';
 export type TaskStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'WAITING' | 'COMPLETED' | 'CANCELLED';
 export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 

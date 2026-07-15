@@ -7,10 +7,10 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 
 const ACTION_VERBS: Record<TaskType, string> = {
-  CALL: 'Call', EMAIL: 'Email', FOLLOW_UP: 'Follow up with', TODO: 'Do',
+  CALL: 'Call', EMAIL: 'Email', FOLLOW_UP: 'Follow up with', TODO: 'Do', MEETING: 'Meet',
 };
-const TYPE_ICONS: Record<TaskType, 'phone' | 'mail' | 'clock' | 'check'> = {
-  CALL: 'phone', EMAIL: 'mail', FOLLOW_UP: 'clock', TODO: 'check',
+const TYPE_ICONS: Record<TaskType, 'phone' | 'mail' | 'clock' | 'check' | 'calendar'> = {
+  CALL: 'phone', EMAIL: 'mail', FOLLOW_UP: 'clock', TODO: 'check', MEETING: 'calendar',
 };
 
 // Answers the rep's morning question in one glance: WHO do I call/email

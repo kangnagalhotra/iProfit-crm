@@ -17,6 +17,7 @@ import { EditableRow } from '../components/EditableRow';
 import { SearchSelect } from '../components/SearchSelect';
 import { LeadForm } from '../components/LeadForm';
 import { AddActivityModal } from '../components/AddActivityModal';
+import { ScheduleMeetingModal } from '../components/ScheduleMeetingModal';
 import { LeadQualificationCard } from '../components/LeadQualificationCard';
 import { ConvertToDealModal } from '../components/ConvertToDealModal';
 import { LinkContactsModal } from '../components/LinkContactsModal';
@@ -97,6 +98,7 @@ export function LeadDetail() {
   const [editingField, setEditingField] = useState<string | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showAddActivity, setShowAddActivity] = useState(false);
+  const [showScheduleMeeting, setShowScheduleMeeting] = useState(false);
   const [showConvertModal, setShowConvertModal] = useState(false);
   const [showQualifiedPrompt, setShowQualifiedPrompt] = useState(false);
   const [convertedDeal, setConvertedDeal] = useState<{ id: string; name: string } | null>(null);
@@ -278,7 +280,7 @@ export function LeadDetail() {
               </button>
             )}
             <button className="btn secondary btn-icon" onClick={scrollToTasks}><Icon name="check" size={14} /> Add Task</button>
-            <button className="btn secondary btn-icon" disabled title="Coming soon — Meeting scheduling not built yet"><Icon name="calendar" size={14} /> Schedule Meeting</button>
+            <button className="btn secondary btn-icon" onClick={() => setShowScheduleMeeting(true)}><Icon name="calendar" size={14} /> Schedule Meeting</button>
             <div className="dropdown-wrap" ref={moreRef}>
               <button className="btn secondary btn-icon" onClick={() => setMoreOpen((o) => !o)}><Icon name="dots" size={14} /> More Actions</button>
               {moreOpen && (
@@ -289,7 +291,7 @@ export function LeadDetail() {
                   <button onClick={() => { setMoreOpen(false); scrollToNotes(); }}>Add Note</button>
                   <button onClick={() => { setMoreOpen(false); scrollToTasks(); }}>Add Task</button>
                   <button onClick={() => { setMoreOpen(false); setShowAddActivity(true); }}>Add Activity</button>
-                  <button disabled title="Coming soon — Meeting scheduling not built yet">Schedule Meeting</button>
+                  <button onClick={() => { setMoreOpen(false); setShowScheduleMeeting(true); }}>Schedule Meeting</button>
                   <button onClick={() => { setMoreOpen(false); duplicateRecord(); }}>Duplicate Record</button>
                   <button onClick={() => { setMoreOpen(false); saveField({ archivedAt: lead.archivedAt ? null : new Date().toISOString() }); }}>
                     {lead.archivedAt ? 'Unarchive Record' : 'Archive Record'}
@@ -326,7 +328,7 @@ export function LeadDetail() {
           <button className="quick-action" onClick={scrollToTasks}>
             <span className="icon"><Icon name="check" size={18} /></span>Task
           </button>
-          <button className="quick-action" disabled title="Coming soon — Meeting scheduling not built yet">
+          <button className="quick-action" onClick={() => setShowScheduleMeeting(true)}>
             <span className="icon"><Icon name="calendar" size={18} /></span>Meeting
           </button>
         </div>
@@ -517,6 +519,21 @@ export function LeadDetail() {
           leadId={lead.id}
           onClose={() => setShowAddActivity(false)}
           onSaved={onActivityLogged}
+        />
+      )}
+
+      {showScheduleMeeting && (
+        <ScheduleMeetingModal
+          leadId={lead.id}
+          defaultTitle={`Meeting with ${name}`}
+          attendeeName={name}
+          attendeeEmail={lead.email}
+          onClose={() => setShowScheduleMeeting(false)}
+          onScheduled={() => {
+            setShowScheduleMeeting(false);
+            setActivityKey((k) => k + 1);
+            toast.success('Meeting scheduled — invite downloaded');
+          }}
         />
       )}
 

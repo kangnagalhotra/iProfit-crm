@@ -39,7 +39,7 @@ create type salutation as enum ('MR', 'MS', 'MRS', 'DR', 'PROF');
 
 create type activity_type as enum ('CALL', 'EMAIL', 'MEETING', 'NOTE', 'FIELD_UPDATE');
 
-create type task_type as enum ('TODO', 'CALL', 'EMAIL', 'FOLLOW_UP');
+create type task_type as enum ('TODO', 'CALL', 'EMAIL', 'FOLLOW_UP', 'MEETING');
 
 create type task_status as enum ('NOT_STARTED', 'IN_PROGRESS', 'WAITING', 'COMPLETED', 'CANCELLED');
 

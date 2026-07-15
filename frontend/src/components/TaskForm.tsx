@@ -8,7 +8,7 @@ import { listLeads } from '../api/leads';
 import { listAccounts } from '../api/accounts';
 import { listDeals } from '../api/deals';
 
-const TASK_TYPES: TaskType[] = ['TODO', 'CALL', 'EMAIL', 'FOLLOW_UP'];
+const TASK_TYPES: TaskType[] = ['TODO', 'CALL', 'EMAIL', 'FOLLOW_UP', 'MEETING'];
 const PRIORITIES: TaskPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 const STATUSES: TaskStatus[] = ['NOT_STARTED', 'IN_PROGRESS', 'WAITING', 'COMPLETED', 'CANCELLED'];
 type ReminderOffset = 'none' | 'at_due' | '15_min' | '1_hour' | '1_day';
