@@ -140,8 +140,8 @@ tr:last-child td { border-bottom: none; }
 tr.clickable-row { cursor: pointer; transition: background-color .1s ease; }
 tr.clickable-row:hover td { background: var(--pale); }
 /* inline-block so a chip whose text wraps stays ONE rounded pill instead of
-   fragmenting into broken per-line pieces (visible on long Next Best Action
-   labels in narrow table columns). */
+   fragmenting into broken per-line pieces (visible on long labels in narrow
+   table columns). */
 .chip { display: inline-block; font-size: 12px; line-height: 1.5; padding: 3px 9px; border-radius: 999px; background: var(--pale); color: var(--navy-text); border: 1px solid rgba(0,0,0,.06); }
 .modal-overlay { position: fixed; inset: 0; background: rgba(16,24,40,.45); display: flex; justify-content: flex-end; z-index: 50; }
 .modal { width: 440px; background: var(--surface); height: 100%; padding: var(--space-7); overflow-y: auto; box-shadow: var(--shadow-xl); }

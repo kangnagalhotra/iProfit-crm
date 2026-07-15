@@ -26,20 +26,8 @@ import { SkeletonTable } from '../components/Skeleton';
 import { EmptyState } from '../components/EmptyState';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
-import { leadNextBestAction } from '../utils/nextBestAction';
-import type { NextBestAction } from '../utils/nextBestAction';
 
 type SortBy = 'firstName' | 'value' | 'updatedAt' | 'createdAt' | 'score';
-
-const NBA_COLORS: Record<NextBestAction['tone'], string> = { hot: '#DC2626', warn: '#F97316', info: '#6B7280' };
-
-function nbaChip(action: NextBestAction) {
-  return (
-    <span className="chip" style={{ background: NBA_COLORS[action.tone] + '22', color: NBA_COLORS[action.tone] }}>
-      {action.label}
-    </span>
-  );
-}
 
 function scoreColor(score: number) {
   return score >= 70 ? '#16A34A' : score >= 40 ? '#F97316' : '#6B7280';
@@ -54,7 +42,6 @@ const LEAD_COLUMNS: ColumnDef[] = [
   { key: 'email', label: 'Email' },
   { key: 'stage', label: 'Stage' },
   { key: 'score', label: 'Score' },
-  { key: 'nextAction', label: 'Next Best Action' },
   { key: 'owner', label: 'Owner' },
   { key: 'company', label: 'Company' },
   { key: 'value', label: 'Value' },
@@ -273,7 +260,6 @@ export function LeadsList() {
               <Link key={l.id} to={`/leads/${l.id}`} className="chip" style={{ textDecoration: 'none' }}>
                 <span style={{ fontWeight: 700, color: scoreColor(l.score), marginRight: 6 }}>{l.score}</span>
                 {l.leadName || [l.firstName, l.lastName].filter(Boolean).join(' ') || l.email}
-                <span style={{ color: 'var(--muted)', marginLeft: 6, fontSize: 12 }}>{leadNextBestAction(l).label}</span>
               </Link>
             ))}
           </div>
@@ -329,7 +315,6 @@ export function LeadsList() {
                   {visibleColumns.includes('email') && <th>Email</th>}
                   {visibleColumns.includes('stage') && <th>Stage</th>}
                   {visibleColumns.includes('score') && <th className="sortable" onClick={() => toggleSort('score')}>Score{sortArrow('score')}</th>}
-                  {visibleColumns.includes('nextAction') && <th style={{ minWidth: 170 }}>Next Best Action</th>}
                   {visibleColumns.includes('owner') && <th>Owner</th>}
                   {visibleColumns.includes('company') && <th>Company</th>}
                   {visibleColumns.includes('value') && <th className="sortable" onClick={() => toggleSort('value')}>Value{sortArrow('value')}</th>}
@@ -365,7 +350,6 @@ export function LeadsList() {
                     {visibleColumns.includes('score') && (
                       <td><span style={{ fontWeight: 600, color: scoreColor(l.score) }}>{l.score}</span></td>
                     )}
-                    {visibleColumns.includes('nextAction') && <td>{nbaChip(leadNextBestAction(l))}</td>}
                     {visibleColumns.includes('owner') && (
                       <td>
                         <InlineCell
