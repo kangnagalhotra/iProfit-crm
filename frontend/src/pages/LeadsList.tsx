@@ -332,7 +332,16 @@ export function LeadsList() {
                     {visibleColumns.includes('stage') && (
                       <td>
                         <InlineCell
-                          display={<span className="chip" style={{ background: l.stage.color + '22', color: l.stage.color }}>{l.stage.name}</span>}
+                          display={(
+                            <>
+                              <span className="chip" style={{ background: l.stage.color + '22', color: l.stage.color }}>{l.stage.name}</span>
+                              {l.convertedAt && (
+                                <span className="chip" style={{ background: '#16A34A22', color: '#16A34A', marginLeft: 6 }} title="Already converted to a deal">
+                                  ✓ Converted
+                                </span>
+                              )}
+                            </>
+                          )}
                           editing={editingCell?.id === l.id && editingCell.field === 'stage'}
                           onStartEdit={() => setEditingCell({ id: l.id, field: 'stage' })}
                         >

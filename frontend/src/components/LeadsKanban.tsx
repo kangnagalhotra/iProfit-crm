@@ -174,6 +174,11 @@ export function LeadsKanban() {
                   {formatValue(lead.value) ? <span className="chip">{formatValue(lead.value)}</span> : <span />}
                   {lead.owner && <div className="avatar avatar-sm" title={lead.owner.fullName}>{initials(lead.owner.fullName)}</div>}
                 </div>
+                {lead.convertedAt && (
+                  <span className="chip" style={{ background: '#16A34A22', color: '#16A34A', marginTop: 6 }} title="Already converted to a deal">
+                    ✓ Converted
+                  </span>
+                )}
                 <div className="kanban-card-footer">
                   <span className="kanban-card-badge"><Icon name="clock" size={11} /> Updated {new Date(lead.updatedAt).toLocaleDateString()}</span>
                 </div>
