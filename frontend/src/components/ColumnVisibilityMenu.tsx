@@ -32,8 +32,8 @@ export function ColumnVisibilityMenu({
 
   return (
     <div className="dropdown-wrap" ref={ref}>
-      <button type="button" className="btn secondary btn-icon" onClick={() => setOpen((o) => !o)}>
-        <Icon name="columns" size={14} /> Columns
+      <button type="button" className="btn secondary btn-icon" title="Choose which fields show in this list" onClick={() => setOpen((o) => !o)}>
+        <Icon name="columns" size={14} /> Manage Fields
       </button>
       {open && (
         <div className="dropdown-menu column-visibility-menu">
