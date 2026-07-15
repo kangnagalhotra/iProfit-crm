@@ -105,6 +105,22 @@ export async function listTasksFor(params: { leadId?: string; accountId?: string
   return (data ?? []).map(mapTask);
 }
 
+// Open tasks for the Reminders menu: everything due before the end of the
+// day after tomorrow (overdue included), oldest first. Grouping into
+// Overdue / Today / Tomorrow / In 2 days happens client-side.
+export async function listReminderTasks(assigneeId: string): Promise<Task[]> {
+  const now = new Date();
+  const horizon = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 3);
+  const { data, error } = await supabase.from('tasks').select(SELECT)
+    .eq('assignee_id', assigneeId)
+    .not('status', 'in', '(COMPLETED,CANCELLED)')
+    .lt('due_at', horizon.toISOString())
+    .order('due_at', { ascending: true })
+    .limit(30);
+  if (error) throw error;
+  return (data ?? []).map(mapTask);
+}
+
 export async function getTask(id: string): Promise<Task> {
   const { data, error } = await supabase.from('tasks').select(SELECT).eq('id', id).single();
   if (error) throw error;

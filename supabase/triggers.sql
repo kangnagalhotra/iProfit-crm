@@ -721,6 +721,29 @@ $$ language plpgsql security definer set search_path = public;
 
 select cron.schedule('check-renewals', '30 8 * * *', 'select check_renewals();');
 
+-- TASK REMINDERS — every 5 minutes, open tasks whose reminder_at has passed
+-- raise a TASK_DUE notification for the assignee, then clear reminder_at so
+-- each reminder fires exactly once.
+create function send_task_reminders() returns void as $$
+begin
+  insert into notifications (user_id, type, message, link_url)
+  select t.assignee_id, 'TASK_DUE',
+    'Reminder: "' || t.title || '" is due ' || to_char(t.due_at, 'Mon DD, HH24:MI'),
+    '/tasks/' || t.id
+  from tasks t
+  where t.reminder_at is not null
+    and t.reminder_at <= now()
+    and t.status not in ('COMPLETED', 'CANCELLED');
+
+  update tasks set reminder_at = null
+  where reminder_at is not null
+    and reminder_at <= now()
+    and status not in ('COMPLETED', 'CANCELLED');
+end;
+$$ language plpgsql security definer set search_path = public;
+
+select cron.schedule('send-task-reminders', '*/5 * * * *', 'select send_task_reminders();');
+
 -- 3. Alert a deal's owner when it's been inactive (no update) for 7+ days.
 -- Fires once per inactive streak, not daily — last_inactivity_alert_at is
 -- only re-armed once the deal is touched again (updated_at moves forward).

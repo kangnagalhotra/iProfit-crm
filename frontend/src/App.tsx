@@ -24,6 +24,7 @@ import { TaskDetail } from './pages/TaskDetail';
 import { NotificationBell } from './components/NotificationBell';
 import { GlobalSearch } from './components/GlobalSearch';
 import { RecentlyViewedMenu } from './components/RecentlyViewedMenu';
+import { RemindersMenu } from './components/RemindersMenu';
 import { Icon } from './components/Icon';
 import type { IconName } from './components/Icon';
 import type { ReactNode } from 'react';
@@ -65,6 +66,7 @@ function Shell({ children }: { children: ReactNode }) {
         <div className="topbar">
           <GlobalSearch />
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <RemindersMenu />
             <RecentlyViewedMenu />
             <button
               className="btn secondary"
