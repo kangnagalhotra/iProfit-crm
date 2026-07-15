@@ -30,10 +30,13 @@ insert into deal_stages (pipeline_id, name, "order", color, is_default, win_prob
 select p.id, s.name, s.ord, s.color, s.is_default, s.win_prob, s.won, s.lost
 from pipelines p,
   (values
-    ('Discovery',   1, '#025ADF', true,  20,  false, false),
-    ('SQL',         2, '#F97316', false, 60,  false, false),
-    ('Closed Won',  3, '#16A34A', false, 100, true,  false),
-    ('Closed Lost', 4, '#DC2626', false, 0,   false, true)
+    ('Discovery',     1, '#025ADF', true,  20,  false, false),
+    ('SQL',           2, '#F97316', false, 60,  false, false),
+    ('Proposal Sent', 3, '#F97316', false, 65,  false, false),
+    ('Product Demo',  4, '#8B5CF6', false, 70,  false, false),
+    ('Negotiation',   5, '#F97316', false, 80,  false, false),
+    ('Closed Lost',   6, '#DC2626', false, 0,   false, true),
+    ('Closed Won',    7, '#16A34A', false, 100, true,  false)
   ) as s(name, ord, color, is_default, win_prob, won, lost)
 where p.name = 'Sales Pipeline'
   and not exists (select 1 from deal_stages ds where ds.pipeline_id = p.id);
