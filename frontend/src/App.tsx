@@ -23,6 +23,7 @@ import { TasksPage } from './pages/TasksPage';
 import { TaskDetail } from './pages/TaskDetail';
 import { NotificationBell } from './components/NotificationBell';
 import { GlobalSearch } from './components/GlobalSearch';
+import { RecentlyViewedMenu } from './components/RecentlyViewedMenu';
 import { Icon } from './components/Icon';
 import type { IconName } from './components/Icon';
 import type { ReactNode } from 'react';
@@ -64,6 +65,7 @@ function Shell({ children }: { children: ReactNode }) {
         <div className="topbar">
           <GlobalSearch />
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <RecentlyViewedMenu />
             <button
               className="btn secondary"
               title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}

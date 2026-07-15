@@ -61,22 +61,30 @@ export function Reports() {
   const [proposals, setProposals] = useState<ProposalWithOutcome[]>([]);
   const [championDealIds, setChampionDealIds] = useState<Set<string>>(new Set());
   const [decisionMakerDealIds, setDecisionMakerDealIds] = useState<Set<string>>(new Set());
+  const [activityCountByRep, setActivityCountByRep] = useState<Map<string, number>>(new Map());
   const [range, setRange] = useState<RangeOption>(90);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
     Promise.all([
       fetchAllDeals(),
       fetchAllLeads(),
       listAllProposalsWithOutcome().catch(() => [] as ProposalWithOutcome[]),
       supabase.from('deal_contacts').select('opportunity_id, role'),
-    ]).then(([dealRes, leadRes, proposalRes, dcRes]) => {
+      supabase.from('activities').select('creator_id').neq('type', 'FIELD_UPDATE').gte('occurred_at', thirtyDaysAgo),
+    ]).then(([dealRes, leadRes, proposalRes, dcRes, actRes]) => {
       setDeals(dealRes);
       setLeads(leadRes);
       setProposals(proposalRes);
       const dcs = dcRes.data ?? [];
       setChampionDealIds(new Set(dcs.filter((r: any) => r.role === 'CHAMPION').map((r: any) => r.opportunity_id)));
       setDecisionMakerDealIds(new Set(dcs.filter((r: any) => r.role === 'DECISION_MAKER').map((r: any) => r.opportunity_id)));
+      const counts = new Map<string, number>();
+      for (const a of (actRes.data ?? []) as { creator_id: string }[]) {
+        counts.set(a.creator_id, (counts.get(a.creator_id) ?? 0) + 1);
+      }
+      setActivityCountByRep(counts);
     }).finally(() => setLoading(false));
   }, []);
 
@@ -136,6 +144,57 @@ export function Reports() {
   const winRateWithChampion = winRate(closedDeals.filter((d) => championDealIds.has(d.id)));
   const winRateWithoutChampion = winRate(closedDeals.filter((d) => !championDealIds.has(d.id)));
 
+  // --- Team performance: leaderboard + sales velocity (Pipedrive/HubSpot-
+  // style insights). Leaderboard ranks reps by won revenue in the selected
+  // range; velocity estimates $/day the pipeline produces.
+  const leaderboard = useMemo(() => {
+    const byRep = new Map<string, {
+      name: string; wonRevenue: number; won: number; lost: number; open: number; cycleDays: number[];
+    }>();
+    for (const d of dealsInRange) {
+      if (!d.owner) continue;
+      const row = byRep.get(d.owner.id) ?? {
+        name: d.owner.fullName, wonRevenue: 0, won: 0, lost: 0, open: 0, cycleDays: [],
+      };
+      if (d.stage.isClosedWon) {
+        row.won += 1;
+        row.wonRevenue += amountOf(d);
+        if (d.closedAt) row.cycleDays.push((new Date(d.closedAt).getTime() - new Date(d.createdAt).getTime()) / 86400000);
+      } else if (d.stage.isClosedLost) row.lost += 1;
+      else if (!d.archivedAt) row.open += 1;
+      byRep.set(d.owner.id, row);
+    }
+    return [...byRep.entries()]
+      .map(([id, r]) => ({
+        id,
+        name: r.name,
+        wonRevenue: r.wonRevenue,
+        won: r.won,
+        open: r.open,
+        winRate: (r.won + r.lost) > 0 ? (r.won / (r.won + r.lost)) * 100 : null,
+        avgCycleDays: r.cycleDays.length ? r.cycleDays.reduce((a, b) => a + b, 0) / r.cycleDays.length : null,
+        activities30d: activityCountByRep.get(id) ?? 0,
+      }))
+      .sort((a, b) => b.wonRevenue - a.wonRevenue);
+  }, [dealsInRange, activityCountByRep]);
+
+  const velocity = useMemo(() => {
+    const closed = dealsInRange.filter((d) => d.stage.isClosedWon || d.stage.isClosedLost);
+    const won = closed.filter((d) => d.stage.isClosedWon);
+    const openCount = dealsInRange.filter((d) => !d.stage.isClosedWon && !d.stage.isClosedLost && !d.archivedAt).length;
+    const rate = closed.length ? won.length / closed.length : 0;
+    const avgValue = won.length ? won.reduce((s, d) => s + amountOf(d), 0) / won.length : 0;
+    const cycles = won.filter((d) => d.closedAt)
+      .map((d) => (new Date(d.closedAt!).getTime() - new Date(d.createdAt).getTime()) / 86400000)
+      .filter((n) => n > 0);
+    const avgCycle = cycles.length ? cycles.reduce((a, b) => a + b, 0) / cycles.length : null;
+    // Classic sales velocity: (# open deals x avg won value x win rate) / avg cycle length
+    const perDay = avgCycle && avgCycle > 0 ? (openCount * avgValue * rate) / avgCycle : null;
+    return {
+      openCount, winRate: closed.length ? rate * 100 : null, avgValue, avgCycle, perDay,
+    };
+  }, [dealsInRange]);
+
   // --- (d) Proposal timing: first proposal sent → closed won/lost days ---
   const proposalTiming = useMemo(() => {
     const firstProposalByDeal = new Map<string, ProposalWithOutcome>();
@@ -169,7 +228,50 @@ export function Reports() {
         </select>
       </div>
 
-      <h3>Forecast <span style={{ color: 'var(--muted)', fontWeight: 400, fontSize: 13 }}>(open pipeline by forecast category — separate from stage view)</span></h3>
+      <h3>Team Performance <span style={{ color: 'var(--muted)', fontWeight: 400, fontSize: 13 }}>(deals created in the selected range)</span></h3>
+      <div className="dashboard-grid" style={{ marginBottom: 14 }}>
+        <div className="card">
+          <div className="label">Sales Velocity</div>
+          <div className="value">{velocity.perDay === null ? '—' : `${money(velocity.perDay)}/day`}</div>
+          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
+            {velocity.openCount} open × {money(velocity.avgValue)} avg × {velocity.winRate === null ? '—' : `${velocity.winRate.toFixed(0)}%`} win ÷ {velocity.avgCycle === null ? '—' : `${velocity.avgCycle.toFixed(0)}d`} cycle
+          </div>
+        </div>
+        <div className="card">
+          <div className="label">Avg. Sales Cycle</div>
+          <div className="value">{velocity.avgCycle === null ? '—' : `${velocity.avgCycle.toFixed(1)} days`}</div>
+        </div>
+        <div className="card">
+          <div className="label">Team Win Rate</div>
+          <div className="value">{velocity.winRate === null ? '—' : `${velocity.winRate.toFixed(0)}%`}</div>
+        </div>
+      </div>
+      {leaderboard.length > 0 && (
+        <div className="card" style={{ marginBottom: 8 }}>
+          <div className="label" style={{ marginBottom: 8 }}>🏆 Leaderboard — ranked by won revenue</div>
+          <table>
+            <thead>
+              <tr><th>#</th><th>Rep</th><th>Won Revenue</th><th>Deals Won</th><th>Open Deals</th><th>Win Rate</th><th>Avg. Cycle</th><th>Activities (30d)</th></tr>
+            </thead>
+            <tbody>
+              {leaderboard.map((r, i) => (
+                <tr key={r.id}>
+                  <td>{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}</td>
+                  <td>{r.name}</td>
+                  <td style={{ fontWeight: 600 }}>{money(r.wonRevenue)}</td>
+                  <td>{r.won}</td>
+                  <td>{r.open}</td>
+                  <td>{r.winRate === null ? '—' : `${r.winRate.toFixed(0)}%`}</td>
+                  <td>{r.avgCycleDays === null ? '—' : `${r.avgCycleDays.toFixed(0)}d`}</td>
+                  <td>{r.activities30d}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <h3 style={{ marginTop: 28 }}>Forecast <span style={{ color: 'var(--muted)', fontWeight: 400, fontSize: 13 }}>(open pipeline by forecast category — separate from stage view)</span></h3>
       <div className="dashboard-grid">
         {forecastTotals.map((f) => (
           <div className="card" key={f.key}>

@@ -85,6 +85,7 @@ export function NotesSection({
           rows={2} value={draft} onChange={(e) => setDraft(e.target.value)}
           placeholder="Add a note…" style={textareaStyle}
         />
+        <div className="helper-text">Tip: mention a teammate with @Full Name (e.g. @Harjot Singh) to send them a notification.</div>
       </div>
       <button className="btn" onClick={addNote} disabled={saving || !draft.trim()}>
         {saving ? 'Saving…' : 'Add note'}

@@ -13,6 +13,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 import { closedWonHandoverMessage } from '../utils/dealAutomation';
+import { idleDays, ROTTING_WARN_DAYS, STALLED_AFTER_DAYS } from '../utils/nextBestAction';
 
 async function loadAllDeals(): Promise<Opportunity[]> {
   let page = 1;
@@ -174,6 +175,22 @@ export function DealsKanban() {
                 <span className="kanban-card-badge">
                   <Icon name="calendar" size={11} /> {deal.closeDate ? `Closes ${new Date(deal.closeDate).toLocaleDateString()}` : `Updated ${new Date(deal.updatedAt).toLocaleDateString()}`}
                 </span>
+                {(() => {
+                  // Deal rotting (Pipedrive-style): idle deals visibly decay so
+                  // reps act before they die quietly.
+                  const idle = idleDays(deal);
+                  if (idle === null || idle < ROTTING_WARN_DAYS) return null;
+                  const rotten = idle >= STALLED_AFTER_DAYS;
+                  return (
+                    <span
+                      className="kanban-card-badge"
+                      title={`No activity for ${idle} days`}
+                      style={{ color: rotten ? '#DC2626' : '#F97316', fontWeight: 600 }}
+                    >
+                      {rotten ? '🥀' : '⏳'} {idle}d idle
+                    </span>
+                  );
+                })()}
               </div>
             </Link>
             <div className="kanban-card-actions">

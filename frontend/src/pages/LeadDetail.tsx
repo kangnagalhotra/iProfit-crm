@@ -30,6 +30,7 @@ import { useConfirm } from '../context/ConfirmContext';
 import { useAuth } from '../context/AuthContext';
 import { timeAgo } from '../utils/timeAgo';
 import { evaluateLeadAutomation } from '../utils/leadAutomation';
+import { useRecordRecentlyViewed } from '../hooks/useRecentlyViewed';
 
 const RATING_LABELS: Record<string, string> = { HOT: 'Hot', WARM: 'Warm', COLD: 'Cold' };
 const UNQUALIFIED_REASON_LABELS: Record<string, string> = {
@@ -133,6 +134,10 @@ export function LeadDetail() {
     document.addEventListener('mousedown', onDocClick);
     return () => document.removeEventListener('mousedown', onDocClick);
   }, []);
+
+  useRecordRecentlyViewed('lead', lead?.id, lead
+    ? (lead.leadName || [lead.firstName, lead.lastName].filter(Boolean).join(' ') || lead.email || 'Untitled lead')
+    : undefined);
 
   if (!lead) return <SkeletonDetailPage />;
 

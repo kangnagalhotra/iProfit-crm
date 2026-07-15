@@ -30,6 +30,7 @@ import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 import { timeAgo } from '../utils/timeAgo';
 import { closedWonHandoverMessage } from '../utils/dealAutomation';
+import { useRecordRecentlyViewed } from '../hooks/useRecentlyViewed';
 import { evaluateStageAutomation } from '../utils/stageAutomation';
 import {
   FORECAST_LABELS, FORECAST_ORDER, deriveForecastCategory, isMoreOptimistic,
@@ -141,6 +142,8 @@ export function DealDetail() {
     document.addEventListener('mousedown', onDocClick);
     return () => document.removeEventListener('mousedown', onDocClick);
   }, []);
+
+  useRecordRecentlyViewed('deal', deal?.id, deal?.name);
 
   if (!deal) return <SkeletonDetailPage />;
 

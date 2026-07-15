@@ -16,6 +16,7 @@ import { SkeletonDetailPage } from '../components/Skeleton';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 import { timeAgo } from '../utils/timeAgo';
+import { useRecordRecentlyViewed } from '../hooks/useRecentlyViewed';
 
 function initials(c: Contact) {
   const parts = [c.firstName, c.lastName].filter(Boolean) as string[];
@@ -53,6 +54,10 @@ export function ContactDetail() {
         setUsers(userRes);
       });
   }, [id]);
+
+  useRecordRecentlyViewed('contact', contact?.id, contact
+    ? ([contact.firstName, contact.lastName].filter(Boolean).join(' ') || contact.email || 'Untitled contact')
+    : undefined);
 
   if (!contact) return <SkeletonDetailPage />;
 

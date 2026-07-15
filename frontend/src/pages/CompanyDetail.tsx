@@ -30,6 +30,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 import { timeAgo } from '../utils/timeAgo';
+import { useRecordRecentlyViewed } from '../hooks/useRecentlyViewed';
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -158,6 +159,8 @@ export function CompanyDetail() {
     document.addEventListener('mousedown', onDocClick);
     return () => document.removeEventListener('mousedown', onDocClick);
   }, []);
+
+  useRecordRecentlyViewed('company', account?.id, account?.name);
 
   if (!account) return <SkeletonDetailPage />;
 
