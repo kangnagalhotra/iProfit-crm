@@ -3,7 +3,7 @@ import type { DealPriority, Opportunity, Paginated } from './types';
 import { listStageHistory } from './dealStageHistory';
 import { setOpportunityAdditionalOwners } from './additionalOwners';
 
-const SELECT = `*, pipeline:pipelines(id, name), stage:deal_stages(*), owner:profiles(id, full_name),
+const SELECT = `*, pipeline:pipelines(id, name), stage:deal_stages(*), owner:profiles!opportunities_owner_id_fkey(id, full_name),
   account:accounts!opportunities_account_id_fkey(id, name, stage:account_stages(name, color)), lead:leads(id, first_name, last_name, email),
   contact:contacts(id, first_name, last_name, email),
   partner_account:accounts!opportunities_partner_account_id_fkey(id, name),

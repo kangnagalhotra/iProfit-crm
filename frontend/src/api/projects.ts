@@ -1,7 +1,7 @@
 import { supabase } from '../lib/supabase';
 import type { Project, ProjectHealth } from './types';
 
-const SELECT = `*, opportunity:opportunities(id, name, renewal_date, last_activity_at, owner:profiles(id, full_name)),
+const SELECT = `*, opportunity:opportunities(id, name, renewal_date, last_activity_at, owner:profiles!opportunities_owner_id_fkey(id, full_name)),
   account:accounts(id, name)`;
 
 function mapProject(row: any): Project {
