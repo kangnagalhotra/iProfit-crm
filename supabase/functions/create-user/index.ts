@@ -55,6 +55,22 @@ Deno.serve(async (req) => {
     });
   }
 
+  // Don't rely on the auth.users insert trigger (auth-trigger.sql) to have
+  // created the matching profiles row — upsert it ourselves so this never
+  // silently reports success while leaving owner_id/assignee_id foreign
+  // keys pointing at a profile that doesn't exist yet.
+  const { error: profileError } = await admin.from('profiles').upsert({
+    id: created.user!.id, email, full_name: fullName, role,
+  });
+  if (profileError) {
+    // The auth user now exists without a usable profile — clean it up so a
+    // retry doesn't collide on the email, rather than leaving a half-created account.
+    await admin.auth.admin.deleteUser(created.user!.id);
+    return new Response(JSON.stringify({ error: `Could not finish creating the account: ${profileError.message}` }), {
+      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
   return new Response(JSON.stringify({
     id: created.user!.id, fullName, email, role,
   }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
