@@ -5,7 +5,7 @@ import { setOpportunityAdditionalOwners } from './additionalOwners';
 
 const SELECT = `*, pipeline:pipelines(id, name), stage:deal_stages(*), owner:profiles!opportunities_owner_id_fkey(id, full_name),
   account:accounts!opportunities_account_id_fkey(id, name, stage:account_stages(name, color)), lead:leads(id, first_name, last_name, email),
-  contact:contacts(id, first_name, last_name, email),
+  contact:contacts(id, first_name, last_name, email, mobile, phone),
   partner_account:accounts!opportunities_partner_account_id_fkey(id, name),
   additionalOwnersRows:opportunity_additional_owners(user:profiles(id, full_name))`;
 
@@ -59,7 +59,12 @@ function mapDeal(row: any): Opportunity {
       id: row.lead.id, firstName: row.lead.first_name ?? undefined, lastName: row.lead.last_name ?? undefined, email: row.lead.email ?? undefined,
     } : undefined,
     contact: row.contact ? {
-      id: row.contact.id, firstName: row.contact.first_name ?? undefined, lastName: row.contact.last_name ?? undefined, email: row.contact.email ?? undefined,
+      id: row.contact.id,
+      firstName: row.contact.first_name ?? undefined,
+      lastName: row.contact.last_name ?? undefined,
+      email: row.contact.email ?? undefined,
+      mobile: row.contact.mobile ?? undefined,
+      phone: row.contact.phone ?? undefined,
     } : undefined,
     archivedAt: row.archived_at ?? undefined,
     createdAt: row.created_at,

@@ -290,7 +290,7 @@ export interface Opportunity {
   additionalOwners?: { id: string; fullName: string }[];
   account?: { id: string; name: string; stage?: { name: string; color: string } };
   lead?: { id: string; firstName?: string; lastName?: string; email?: string };
-  contact?: { id: string; firstName?: string; lastName?: string; email?: string };
+  contact?: { id: string; firstName?: string; lastName?: string; email?: string; mobile?: string; phone?: string };
   archivedAt?: string;
   createdAt: string;
   updatedAt: string;

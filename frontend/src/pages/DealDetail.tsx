@@ -296,6 +296,24 @@ export function DealDetail() {
         </div>
 
         <div className="quick-actions">
+          <a
+            className={`quick-action${deal.contact?.email ? '' : ' disabled'}`}
+            href={deal.contact?.email ? `mailto:${deal.contact.email}` : undefined}
+            aria-disabled={!deal.contact?.email}
+            tabIndex={deal.contact?.email ? 0 : -1}
+            title={deal.contact?.email ? `Email ${deal.contact.email}` : 'No email on file'}
+          >
+            <span className="icon"><Icon name="mail" size={18} /></span>Email
+          </a>
+          <a
+            className={`quick-action${deal.contact?.mobile ? '' : ' disabled'}`}
+            href={deal.contact?.mobile ? `tel:${deal.contact.mobile}` : undefined}
+            aria-disabled={!deal.contact?.mobile}
+            tabIndex={deal.contact?.mobile ? 0 : -1}
+            title={deal.contact?.mobile ? `Call ${deal.contact.mobile}` : 'No mobile number on file'}
+          >
+            <span className="icon"><Icon name="phone" size={18} /></span>Call
+          </a>
           <button className="quick-action" onClick={scrollToNotes}>
             <span className="icon"><Icon name="note" size={18} /></span>Note
           </button>
