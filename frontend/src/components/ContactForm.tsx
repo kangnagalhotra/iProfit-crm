@@ -12,6 +12,7 @@ import { SocialLinksEditor, validateSocialUrl } from './SocialLinksEditor';
 import type { OtherSocialLink } from './SocialLinksEditor';
 import {
   stripPhoneDigits, formatPhoneDisplay, isValidPhone, PHONE_ERROR_MESSAGE,
+  isValidEmail, EMAIL_ERROR_MESSAGE,
 } from '../utils/validation';
 
 function leadLabel(l: { firstName?: string; lastName?: string; email?: string }) {
@@ -53,6 +54,7 @@ export function ContactForm({
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [leads, setLeads] = useState<{ id: string; firstName?: string; lastName?: string; email?: string }[]>([]);
   const [mobileError, setMobileError] = useState('');
+  const [emailError, setEmailError] = useState('');
   const [socialError, setSocialError] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -78,8 +80,16 @@ export function ContactForm({
   }
 
   function validateMobile(digits: string): boolean {
-    if (digits && !isValidPhone(digits)) { setMobileError(PHONE_ERROR_MESSAGE); return false; }
+    if (!digits) { setMobileError('Mobile number is required.'); return false; }
+    if (!isValidPhone(digits)) { setMobileError(PHONE_ERROR_MESSAGE); return false; }
     setMobileError('');
+    return true;
+  }
+
+  function validateEmail(value: string): boolean {
+    if (!value.trim()) { setEmailError('Email is required.'); return false; }
+    if (!isValidEmail(value)) { setEmailError(EMAIL_ERROR_MESSAGE); return false; }
+    setEmailError('');
     return true;
   }
 
@@ -88,6 +98,8 @@ export function ContactForm({
 
   async function submit() {
     setError('');
+    if (!form.firstName.trim()) { setError('First name is required.'); return; }
+    if (!validateEmail(form.email)) return;
     if (!validateMobile(form.mobile)) return;
     if (!form.accountId) { setError('Company is required.'); return; }
     const urls = [form.linkedinUrl, form.instagramUrl, form.twitterUrl, ...otherSocialLinks.map((l) => l.url)];
@@ -112,21 +124,26 @@ export function ContactForm({
     }
   }
 
-  const canSubmit = (form.firstName.trim() || form.lastName.trim() || form.email.trim()) && !!form.accountId;
+  const canSubmit = form.firstName.trim() && form.email.trim() && form.mobile.trim() && !!form.accountId;
 
   return (
     <>
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h3 style={{ marginTop: 0 }}>{isEdit ? 'Edit contact' : 'Add contact'}</h3>
-        <div className="helper-text" style={{ marginTop: 0 }}>Provide at least a name or email.</div>
-        <div className="field"><label>First name</label>
+        <div className="field"><label>First name*</label>
           <input value={form.firstName} onChange={(e) => set('firstName', e.target.value)} /></div>
         <div className="field"><label>Last name</label>
           <input value={form.lastName} onChange={(e) => set('lastName', e.target.value)} /></div>
-        <div className="field"><label>Email</label>
-          <input value={form.email} onChange={(e) => set('email', e.target.value)} /></div>
-        <div className="field"><label>Mobile Number</label>
+        <div className="field"><label>Email*</label>
+          <input
+            value={form.email}
+            onChange={(e) => set('email', e.target.value)}
+            onBlur={() => validateEmail(form.email)}
+          />
+          {emailError && <div className="error" style={{ margin: '4px 0 0' }}>{emailError}</div>}
+        </div>
+        <div className="field"><label>Mobile Number*</label>
           <input
             value={formatPhoneDisplay(form.mobile)}
             onChange={(e) => set('mobile', stripPhoneDigits(e.target.value))}

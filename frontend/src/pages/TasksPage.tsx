@@ -8,6 +8,7 @@ import {
   bulkUpdateTaskStatus, bulkUpdateTaskOwner, bulkDeleteTasks,
 } from '../api/tasks';
 import { listUsers } from '../api/users';
+import { TASK_TYPE_LABELS } from '../utils/taskTypeLabels';
 import { TaskForm } from '../components/TaskForm';
 import { TaskImport } from '../components/TaskImport';
 import { MyActionsPanel } from '../components/MyActionsPanel';
@@ -54,7 +55,7 @@ function relatedRecord(task: Task) {
 
 const EXPORT_COLUMNS: ExportColumn<Task>[] = [
   { label: 'Task Title', get: (t) => t.title },
-  { label: 'Type', get: (t) => t.type },
+  { label: 'Type', get: (t) => TASK_TYPE_LABELS[t.type] },
   { label: 'Priority', get: (t) => t.priority },
   { label: 'Related Record', get: (t) => relatedRecord(t)?.label ?? '' },
   { label: 'Module', get: (t) => relatedRecord(t)?.module ?? '' },

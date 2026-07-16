@@ -8,6 +8,7 @@ import { ActivityTimeline } from '../components/ActivityTimeline';
 import { Icon } from '../components/Icon';
 import { SkeletonDetailPage } from '../components/Skeleton';
 import { useToast } from '../context/ToastContext';
+import { TASK_TYPE_LABELS } from '../utils/taskTypeLabels';
 
 const textareaStyle = {
   width: '100%', padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 6, fontSize: 14, fontFamily: 'inherit',
@@ -93,7 +94,7 @@ export function TaskDetail() {
       <div className="card">
         <h3 style={{ marginTop: 0 }}>Task details</h3>
         <div className="key-info">
-          <Row label="Type" value={task.type.replace('_', ' ')} />
+          <Row label="Type" value={TASK_TYPE_LABELS[task.type]} />
           <Row label="Owner" value={task.assignee?.fullName} />
           <Row label="Due date" value={new Date(task.dueAt).toLocaleDateString()} />
           <Row label="Reminder" value={task.reminderAt ? new Date(task.reminderAt).toLocaleString() : undefined} />

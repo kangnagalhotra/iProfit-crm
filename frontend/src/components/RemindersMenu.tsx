@@ -5,6 +5,7 @@ import { listReminderTasks, completeTask } from '../api/tasks';
 import { Icon } from './Icon';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { TASK_TYPE_LABELS } from '../utils/taskTypeLabels';
 
 const POLL_MS = 60000;
 const REMINDED_KEY = 'crm:reminded-task-ids';
@@ -113,7 +114,7 @@ export function RemindersMenu() {
                   <button type="button" className="reminders-item-main" onClick={() => { setOpen(false); navigate(`/tasks/${t.id}`); }}>
                     <span className="reminders-item-title">{t.title}</span>
                     <span className="reminders-item-meta">
-                      {t.type.replace('_', ' ')} · due {new Date(t.dueAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                      {TASK_TYPE_LABELS[t.type]} · due {new Date(t.dueAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                     </span>
                   </button>
                   <button type="button" className="reminders-item-done" title="Mark complete" onClick={() => done(t)}>

@@ -243,7 +243,29 @@ export function LeadForm({
   const companyOptions: SearchSelectOption[] = accounts.map((a) => ({ value: a.id, label: a.name }));
 
   function setCompany(v: string) {
-    if (accounts.some((a) => a.id === v)) { set('accountId', v); set('companyName', ''); } else { set('accountId', ''); set('companyName', v); }
+    const existing = accounts.find((a) => a.id === v);
+    if (existing) {
+      set('accountId', v); set('companyName', '');
+      // Auto-populate the company enrichment fields from the selected
+      // Company's existing data, but only where this lead's own fields are
+      // still blank — never clobbers anything already typed, and every
+      // field stays editable afterward in case something needs correcting.
+      setForm((f) => ({
+        ...f,
+        industry: f.industry || existing.industry || '',
+        sizeBucket: f.sizeBucket || existing.sizeBucket || '',
+        annualRevenue: f.annualRevenue || existing.annualRevenue || '',
+        currency: existing.currency ?? f.currency,
+        domain: f.domain || existing.domain || '',
+        address: f.address || existing.address || '',
+        addressCity: f.addressCity || existing.city || '',
+        state: f.state || existing.state || '',
+        postalCode: f.postalCode || existing.postalCode || '',
+        country: f.country || existing.country || '',
+      }));
+    } else {
+      set('accountId', ''); set('companyName', v);
+    }
   }
 
   async function onStageChange(newStageId: string) {

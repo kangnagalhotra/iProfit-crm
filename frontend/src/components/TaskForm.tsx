@@ -4,6 +4,7 @@ import type {
 } from '../api/types';
 import { createTask, updateTask } from '../api/tasks';
 import { listUsers } from '../api/users';
+import { TASK_TYPE_LABELS } from '../utils/taskTypeLabels';
 import { listLeads } from '../api/leads';
 import { listAccounts } from '../api/accounts';
 import { listDeals } from '../api/deals';
@@ -21,9 +22,24 @@ const REMINDER_OFFSETS: { value: ReminderOffset; label: string }[] = [
 ];
 type RelatedModule = '' | 'lead' | 'account' | 'opportunity';
 
-function computeReminderAt(dueAt: string, offset: ReminderOffset): string | undefined {
-  if (offset === 'none' || !dueAt) return undefined;
-  const due = new Date(dueAt);
+// Due date defaults to end-of-business-day when the rep doesn't set a
+// precise time — chosen over midnight so "due today" reads as "due by end
+// of day" rather than an arbitrary instant with no relation to work hours.
+const DEFAULT_DUE_TIME = '17:00';
+
+// Combines the date-only input with an optional time-of-day as LOCAL time
+// (no trailing Z/offset — new Date("YYYY-MM-DDTHH:mm:00") parses as local,
+// unlike new Date("YYYY-MM-DD") alone, which parses as UTC midnight and
+// silently drifts the "due" instant by the viewer's UTC offset).
+function combineDueDateTime(dueDate: string, dueTime: string): Date | null {
+  if (!dueDate) return null;
+  return new Date(`${dueDate}T${dueTime || DEFAULT_DUE_TIME}:00`);
+}
+
+function computeReminderAt(dueDate: string, dueTime: string, offset: ReminderOffset): string | undefined {
+  if (offset === 'none' || !dueDate) return undefined;
+  const due = combineDueDateTime(dueDate, dueTime);
+  if (!due) return undefined;
   if (offset === '15_min') due.setMinutes(due.getMinutes() - 15);
   else if (offset === '1_hour') due.setHours(due.getHours() - 1);
   else if (offset === '1_day') due.setDate(due.getDate() - 1);
@@ -53,6 +69,7 @@ export function TaskForm({
     priority: (task?.priority ?? 'MEDIUM') as TaskPriority,
     status: (task?.status ?? defaultStatus ?? 'NOT_STARTED') as TaskStatus,
     dueAt: task?.dueAt ? task.dueAt.slice(0, 10) : '',
+    dueTime: '',
     notes: task?.notes ?? '',
     assigneeId: task?.assignee?.id ?? '',
   });
@@ -103,10 +120,13 @@ export function TaskForm({
           accountId: relatedModule === 'account' ? relatedRecordId : undefined,
           opportunityId: relatedModule === 'opportunity' ? relatedRecordId : undefined,
         };
+      const { dueTime, ...formRest } = form;
+      const combinedDue = combineDueDateTime(form.dueAt, dueTime);
       const payload: Record<string, any> = {
-        ...form,
+        ...formRest,
         ...relation,
-        reminderAt: computeReminderAt(form.dueAt, reminderOffset),
+        dueAt: combinedDue ? combinedDue.toISOString() : undefined,
+        reminderAt: computeReminderAt(form.dueAt, dueTime, reminderOffset),
       };
       Object.keys(payload).forEach((k) => { if (payload[k] === '' || payload[k] === undefined) delete payload[k]; });
       const data = isEdit
@@ -130,7 +150,7 @@ export function TaskForm({
           <input value={form.title} onChange={(e) => set('title', e.target.value)} /></div>
         <div className="field"><label>Task type</label>
           <select value={form.type} onChange={(e) => set('type', e.target.value as TaskType)}>
-            {TASK_TYPES.map((t) => <option key={t} value={t}>{t.replace('_', ' ')}</option>)}
+            {TASK_TYPES.map((t) => <option key={t} value={t}>{TASK_TYPE_LABELS[t]}</option>)}
           </select>
         </div>
         <div className="field"><label>Priority</label>
@@ -145,6 +165,10 @@ export function TaskForm({
         </div>
         <div className="field"><label>Due date</label>
           <input type="date" value={form.dueAt} onChange={(e) => set('dueAt', e.target.value)} /></div>
+        <div className="field"><label>Due time (optional)</label>
+          <input type="time" value={form.dueTime} onChange={(e) => set('dueTime', e.target.value)} placeholder="5:00 PM" />
+          <div className="helper-text" style={{ marginTop: 4 }}>Defaults to end of day (5:00 PM) if left blank.</div>
+        </div>
         <div className="field"><label>Reminder</label>
           <select value={reminderOffset} onChange={(e) => setReminderOffset(e.target.value as ReminderOffset)}>
             {REMINDER_OFFSETS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}

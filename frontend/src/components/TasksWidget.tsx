@@ -8,6 +8,7 @@ import { TaskForm } from './TaskForm';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 import { Icon } from './Icon';
+import { TASK_TYPE_LABELS } from '../utils/taskTypeLabels';
 import { EmptyState } from './EmptyState';
 
 const STATUSES: TaskStatus[] = ['NOT_STARTED', 'IN_PROGRESS', 'WAITING', 'COMPLETED', 'CANCELLED'];
@@ -84,7 +85,7 @@ export function TasksWidget({
               <span className="chip" style={{ background: priorityColor(task.priority) + '22', color: priorityColor(task.priority), marginRight: 6 }}>
                 {task.priority}
               </span>
-              {task.type.replace('_', ' ')} · Due {new Date(task.dueAt).toLocaleDateString()}
+              {TASK_TYPE_LABELS[task.type]} · Due {new Date(task.dueAt).toLocaleDateString()}
               {task.assignee && ` · ${task.assignee.fullName}`}
             </div>
             {task.notes && <div className="task-card-notes">{task.notes}</div>}
