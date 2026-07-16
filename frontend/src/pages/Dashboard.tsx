@@ -152,7 +152,7 @@ export function Dashboard() {
 
   const contactsOverTime = countByDay(leads, (l) => l.createdAt, rangeStart, now);
   const dealsOverTime = countByDay(deals, (d) => d.createdAt, rangeStart, now);
-  const sourceData = countBy(leads, (l) => l.source ?? 'OTHER');
+  const sourceData = countBy(leads, (l) => l.source?.name ?? 'Other');
   const stageData = countBy(deals, (d) => d.stage.name);
   const stageColorByName = new Map(dealStages.map((s) => [s.name, s.color]));
 

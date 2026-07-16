@@ -22,7 +22,7 @@ function mapAccount(row: any): Account {
     phone: row.phone ?? undefined,
     address: row.address ?? undefined,
     description: row.description ?? undefined,
-    annualRevenue: row.annual_revenue !== null && row.annual_revenue !== undefined ? String(row.annual_revenue) : undefined,
+    annualRevenue: row.annual_revenue ?? undefined,
     currency: row.currency ?? undefined,
     stage: {
       id: row.stage.id, name: row.stage.name, order: row.stage.order, color: row.stage.color, isDefault: row.stage.is_default,

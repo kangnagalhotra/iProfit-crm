@@ -111,7 +111,7 @@ export function Reports() {
   // --- (b) Revenue per channel: deal value + win rate grouped by the
   // originating lead's source (deals are created only via lead conversion,
   // so lead_id → leads.source is the channel of record) ---
-  const leadSourceById = useMemo(() => new Map(leads.map((l) => [l.id, l.source ?? 'OTHER'])), [leads]);
+  const leadSourceById = useMemo(() => new Map(leads.map((l) => [l.id, l.source?.name ?? 'Other'])), [leads]);
   const channelReport = useMemo(() => {
     const byChannel = new Map<string, { value: number; won: number; lost: number; total: number; wonValue: number }>();
     for (const d of dealsInRange) {

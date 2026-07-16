@@ -32,6 +32,7 @@ import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 import { timeAgo } from '../utils/timeAgo';
 import { useRecordRecentlyViewed } from '../hooks/useRecentlyViewed';
+import { REVENUE_BANDS } from '../constants/companyOptions';
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -73,9 +74,7 @@ function websiteUrl(domain: string) {
 
 function formatRevenue(value?: string) {
   if (!value) return undefined;
-  const n = parseFloat(value);
-  if (Number.isNaN(n)) return undefined;
-  return n.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
+  return REVENUE_BANDS.find((b) => b.value === value)?.label ?? value;
 }
 
 function formatMoney(n: number) {
@@ -367,18 +366,15 @@ export function CompanyDetail() {
             editing={editingField === 'revenue'}
             onStartEdit={() => setEditingField('revenue')}
           >
-            <input
-              type="number"
-              min="0"
+            <select
               autoFocus
               defaultValue={account.annualRevenue ?? ''}
-              placeholder="0.00"
-              onBlur={(e) => saveField({ annualRevenue: e.target.value })}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-                if (e.key === 'Escape') setEditingField(null);
-              }}
-            />
+              onChange={(e) => { saveField({ annualRevenue: e.target.value || null }); setEditingField(null); }}
+              onBlur={() => setEditingField(null)}
+            >
+              <option value="">—</option>
+              {REVENUE_BANDS.map((b) => <option key={b.value} value={b.value}>{b.label}</option>)}
+            </select>
           </EditableRow>
           <EditableRow
             label="Lifecycle Stage"

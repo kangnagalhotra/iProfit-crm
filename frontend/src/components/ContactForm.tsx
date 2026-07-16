@@ -8,6 +8,8 @@ import type { SearchSelectOption } from './SearchSelect';
 import { MultiEntitySelect } from './MultiEntitySelect';
 import { CompanyForm } from './CompanyForm';
 import { LeadForm } from './LeadForm';
+import { SocialLinksEditor, validateSocialUrl } from './SocialLinksEditor';
+import type { OtherSocialLink } from './SocialLinksEditor';
 import {
   stripPhoneDigits, formatPhoneDisplay, isValidPhone, PHONE_ERROR_MESSAGE,
 } from '../utils/validation';
@@ -36,15 +38,22 @@ export function ContactForm({
     mobile: stripPhoneDigits(contact?.mobile ?? ''),
     jobTitle: contact?.jobTitle ?? '',
     department: contact?.department ?? '',
+    linkedinUrl: contact?.linkedinUrl ?? '',
+    instagramUrl: contact?.instagramUrl ?? '',
+    twitterUrl: contact?.twitterUrl ?? '',
     notes: contact?.notes ?? '',
     accountId: contact?.account?.id ?? accountId ?? '',
   });
+  const [otherSocialLinks, setOtherSocialLinks] = useState<OtherSocialLink[]>(
+    contact?.socialLinks?.map((l) => ({ platform: l.platform, url: l.url })) ?? [],
+  );
   const [leadIds, setLeadIds] = useState<string[]>(
     contact?.leads?.map((l) => l.id) ?? (leadId ? [leadId] : []),
   );
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [leads, setLeads] = useState<{ id: string; firstName?: string; lastName?: string; email?: string }[]>([]);
   const [mobileError, setMobileError] = useState('');
+  const [socialError, setSocialError] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [showCreateCompany, setShowCreateCompany] = useState(false);
@@ -73,9 +82,17 @@ export function ContactForm({
     setError('');
     if (!validateMobile(form.mobile)) return;
     if (!form.accountId) { setError('Company is required.'); return; }
+    const urls = [form.linkedinUrl, form.instagramUrl, form.twitterUrl, ...otherSocialLinks.map((l) => l.url)];
+    if (urls.some((u) => u && !validateSocialUrl(u))) {
+      setSocialError('Social links must start with http:// or https://');
+      return;
+    }
+    setSocialError('');
     setSaving(true);
     try {
-      const payload: Record<string, any> = { ...Object.fromEntries(Object.entries(form).filter(([, v]) => v !== '')), leadIds };
+      const payload: Record<string, any> = {
+        ...Object.fromEntries(Object.entries(form).filter(([, v]) => v !== '')), leadIds, otherSocialLinks,
+      };
       const data = isEdit
         ? await updateContact(contact!.id, payload)
         : await createContact(payload);
@@ -94,6 +111,7 @@ export function ContactForm({
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h3 style={{ marginTop: 0 }}>{isEdit ? 'Edit contact' : 'Add contact'}</h3>
+        <div className="helper-text" style={{ marginTop: 0 }}>Provide at least a name or email.</div>
         <div className="field"><label>First name</label>
           <input value={form.firstName} onChange={(e) => set('firstName', e.target.value)} /></div>
         <div className="field"><label>Last name</label>
@@ -114,6 +132,17 @@ export function ContactForm({
           <input value={form.jobTitle} onChange={(e) => set('jobTitle', e.target.value)} /></div>
         <div className="field"><label>Department</label>
           <input value={form.department} onChange={(e) => set('department', e.target.value)} /></div>
+        <SocialLinksEditor
+          linkedinUrl={form.linkedinUrl}
+          instagramUrl={form.instagramUrl}
+          twitterUrl={form.twitterUrl}
+          otherLinks={otherSocialLinks}
+          onChangeLinkedin={(v) => set('linkedinUrl', v)}
+          onChangeInstagram={(v) => set('instagramUrl', v)}
+          onChangeTwitter={(v) => set('twitterUrl', v)}
+          onChangeOtherLinks={setOtherSocialLinks}
+        />
+        {socialError && <div className="error" style={{ margin: '4px 0 0' }}>{socialError}</div>}
         {!isScoped && (
           <div className="field"><label>Company*</label>
             <SearchSelect

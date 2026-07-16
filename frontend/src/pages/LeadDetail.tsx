@@ -201,7 +201,7 @@ export function LeadDetail() {
         companyName: lead!.account?.name,
         jobTitle: lead!.jobTitle,
         city: lead!.city,
-        source: lead!.source,
+        sourceId: lead!.source?.id,
         ownerId: lead!.owner?.id,
         stageId: lead!.stage.id,
         value: lead!.value,
@@ -351,6 +351,9 @@ export function LeadDetail() {
               placeholder="Search owner…"
             />
           </EditableRow>
+          {lead.additionalOwners && lead.additionalOwners.length > 0 && (
+            <Row label="Additional Owners" value={lead.additionalOwners.map((o) => o.fullName).join(', ')} />
+          )}
           <Row label="Job Title" value={lead.jobTitle} onEmptyClick={canEdit ? () => setShowEditModal(true) : undefined} />
           <Row label="Mobile Number" value={lead.mobile} onEmptyClick={canEdit ? () => setShowEditModal(true) : undefined} />
           <Row label="Email" value={lead.email} onEmptyClick={canEdit ? () => setShowEditModal(true) : undefined} />
@@ -369,7 +372,7 @@ export function LeadDetail() {
             />
           </EditableRow>
           <Row label="Engagement Score" value={<span className="chip">{lead.score}/100</span>} />
-          <Row label="Lead Source" value={lead.source} onEmptyClick={canEdit ? () => setShowEditModal(true) : undefined} />
+          <Row label="Lead Source" value={lead.source?.name} onEmptyClick={canEdit ? () => setShowEditModal(true) : undefined} />
           <Row label="Rating" value={lead.rating ? RATING_LABELS[lead.rating] : undefined} onEmptyClick={canEdit ? () => setShowEditModal(true) : undefined} />
           {lead.unqualifiedReason && (
             <Row label="Unqualified Reason" value={UNQUALIFIED_REASON_LABELS[lead.unqualifiedReason]} />

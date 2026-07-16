@@ -1,6 +1,10 @@
 export type Role = 'ADMIN' | 'SALES_MANAGER' | 'SALES_REP';
-export type LeadSource = 'IMPORT' | 'OUTREACH' | 'EMAIL' | 'CAMPAIGN' | 'REFERRAL' | 'WEBSITE' | 'SOCIAL_MEDIA' | 'EVENT' | 'PARTNER' | 'OTHER' | 'COLD_CALL' | 'ADVERTISEMENT';
+// Lead Source is an admin-configurable list (lead_source_options table),
+// not a fixed enum — see api/leadSourceOptions.ts.
+export interface LeadSourceOption { id: string; name: string; order: number; isActive: boolean; }
 export type Salutation = 'MR' | 'MS' | 'MRS' | 'DR' | 'PROF';
+export type RevenueBand = 'LT_1CR' | 'CR_1_10' | 'CR_10_50' | 'CR_50_100' | 'CR_100_PLUS';
+export interface SocialLink { id: string; platform: string; url: string; order: number; }
 export type LeadRating = 'HOT' | 'WARM' | 'COLD';
 export type LeadUnqualifiedReason = 'NO_BUDGET' | 'NOT_A_FIT' | 'NO_RESPONSE' | 'COMPETITOR' | 'BAD_DATA';
 
@@ -49,11 +53,14 @@ export interface Lead {
   mobile?: string;
   jobTitle?: string;
   linkedinUrl?: string;
+  instagramUrl?: string;
+  twitterUrl?: string;
+  socialLinks?: SocialLink[];
   city?: string;
   value?: string;
   notes?: string;
   stage: LeadStage;
-  source?: LeadSource;
+  source?: { id: string; name: string };
   sourceDetails?: string;
   // 0-100 manual field, unrelated to the BANT budget/authority/need/timeline
   // sum below (separate concept, separate scale).
@@ -62,6 +69,9 @@ export interface Lead {
   unqualifiedReason?: LeadUnqualifiedReason;
   tags?: string[];
   owner?: { id: string; fullName: string };
+  // Additive co-owners — collaborators beyond the primary owner above.
+  // Display-only; access control still keys off `owner` alone.
+  additionalOwners?: { id: string; fullName: string }[];
   createdBy?: { id: string; fullName: string };
   account?: { id: string; name: string };
   lastActivityAt?: string;
@@ -89,6 +99,10 @@ export interface Contact {
   mobile?: string;
   jobTitle?: string; // shown as "Designation" in the Contacts UI
   department?: string;
+  linkedinUrl?: string;
+  instagramUrl?: string;
+  twitterUrl?: string;
+  socialLinks?: SocialLink[];
   notes?: string;
   account?: { id: string; name: string; stage?: { name: string; color: string } };
   // A Contact can be linked to multiple Leads (and vice versa) via lead_contacts.
@@ -130,7 +144,7 @@ export interface Account {
   phone?: string;
   address?: string;
   description?: string;
-  annualRevenue?: string;
+  annualRevenue?: RevenueBand;
   currency?: Currency;
   stage: AccountStage;
   customerStage?: CustomerStage;
@@ -271,6 +285,7 @@ export interface Opportunity {
   pipeline: { id: string; name: string };
   stage: DealStage;
   owner?: { id: string; fullName: string };
+  additionalOwners?: { id: string; fullName: string }[];
   account?: { id: string; name: string; stage?: { name: string; color: string } };
   lead?: { id: string; firstName?: string; lastName?: string; email?: string };
   contact?: { id: string; firstName?: string; lastName?: string; email?: string };

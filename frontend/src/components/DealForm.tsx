@@ -14,6 +14,8 @@ import { listDealContacts, replaceDealContacts } from '../api/dealContacts';
 import { listLineItems, replaceLineItems } from '../api/dealLineItems';
 import { listAttachments, uploadAttachment, deleteAttachment } from '../api/dealAttachments';
 import { SearchSelect } from './SearchSelect';
+import type { SearchSelectOption } from './SearchSelect';
+import { MultiEntitySelect } from './MultiEntitySelect';
 import { CompanyForm } from './CompanyForm';
 import { FormSection } from './FormSection';
 import { MultiContactRoleSelect } from './MultiContactRoleSelect';
@@ -41,6 +43,7 @@ interface DealFormState {
   stageId: string;
   closeDate: string;
   ownerId: string;
+  additionalOwnerIds: string[];
   pipelineId: string;
   currency: Currency;
   probability: number | '';
@@ -71,6 +74,7 @@ function initialState(deal: Opportunity): DealFormState {
     stageId: deal.stage.id ?? '',
     closeDate: deal.closeDate ? deal.closeDate.slice(0, 10) : '',
     ownerId: deal.owner?.id ?? '',
+    additionalOwnerIds: deal.additionalOwners?.map((o) => o.id) ?? [],
     pipelineId: deal.pipeline.id ?? '',
     currency: deal.currency ?? 'USD',
     probability: deal.probabilityOverride ?? deal.stage.winProbability ?? '',
@@ -201,6 +205,7 @@ export function DealForm({
         stageId: form.stageId || undefined,
         closeDate: form.closeDate || undefined,
         ownerId: form.ownerId || undefined,
+        additionalOwnerIds: form.additionalOwnerIds,
         pipelineId: form.pipelineId || undefined,
         currency: form.currency,
         probabilityOverride: probabilityTouched && form.probability !== '' ? Number(form.probability) : undefined,
@@ -286,6 +291,14 @@ export function DealForm({
               <option value="">Auto-assign</option>
               {users.map((u) => <option key={u.id} value={u.id}>{u.fullName}</option>)}
             </select>
+          </div>
+          <div className="field field-span-2"><label>Additional owners</label>
+            <MultiEntitySelect
+              options={users.filter((u) => u.id !== form.ownerId).map((u): SearchSelectOption => ({ value: u.id, label: u.fullName }))}
+              value={form.additionalOwnerIds}
+              onChange={(ids) => set('additionalOwnerIds', ids)}
+              placeholder="Add another owner…"
+            />
           </div>
         </div>
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type {
-  Account, Currency, Lead, LeadRating, LeadSource, LeadStage, LeadUnqualifiedReason, User,
+  Account, Currency, Lead, LeadRating, LeadSourceOption, LeadStage, LeadUnqualifiedReason, RevenueBand, User,
 } from '../api/types';
 import {
   createLead, updateLead, checkDuplicateLead,
@@ -10,9 +10,13 @@ import type { DuplicateLeadMatch } from '../api/leads';
 import { listStages } from '../api/stages';
 import { listUsers } from '../api/users';
 import { listAccounts } from '../api/accounts';
+import { listLeadSourceOptions } from '../api/leadSourceOptions';
 import { listAttachments, uploadAttachment, deleteAttachment } from '../api/leadAttachments';
 import { SearchSelect } from './SearchSelect';
 import type { SearchSelectOption } from './SearchSelect';
+import { MultiEntitySelect } from './MultiEntitySelect';
+import { SocialLinksEditor, validateSocialUrl } from './SocialLinksEditor';
+import type { OtherSocialLink } from './SocialLinksEditor';
 import { CreateUserModal } from './CreateUserModal';
 import { CompanyForm } from './CompanyForm';
 import { FormSection } from './FormSection';
@@ -22,13 +26,12 @@ import type { PendingOrUploadedFile } from './FileUploadList';
 import { ConvertToDealModal } from './ConvertToDealModal';
 import { useAuth } from '../context/AuthContext';
 import { COUNTRIES } from '../constants/countries';
-import { INDUSTRIES, COMPANY_SIZES } from '../constants/companyOptions';
+import { INDUSTRIES, COMPANY_SIZES, REVENUE_BANDS } from '../constants/companyOptions';
 import {
   stripPhoneDigits, formatPhoneDisplay, isValidPhone, PHONE_ERROR_MESSAGE,
   stripEmailInput, isValidEmail, EMAIL_ERROR_MESSAGE,
 } from '../utils/validation';
 
-const SOURCES: LeadSource[] = ['WEBSITE', 'REFERRAL', 'COLD_CALL', 'EVENT', 'SOCIAL_MEDIA', 'ADVERTISEMENT', 'PARTNER', 'OTHER'];
 const RATINGS: LeadRating[] = ['HOT', 'WARM', 'COLD'];
 const CURRENCIES: Currency[] = ['USD', 'EUR', 'GBP', 'INR'];
 const UNQUALIFIED_REASONS: { value: LeadUnqualifiedReason; label: string }[] = [
@@ -40,7 +43,6 @@ const UNQUALIFIED_REASONS: { value: LeadUnqualifiedReason; label: string }[] = [
 ];
 const INDUSTRY_OPTIONS: SearchSelectOption[] = INDUSTRIES.map((v) => ({ value: v, label: v }));
 const SIZE_OPTIONS: SearchSelectOption[] = COMPANY_SIZES.map((v) => ({ value: v, label: v }));
-const LINKEDIN_RE = /^https?:\/\/([a-z]{2,3}\.)?linkedin\.com\/.+/i;
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -56,11 +58,13 @@ interface LeadFormState {
   mobile: string;
   jobTitle: string;
   linkedinUrl: string;
+  instagramUrl: string;
+  twitterUrl: string;
   accountId: string;
   companyName: string;
   industry: string;
   sizeBucket: string;
-  annualRevenue: string;
+  annualRevenue: RevenueBand | '';
   currency: Currency;
   domain: string;
   address: string;
@@ -68,9 +72,10 @@ interface LeadFormState {
   state: string;
   postalCode: string;
   country: string;
-  source: LeadSource;
+  sourceId: string;
   sourceDetails: string;
   ownerId: string;
+  additionalOwnerIds: string[];
   stageId: string;
   rating: LeadRating | '';
   unqualifiedReason: LeadUnqualifiedReason | '';
@@ -88,6 +93,8 @@ function initialState(lead?: Lead, defaultStageId?: string): LeadFormState {
     mobile: stripPhoneDigits(lead?.mobile ?? lead?.phone ?? ''),
     jobTitle: lead?.jobTitle ?? '',
     linkedinUrl: lead?.linkedinUrl ?? '',
+    instagramUrl: lead?.instagramUrl ?? '',
+    twitterUrl: lead?.twitterUrl ?? '',
     accountId: lead?.account?.id ?? '',
     companyName: '',
     industry: '',
@@ -100,9 +107,10 @@ function initialState(lead?: Lead, defaultStageId?: string): LeadFormState {
     state: '',
     postalCode: '',
     country: '',
-    source: (lead?.source ?? 'OTHER') as LeadSource,
+    sourceId: lead?.source?.id ?? '',
     sourceDetails: lead?.sourceDetails ?? '',
     ownerId: lead?.owner?.id ?? '',
+    additionalOwnerIds: lead?.additionalOwners?.map((o) => o.id) ?? [],
     stageId: lead?.stage.id ?? defaultStageId ?? '',
     rating: lead?.rating ?? '',
     unqualifiedReason: lead?.unqualifiedReason ?? '',
@@ -128,10 +136,14 @@ export function LeadForm({
   const [stages, setStages] = useState<LeadStage[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [sourceOptions, setSourceOptions] = useState<LeadSourceOption[]>([]);
+  const [otherSocialLinks, setOtherSocialLinks] = useState<OtherSocialLink[]>(
+    lead?.socialLinks?.map((l) => ({ platform: l.platform, url: l.url })) ?? [],
+  );
   const [error, setError] = useState('');
   const [mobileError, setMobileError] = useState('');
   const [emailError, setEmailError] = useState('');
-  const [linkedinError, setLinkedinError] = useState('');
+  const [socialError, setSocialError] = useState('');
   const [dupMatch, setDupMatch] = useState<DuplicateLeadMatch | null>(null);
   const [saving, setSaving] = useState(false);
   const [showCreateUser, setShowCreateUser] = useState(false);
@@ -148,14 +160,20 @@ export function LeadForm({
       listStages('lead_stages'),
       listUsers(),
       listAccounts({ pageSize: 100 }),
-    ]).then(([stageRes, userRes, accountRes]) => {
+      listLeadSourceOptions(),
+    ]).then(([stageRes, userRes, accountRes, sourceRes]) => {
       const stagesTyped = stageRes as LeadStage[];
       setStages(stagesTyped);
       setUsers(userRes);
       setAccounts(accountRes.data);
+      setSourceOptions(sourceRes);
       if (!isEdit && !defaultStageId) {
         const defaultStage = stagesTyped.find((s) => s.isDefault) ?? stagesTyped[0];
         if (defaultStage) set('stageId', defaultStage.id);
+      }
+      if (!isEdit && !form.sourceId && sourceRes.length > 0) {
+        const other = sourceRes.find((o) => o.name === 'Other') ?? sourceRes[0];
+        set('sourceId', other.id);
       }
     });
     if (isEdit && lead) {
@@ -182,9 +200,13 @@ export function LeadForm({
     return true;
   }
 
-  function validateLinkedin(value: string): boolean {
-    if (value && !LINKEDIN_RE.test(value.trim())) { setLinkedinError('Enter a valid LinkedIn URL.'); return false; }
-    setLinkedinError('');
+  function validateSocials(): boolean {
+    const urls = [form.linkedinUrl, form.instagramUrl, form.twitterUrl, ...otherSocialLinks.map((l) => l.url)];
+    if (urls.some((u) => u && !validateSocialUrl(u))) {
+      setSocialError('Social links must start with http:// or https://');
+      return false;
+    }
+    setSocialError('');
     return true;
   }
 
@@ -208,6 +230,9 @@ export function LeadForm({
     { value: '', label: 'Auto-assign' },
     ...users.map((u) => ({ value: u.id, label: u.fullName, sublabel: u.email })),
   ];
+  const additionalOwnerOptions: SearchSelectOption[] = users
+    .filter((u) => u.id !== form.ownerId)
+    .map((u) => ({ value: u.id, label: u.fullName, sublabel: u.email }));
   const companyOptions: SearchSelectOption[] = accounts.map((a) => ({ value: a.id, label: a.name }));
 
   function setCompany(v: string) {
@@ -228,7 +253,7 @@ export function LeadForm({
     if (!form.accountId && !form.companyName.trim()) { setError('Company name is required.'); return false; }
     if (!form.mobile) { setError('Mobile number is required.'); return false; }
     if (!validateMobile(form.mobile) || !validateEmail(trimmedEmail)) return false;
-    if (form.linkedinUrl && !validateLinkedin(form.linkedinUrl)) { setExpanded(true); return false; }
+    if (!validateSocials()) { setExpanded(true); return false; }
     if (selectedStage?.isLost && !form.unqualifiedReason) {
       setExpanded(true);
       setError('Unqualified reason is required for an unqualified lead.');
@@ -263,12 +288,16 @@ export function LeadForm({
       mobile: form.mobile || undefined,
       jobTitle: form.jobTitle || undefined,
       linkedinUrl: form.linkedinUrl || undefined,
+      instagramUrl: form.instagramUrl || undefined,
+      twitterUrl: form.twitterUrl || undefined,
+      otherSocialLinks,
       accountId: form.accountId || undefined,
       companyName: form.companyName || undefined,
       companyEnrichment,
-      source: form.source,
+      sourceId: form.sourceId || undefined,
       sourceDetails: form.sourceDetails || undefined,
       ownerId: form.ownerId || undefined,
+      additionalOwnerIds: form.additionalOwnerIds,
       stageId: form.stageId || undefined,
       rating: form.rating || undefined,
       unqualifiedReason: selectedStage?.isLost ? (form.unqualifiedReason || undefined) : undefined,
@@ -371,9 +400,11 @@ export function LeadForm({
               />
               {mobileError && <div className="error" style={{ margin: '4px 0 0' }}>{mobileError}</div>}
             </div>
+            <div className="field"><label>Lead value</label>
+              <input type="number" min="0" value={form.value} onChange={(e) => set('value', e.target.value)} placeholder="0.00" /></div>
             <div className="field"><label>Lead source*</label>
-              <select value={form.source} onChange={(e) => set('source', e.target.value as LeadSource)}>
-                {SOURCES.map((s) => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
+              <select value={form.sourceId} onChange={(e) => set('sourceId', e.target.value)}>
+                {sourceOptions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             </div>
             <div className="field"><label>Status</label>
@@ -390,6 +421,14 @@ export function LeadForm({
                 renderAvatar={(opt) => (opt.value ? <div className="avatar avatar-sm">{initials(opt.label)}</div> : undefined)}
                 onCreateNew={canAddOwner ? () => setShowCreateUser(true) : undefined}
                 createNewLabel="+ Add new owner"
+              />
+            </div>
+            <div className="field field-span-2"><label>Additional owners</label>
+              <MultiEntitySelect
+                options={additionalOwnerOptions}
+                value={form.additionalOwnerIds}
+                onChange={(ids) => set('additionalOwnerIds', ids)}
+                placeholder="Add another owner…"
               />
             </div>
             <div className="field field-span-2"><label>Notes</label>
@@ -421,16 +460,7 @@ export function LeadForm({
                 <div className="form-grid-2">
                   <div className="field"><label>Job title</label>
                     <input value={form.jobTitle} onChange={(e) => set('jobTitle', e.target.value)} /></div>
-                  <div className="field"><label>LinkedIn URL</label>
-                    <input
-                      value={form.linkedinUrl}
-                      onChange={(e) => set('linkedinUrl', e.target.value)}
-                      onBlur={(e) => validateLinkedin(e.target.value)}
-                      placeholder="https://linkedin.com/in/…"
-                    />
-                    {linkedinError && <div className="error" style={{ margin: '4px 0 0' }}>{linkedinError}</div>}
-                  </div>
-                  <div className="field"><label>Source details</label>
+                  <div className="field"><label>Source details (optional notes)</label>
                     <input value={form.sourceDetails} onChange={(e) => set('sourceDetails', e.target.value)} placeholder="Campaign name, referrer…" /></div>
                   <div className="field">
                     <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 22 }}>
@@ -439,6 +469,17 @@ export function LeadForm({
                     </label>
                   </div>
                 </div>
+                <SocialLinksEditor
+                  linkedinUrl={form.linkedinUrl}
+                  instagramUrl={form.instagramUrl}
+                  twitterUrl={form.twitterUrl}
+                  otherLinks={otherSocialLinks}
+                  onChangeLinkedin={(v) => set('linkedinUrl', v)}
+                  onChangeInstagram={(v) => set('instagramUrl', v)}
+                  onChangeTwitter={(v) => set('twitterUrl', v)}
+                  onChangeOtherLinks={setOtherSocialLinks}
+                />
+                {socialError && <div className="error" style={{ margin: '4px 0 0' }}>{socialError}</div>}
               </FormSection>
 
               <FormSection title="Company & Address">
@@ -451,7 +492,11 @@ export function LeadForm({
                   <div className="field"><label>Company size</label>
                     <SearchSelect options={SIZE_OPTIONS} value={form.sizeBucket} onChange={(v) => set('sizeBucket', v)} placeholder="Search company size…" /></div>
                   <div className="field"><label>Annual revenue</label>
-                    <input type="number" min="0" value={form.annualRevenue} onChange={(e) => set('annualRevenue', e.target.value)} /></div>
+                    <select value={form.annualRevenue} onChange={(e) => set('annualRevenue', e.target.value as RevenueBand | '')}>
+                      <option value="">—</option>
+                      {REVENUE_BANDS.map((b) => <option key={b.value} value={b.value}>{b.label}</option>)}
+                    </select>
+                  </div>
                   <div className="field"><label>Currency</label>
                     <select value={form.currency} onChange={(e) => set('currency', e.target.value as Currency)}>
                       {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -480,8 +525,6 @@ export function LeadForm({
                       {RATINGS.map((r) => <option key={r} value={r}>{r.charAt(0) + r.slice(1).toLowerCase()}</option>)}
                     </select>
                   </div>
-                  <div className="field"><label>Lead value</label>
-                    <input type="number" min="0" value={form.value} onChange={(e) => set('value', e.target.value)} placeholder="0.00" /></div>
                   {selectedStage?.isLost && (
                     <div className="field"><label>Unqualified reason*</label>
                       <select value={form.unqualifiedReason} onChange={(e) => set('unqualifiedReason', e.target.value as LeadUnqualifiedReason | '')}>

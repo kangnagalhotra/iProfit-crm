@@ -1,11 +1,12 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import type {
-  Lead, LeadSource, LeadStage, User,
+  Lead, LeadStage, User,
 } from '../api/types';
 import { listLeads, updateLead, bulkDeleteLeads } from '../api/leads';
 import { listStages } from '../api/stages';
 import { listUsers } from '../api/users';
+import { listLeadSourceOptions } from '../api/leadSourceOptions';
 import { LeadForm } from '../components/LeadForm';
 import { LeadImport } from '../components/LeadImport';
 import { ConvertToDealModal } from '../components/ConvertToDealModal';
@@ -33,9 +34,9 @@ function scoreColor(score: number) {
   return score >= 70 ? '#16A34A' : score >= 40 ? '#F97316' : '#6B7280';
 }
 
-interface LeadFilters { [key: string]: string; stageId: string; ownerId: string; source: string; }
+interface LeadFilters { [key: string]: string; stageId: string; ownerId: string; sourceId: string; }
 
-const EMPTY_LEAD_FILTERS: LeadFilters = { stageId: '', ownerId: '', source: '' };
+const EMPTY_LEAD_FILTERS: LeadFilters = { stageId: '', ownerId: '', sourceId: '' };
 
 const LEAD_COLUMNS: ColumnDef[] = [
   { key: 'name', label: 'Name', required: true },
@@ -49,19 +50,6 @@ const LEAD_COLUMNS: ColumnDef[] = [
   { key: 'created', label: 'Created' },
 ];
 const ALL_LEAD_COLUMN_KEYS = LEAD_COLUMNS.map((c) => c.key);
-
-const LEAD_SOURCE_OPTIONS: { value: LeadSource; label: string }[] = [
-  { value: 'IMPORT', label: 'Import' },
-  { value: 'OUTREACH', label: 'Outreach' },
-  { value: 'EMAIL', label: 'Email' },
-  { value: 'CAMPAIGN', label: 'Campaign' },
-  { value: 'REFERRAL', label: 'Referral' },
-  { value: 'WEBSITE', label: 'Website' },
-  { value: 'SOCIAL_MEDIA', label: 'Social Media' },
-  { value: 'EVENT', label: 'Event' },
-  { value: 'PARTNER', label: 'Partner' },
-  { value: 'OTHER', label: 'Other' },
-];
 
 function formatValue(value?: string) {
   if (!value) return '—';
@@ -78,7 +66,7 @@ const EXPORT_COLUMNS: ExportColumn<Lead>[] = [
   { label: 'Owner', get: (l) => l.owner?.fullName ?? '' },
   { label: 'Company', get: (l) => l.account?.name ?? '' },
   { label: 'Value', get: (l) => l.value ?? '' },
-  { label: 'Source', get: (l) => l.source ?? '' },
+  { label: 'Source', get: (l) => l.source?.name ?? '' },
   { label: 'Created', get: (l) => new Date(l.createdAt).toLocaleDateString() },
   { label: 'Last Activity', get: (l) => (l.lastActivityAt ? new Date(l.lastActivityAt).toLocaleDateString() : '') },
 ];
@@ -115,6 +103,7 @@ export function LeadsList() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [stages, setStages] = useState<LeadStage[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [sourceOptions, setSourceOptions] = useState<{ id: string; name: string }[]>([]);
   const [editingCell, setEditingCell] = useState<{ id: string; field: 'stage' | 'owner' } | null>(null);
   const [convertingLead, setConvertingLead] = useState<Lead | null>(null);
   const [hotLeads, setHotLeads] = useState<Lead[]>([]);
@@ -148,12 +137,12 @@ export function LeadsList() {
   const LEAD_FILTER_FIELDS: FilterField[] = [
     { key: 'stageId', label: 'Stage', options: stages.map((s) => ({ value: s.id, label: s.name })) },
     { key: 'ownerId', label: 'Owner', options: users.map((u) => ({ value: u.id, label: u.fullName })) },
-    { key: 'source', label: 'Source', options: LEAD_SOURCE_OPTIONS },
+    { key: 'sourceId', label: 'Source', options: sourceOptions.map((o) => ({ value: o.id, label: o.name })) },
   ];
 
   useEffect(() => {
-    Promise.all([listStages('lead_stages'), listUsers()])
-      .then(([stageRes, userRes]) => { setStages(stageRes as LeadStage[]); setUsers(userRes); });
+    Promise.all([listStages('lead_stages'), listUsers(), listLeadSourceOptions()])
+      .then(([stageRes, userRes, sourceRes]) => { setStages(stageRes as LeadStage[]); setUsers(userRes); setSourceOptions(sourceRes); });
     // Hot Leads smart view: top 5 by engagement score with activity in the
     // last 7 days (unconverted only).
     const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
@@ -175,7 +164,7 @@ export function LeadsList() {
       sortDir,
       stageId: filters.stageId || undefined,
       ownerId: filters.ownerId || undefined,
-      source: (filters.source || undefined) as LeadSource | undefined,
+      sourceId: filters.sourceId || undefined,
     })
       .then((data) => { setLeads(data.data); setTotal(data.total); setSelected(new Set()); })
       .finally(() => setLoading(false));

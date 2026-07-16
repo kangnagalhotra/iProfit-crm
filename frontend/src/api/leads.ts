@@ -1,12 +1,18 @@
 import { supabase } from '../lib/supabase';
 import type {
-  Lead, LeadSource, Opportunity, Paginated,
+  Lead, Opportunity, Paginated,
 } from './types';
 import { createDeal } from './deals';
 import { createContact } from './contacts';
+import { setLeadAdditionalOwners } from './additionalOwners';
+import { setLeadSocialLinks, mapSocialLinks } from './socialLinks';
+import type { OtherSocialLink } from '../components/SocialLinksEditor';
 
 const SELECT = `*, stage:lead_stages(*), owner:profiles!leads_owner_id_fkey(id, full_name),
-  createdByProfile:profiles!leads_created_by_fkey(id, full_name), account:accounts(id, name)`;
+  createdByProfile:profiles!leads_created_by_fkey(id, full_name), account:accounts(id, name),
+  sourceOption:lead_source_options(id, name),
+  additionalOwnersRows:lead_additional_owners(user:profiles(id, full_name)),
+  socialLinksRows:social_links(id, platform, url, order)`;
 
 const SORT_COLUMN: Record<string, string> = {
   firstName: 'first_name', lastName: 'last_name', value: 'value', updatedAt: 'updated_at', createdAt: 'created_at', score: 'score',
@@ -25,6 +31,9 @@ function mapLead(row: any): Lead {
     mobile: row.mobile ?? undefined,
     jobTitle: row.job_title ?? undefined,
     linkedinUrl: row.linkedin_url ?? undefined,
+    instagramUrl: row.instagram_url ?? undefined,
+    twitterUrl: row.twitter_url ?? undefined,
+    socialLinks: mapSocialLinks(row.socialLinksRows),
     city: row.city ?? undefined,
     value: row.value !== null && row.value !== undefined ? String(row.value) : undefined,
     notes: row.notes ?? undefined,
@@ -32,13 +41,16 @@ function mapLead(row: any): Lead {
       id: row.stage.id, name: row.stage.name, order: row.stage.order, color: row.stage.color,
       isDefault: row.stage.is_default, isWon: row.stage.is_won, isLost: row.stage.is_lost,
     },
-    source: row.source ?? undefined,
+    source: row.sourceOption ? { id: row.sourceOption.id, name: row.sourceOption.name } : undefined,
     sourceDetails: row.source_details ?? undefined,
     score: row.score,
     rating: row.rating ?? undefined,
     unqualifiedReason: row.unqualified_reason ?? undefined,
     tags: row.tags ?? [],
     owner: row.owner ? { id: row.owner.id, fullName: row.owner.full_name } : undefined,
+    additionalOwners: (row.additionalOwnersRows ?? [])
+      .filter((r: any) => r.user)
+      .map((r: any) => ({ id: r.user.id, fullName: r.user.full_name })),
     createdBy: row.createdByProfile ? { id: row.createdByProfile.id, fullName: row.createdByProfile.full_name } : undefined,
     account: row.account ? { id: row.account.id, name: row.account.name } : undefined,
     lastActivityAt: row.last_activity_at ?? undefined,
@@ -58,7 +70,7 @@ function mapLead(row: any): Lead {
 export interface ListLeadsParams {
   page?: number; pageSize?: number; sortBy?: string; sortDir?: 'asc' | 'desc';
   search?: string; stageId?: string; ownerId?: string; accountId?: string; createdAfter?: string;
-  source?: LeadSource; includeArchived?: boolean;
+  sourceId?: string; includeArchived?: boolean;
 }
 
 export async function listLeads(params: ListLeadsParams = {}): Promise<Paginated<Lead>> {
@@ -71,7 +83,7 @@ export async function listLeads(params: ListLeadsParams = {}): Promise<Paginated
   if (params.ownerId) query = query.eq('owner_id', params.ownerId);
   if (params.accountId) query = query.eq('account_id', params.accountId);
   if (params.createdAfter) query = query.gte('created_at', params.createdAfter);
-  if (params.source) query = query.eq('source', params.source);
+  if (params.sourceId) query = query.eq('source_id', params.sourceId);
   if (params.search) {
     const term = `%${params.search}%`;
     query = query.or(`first_name.ilike.${term},last_name.ilike.${term},email.ilike.${term}`);
@@ -115,12 +127,6 @@ async function defaultLeadStageId(): Promise<string> {
   const { data, error } = await supabase.from('lead_stages').select('id').eq('is_default', true).single();
   if (error) throw error;
   return data.id;
-}
-
-// 'COLD_CALL' -> 'Cold Call', 'WEBSITE' -> 'Website', etc.
-export function humanizeLeadSource(source?: LeadSource): string | undefined {
-  if (!source) return undefined;
-  return source.toLowerCase().split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
 function translateError(error: any): never {
@@ -238,8 +244,9 @@ export async function createLead(input: Record<string, any>): Promise<Lead> {
   const row: Record<string, any> = {
     salutation: rest.salutation, first_name: rest.firstName, last_name: rest.lastName,
     email: rest.email, email_opt_in: rest.emailOptIn, phone: rest.phone, mobile: rest.mobile,
-    job_title: rest.jobTitle, linkedin_url: rest.linkedinUrl, city: rest.city, value: rest.value, notes: rest.notes,
-    source: rest.source, source_details: rest.sourceDetails, score: rest.score, rating: rest.rating,
+    job_title: rest.jobTitle, linkedin_url: rest.linkedinUrl, instagram_url: rest.instagramUrl,
+    twitter_url: rest.twitterUrl, city: rest.city, value: rest.value, notes: rest.notes,
+    source_id: rest.sourceId, source_details: rest.sourceDetails, score: rest.score, rating: rest.rating,
     unqualified_reason: rest.unqualifiedReason, tags: rest.tags,
     owner_id: ownerId, created_by: currentUser?.id, account_id: accountId, stage_id: stageId,
     lead_name: [rest.firstName, rest.lastName].filter(Boolean).join(' ') || undefined,
@@ -247,9 +254,13 @@ export async function createLead(input: Record<string, any>): Promise<Lead> {
   };
   Object.keys(row).forEach((k) => { if (row[k] === undefined) delete row[k]; });
 
-  const { data, error } = await supabase.from('leads').insert(row).select(SELECT).single();
+  const { data, error } = await supabase.from('leads').insert(row).select('id').single();
   if (error) translateError(error);
-  return mapLead(data);
+
+  if (rest.additionalOwnerIds) await setLeadAdditionalOwners(data.id, rest.additionalOwnerIds);
+  if (rest.otherSocialLinks) await setLeadSocialLinks(data.id, rest.otherSocialLinks as OtherSocialLink[]);
+
+  return getLead(data.id);
 }
 
 export async function updateLead(id: string, input: Record<string, any>): Promise<Lead> {
@@ -267,8 +278,9 @@ export async function updateLead(id: string, input: Record<string, any>): Promis
   const row: Record<string, any> = {
     salutation: rest.salutation, first_name: rest.firstName, last_name: rest.lastName,
     email: rest.email, email_opt_in: rest.emailOptIn, phone: rest.phone, mobile: rest.mobile,
-    job_title: rest.jobTitle, linkedin_url: rest.linkedinUrl, city: rest.city, value: rest.value, notes: rest.notes,
-    source: rest.source, source_details: rest.sourceDetails, owner_id: rest.ownerId, stage_id: rest.stageId,
+    job_title: rest.jobTitle, linkedin_url: rest.linkedinUrl, instagram_url: rest.instagramUrl,
+    twitter_url: rest.twitterUrl, city: rest.city, value: rest.value, notes: rest.notes,
+    source_id: rest.sourceId, source_details: rest.sourceDetails, owner_id: rest.ownerId, stage_id: rest.stageId,
     score: rest.score, rating: rest.rating, unqualified_reason: rest.unqualifiedReason, tags: rest.tags,
     account_id: accountId,
     budget_score: rest.budgetScore, authority_score: rest.authorityScore, need_score: rest.needScore,
@@ -286,9 +298,13 @@ export async function updateLead(id: string, input: Record<string, any>): Promis
     row.lead_name = [first, last].filter(Boolean).join(' ') || null;
   }
 
-  const { data, error } = await supabase.from('leads').update(row).eq('id', id).select(SELECT).single();
+  const { error } = await supabase.from('leads').update(row).eq('id', id);
   if (error) translateError(error);
-  return mapLead(data);
+
+  if (rest.additionalOwnerIds) await setLeadAdditionalOwners(id, rest.additionalOwnerIds);
+  if (rest.otherSocialLinks) await setLeadSocialLinks(id, rest.otherSocialLinks as OtherSocialLink[]);
+
+  return getLead(id);
 }
 
 export async function deleteLead(id: string): Promise<void> {
@@ -369,8 +385,9 @@ export async function convertLeadToDeal(
     stageId: opts.stageId,
     closeDate: opts.closeDate,
     // Source is inherited from the originating lead, never hand-picked on a
-    // deal — keeps channel reporting honest.
-    source: humanizeLeadSource(lead.source),
+    // deal — keeps channel reporting honest. Snapshotted as plain text since
+    // lead_source_options rows can later be renamed/retired independently.
+    source: lead.source?.name,
   });
 
   // Carry every OTHER contact linked to the lead onto the deal too (the

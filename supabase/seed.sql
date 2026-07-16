@@ -83,6 +83,19 @@ select * from (values
 where not exists (select 1 from lead_stages);
 
 -- ---------------------------------------------------------------------------
+-- Default Lead Source options (Group 1 / A1 — admin-configurable list,
+-- replaces the old lead_source enum)
+-- ---------------------------------------------------------------------------
+
+insert into lead_source_options (name, "order")
+select * from (values
+  ('Import', 1), ('Outreach', 2), ('Email', 3), ('Campaign', 4),
+  ('Referral', 5), ('Website', 6), ('Social Media', 7), ('Event', 8),
+  ('Partner', 9), ('Cold Call', 10), ('Advertisement', 11), ('Other', 12)
+) as s(name, "order")
+where not exists (select 1 from lead_source_options);
+
+-- ---------------------------------------------------------------------------
 -- Sample account + lead (matches seed.ts's demo data)
 -- ---------------------------------------------------------------------------
 
@@ -92,10 +105,10 @@ select 'Acme Foods', 'acmefoods.com', 'Food & Beverage',
   (select id from auth.users where email = 'admin@iprofit.com')
 where not exists (select 1 from accounts where domain = 'acmefoods.com');
 
-insert into leads (first_name, last_name, email, stage_id, source, owner_id, account_id, last_activity_at)
+insert into leads (first_name, last_name, email, stage_id, source_id, owner_id, account_id, last_activity_at)
 select 'Maria', 'Johnson', 'maria@acmefoods.com',
   (select id from lead_stages where is_default limit 1),
-  'OUTREACH',
+  (select id from lead_source_options where name = 'Outreach'),
   (select id from auth.users where email = 'rep@iprofit.com'),
   (select id from accounts where domain = 'acmefoods.com'),
   now()

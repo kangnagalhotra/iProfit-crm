@@ -15,6 +15,7 @@ import { ProductsList } from './pages/ProductsList';
 import { Reports } from './pages/Reports';
 import { ClientHealth } from './pages/ClientHealth';
 import { SettingsAutomation } from './pages/SettingsAutomation';
+import { SettingsLeadSources } from './pages/SettingsLeadSources';
 import { PipelineBoard } from './pages/PipelineBoard';
 import { CustomerSuccessBoard } from './pages/CustomerSuccessBoard';
 import { SupportTicketsList } from './pages/SupportTicketsList';
@@ -43,6 +44,7 @@ const NAV_LINKS: { to: string; label: string; icon: IconName; end?: boolean }[] 
   { to: '/support-tickets', label: 'Support Tickets', icon: 'ticket' },
   { to: '/tasks', label: 'Tasks', icon: 'checklist' },
   { to: '/settings/automation', label: 'Automation', icon: 'sparkle' },
+  { to: '/settings/lead-sources', label: 'Lead Sources', icon: 'filter' },
 ];
 
 function Shell({ children }: { children: ReactNode }) {
@@ -109,6 +111,7 @@ export function App() {
       <Route path="/reports" element={<Protected><Reports /></Protected>} />
       <Route path="/client-health" element={<Protected><ClientHealth /></Protected>} />
       <Route path="/settings/automation" element={<Protected><SettingsAutomation /></Protected>} />
+      <Route path="/settings/lead-sources" element={<Protected><SettingsLeadSources /></Protected>} />
       <Route path="/pipeline" element={<Protected><PipelineBoard /></Protected>} />
       <Route path="/customer-success" element={<Protected><CustomerSuccessBoard /></Protected>} />
       <Route path="/support-tickets" element={<Protected><SupportTicketsList /></Protected>} />

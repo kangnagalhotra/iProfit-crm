@@ -1,8 +1,10 @@
 import { supabase } from '../lib/supabase';
 import type { Contact, Paginated } from './types';
+import { setContactSocialLinks, mapSocialLinks } from './socialLinks';
 
 const SELECT = `*, account:accounts(id, name, stage:account_stages(name, color)),
-  lead_contacts(lead:leads(id, first_name, last_name, email)), owner:profiles(id, full_name)`;
+  lead_contacts(lead:leads(id, first_name, last_name, email)), owner:profiles(id, full_name),
+  socialLinksRows:social_links(id, platform, url, order)`;
 
 const SORT_COLUMN: Record<string, string> = {
   firstName: 'first_name', lastName: 'last_name', updatedAt: 'updated_at', createdAt: 'created_at',
@@ -18,6 +20,10 @@ function mapContact(row: any): Contact {
     mobile: row.mobile ?? undefined,
     jobTitle: row.job_title ?? undefined,
     department: row.department ?? undefined,
+    linkedinUrl: row.linkedin_url ?? undefined,
+    instagramUrl: row.instagram_url ?? undefined,
+    twitterUrl: row.twitter_url ?? undefined,
+    socialLinks: mapSocialLinks(row.socialLinksRows),
     notes: row.notes ?? undefined,
     account: row.account ? {
       id: row.account.id, name: row.account.name,
@@ -70,6 +76,7 @@ function toRow(input: Record<string, any>) {
   const row: Record<string, any> = {
     first_name: input.firstName, last_name: input.lastName, email: input.email, phone: input.phone,
     mobile: input.mobile, job_title: input.jobTitle, department: input.department, notes: input.notes,
+    linkedin_url: input.linkedinUrl, instagram_url: input.instagramUrl, twitter_url: input.twitterUrl,
     account_id: input.accountId, owner_id: input.ownerId,
   };
   Object.keys(row).forEach((k) => { if (row[k] === undefined) delete row[k]; });
@@ -95,6 +102,7 @@ export async function createContact(input: Record<string, any>): Promise<Contact
   const { data, error } = await supabase.from('contacts').insert(row).select(SELECT).single();
   if (error) throw new Error(error.message);
   if (input.leadIds) await replaceContactLeads(data.id, input.leadIds);
+  if (input.otherSocialLinks) await setContactSocialLinks(data.id, input.otherSocialLinks);
   return getContact(data.id);
 }
 
@@ -103,6 +111,7 @@ export async function updateContact(id: string, input: Record<string, any>): Pro
   const { data, error } = await supabase.from('contacts').update(row).eq('id', id).select(SELECT).single();
   if (error) throw new Error(error.message);
   if (input.leadIds) await replaceContactLeads(data.id, input.leadIds);
+  if (input.otherSocialLinks) await setContactSocialLinks(data.id, input.otherSocialLinks);
   return getContact(data.id);
 }
 

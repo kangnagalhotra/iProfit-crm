@@ -316,6 +316,9 @@ export function DealDetail() {
               placeholder="Search owner…"
             />
           </EditableRow>
+          {deal.additionalOwners && deal.additionalOwners.length > 0 && (
+            <Row label="Additional Owners" value={deal.additionalOwners.map((o) => o.fullName).join(', ')} />
+          )}
           <EditableRow
             label="Company"
             value={deal.account ? (

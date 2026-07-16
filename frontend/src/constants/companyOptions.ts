@@ -5,3 +5,11 @@ export const INDUSTRIES = [
   'Telecommunications', 'Media & Entertainment', 'Transportation & Logistics', 'Construction', 'Energy',
   'Agriculture', 'Government', 'Non-profit', 'Consulting', 'Other',
 ];
+
+export const REVENUE_BANDS: { value: 'LT_1CR' | 'CR_1_10' | 'CR_10_50' | 'CR_50_100' | 'CR_100_PLUS'; label: string }[] = [
+  { value: 'LT_1CR', label: '< ₹1 Cr' },
+  { value: 'CR_1_10', label: '₹1-10 Cr' },
+  { value: 'CR_10_50', label: '₹10-50 Cr' },
+  { value: 'CR_50_100', label: '₹50-100 Cr' },
+  { value: 'CR_100_PLUS', label: '₹100 Cr+' },
+];

@@ -16,7 +16,7 @@ import {
   stripPhoneDigits, formatPhoneDisplay, isValidPhone, PHONE_ERROR_MESSAGE,
   stripEmailInput, isValidEmail, EMAIL_ERROR_MESSAGE,
 } from '../utils/validation';
-import { COMPANY_SIZES, INDUSTRIES } from '../constants/companyOptions';
+import { COMPANY_SIZES, INDUSTRIES, REVENUE_BANDS } from '../constants/companyOptions';
 
 const toOptions = (values: string[]): SearchSelectOption[] => values.map((v) => ({ value: v, label: v }));
 
@@ -256,7 +256,11 @@ export function CompanyForm({
                 />
               </div>
               <div className="field"><label>Annual revenue</label>
-                <input type="number" min="0" value={form.annualRevenue} onChange={(e) => set('annualRevenue', e.target.value)} /></div>
+                <select value={form.annualRevenue} onChange={(e) => set('annualRevenue', e.target.value)}>
+                  <option value="">—</option>
+                  {REVENUE_BANDS.map((b) => <option key={b.value} value={b.value}>{b.label}</option>)}
+                </select>
+              </div>
               <div className="field"><label>Lifecycle Stage</label>
                 <SearchSelect
                   options={stageOptions}

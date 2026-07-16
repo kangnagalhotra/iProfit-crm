@@ -1,11 +1,13 @@
 import { supabase } from '../lib/supabase';
 import type { DealPriority, Opportunity, Paginated } from './types';
 import { listStageHistory } from './dealStageHistory';
+import { setOpportunityAdditionalOwners } from './additionalOwners';
 
 const SELECT = `*, pipeline:pipelines(id, name), stage:deal_stages(*), owner:profiles(id, full_name),
   account:accounts!opportunities_account_id_fkey(id, name, stage:account_stages(name, color)), lead:leads(id, first_name, last_name, email),
   contact:contacts(id, first_name, last_name, email),
-  partner_account:accounts!opportunities_partner_account_id_fkey(id, name)`;
+  partner_account:accounts!opportunities_partner_account_id_fkey(id, name),
+  additionalOwnersRows:opportunity_additional_owners(user:profiles(id, full_name))`;
 
 const SORT_COLUMN: Record<string, string> = {
   name: 'name', amount: 'amount', closeDate: 'close_date', updatedAt: 'updated_at', createdAt: 'created_at', score: 'score',
@@ -46,6 +48,9 @@ function mapDeal(row: any): Opportunity {
       isClosedWon: row.stage.is_closed_won, isClosedLost: row.stage.is_closed_lost,
     },
     owner: row.owner ? { id: row.owner.id, fullName: row.owner.full_name } : undefined,
+    additionalOwners: (row.additionalOwnersRows ?? [])
+      .filter((r: any) => r.user)
+      .map((r: any) => ({ id: r.user.id, fullName: r.user.full_name })),
     account: row.account ? {
       id: row.account.id, name: row.account.name,
       stage: row.account.stage ? { name: row.account.stage.name, color: row.account.stage.color } : undefined,
@@ -160,9 +165,12 @@ export async function createDeal(input: Record<string, any>): Promise<Opportunit
   });
   row.pipeline_id = pipeline.id;
 
-  const { data, error } = await supabase.from('opportunities').insert(row).select(SELECT).single();
+  const { data, error } = await supabase.from('opportunities').insert(row).select('id').single();
   if (error) throw new Error(error.message);
-  return mapDeal(data);
+
+  if (rest.additionalOwnerIds) await setOpportunityAdditionalOwners(data.id, rest.additionalOwnerIds);
+
+  return getDeal(data.id);
 }
 
 export async function updateDeal(id: string, input: Record<string, any>): Promise<Opportunity> {
@@ -173,9 +181,12 @@ export async function updateDeal(id: string, input: Record<string, any>): Promis
     accountId = await resolveCompany(companyName, current?.owner_id);
   }
   const row = toRow({ ...rest, accountId });
-  const { data, error } = await supabase.from('opportunities').update(row).eq('id', id).select(SELECT).single();
+  const { error } = await supabase.from('opportunities').update(row).eq('id', id);
   if (error) throw new Error(error.message);
-  return mapDeal(data);
+
+  if (rest.additionalOwnerIds) await setOpportunityAdditionalOwners(id, rest.additionalOwnerIds);
+
+  return getDeal(id);
 }
 
 export async function deleteDeal(id: string): Promise<void> {

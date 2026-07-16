@@ -24,12 +24,13 @@ create extension if not exists pg_cron;
 
 create type role as enum ('ADMIN', 'SALES_MANAGER', 'SALES_REP');
 
-create type lead_source as enum (
-  'IMPORT', 'OUTREACH', 'EMAIL', 'CAMPAIGN', 'REFERRAL', 'WEBSITE',
-  'SOCIAL_MEDIA', 'EVENT', 'PARTNER', 'OTHER', 'COLD_CALL', 'ADVERTISEMENT'
-);
+-- Lead Source used to be a fixed enum here; it's now the admin-configurable
+-- lead_source_options table (see below), so leads.source_id is a plain FK.
 
 create type lead_rating as enum ('HOT', 'WARM', 'COLD');
+
+-- Annual Revenue band, replacing a free numeric input (Group 1 / A5).
+create type revenue_band as enum ('LT_1CR', 'CR_1_10', 'CR_10_50', 'CR_50_100', 'CR_100_PLUS');
 
 create type lead_unqualified_reason as enum (
   'NO_BUDGET', 'NOT_A_FIT', 'NO_RESPONSE', 'COMPETITOR', 'BAD_DATA'
@@ -155,7 +156,7 @@ create table accounts (
   domain_normalized text generated always as (normalize_domain(domain)) stored,
   industry varchar(120),
   size_bucket varchar(40),
-  annual_revenue numeric(15, 2) check (annual_revenue is null or annual_revenue >= 0),
+  annual_revenue revenue_band,
   city varchar(120),
   state varchar(120),
   country varchar(120),
@@ -199,6 +200,17 @@ create table lead_stages (
 );
 create index lead_stages_order_idx on lead_stages("order");
 
+-- Admin-configurable Lead Source list (Group 1 / A1) — mirrors the stages
+-- tables' pattern (a real table + CRUD) instead of a fixed enum, so admins
+-- can add/rename/reorder/retire values without a code change.
+create table lead_source_options (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  "order" int not null,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
 create table leads (
   id uuid primary key default gen_random_uuid(),
   lead_name varchar(200),
@@ -210,11 +222,13 @@ create table leads (
   mobile varchar(40) check (mobile is null or mobile ~ '^\+?[0-9]{10}$'),
   job_title varchar(150),
   linkedin_url varchar(500) check (linkedin_url is null or linkedin_url ~* '^https?://([a-z]{2,3}\.)?linkedin\.com/.*$'),
+  instagram_url varchar(500),
+  twitter_url varchar(500),
   city varchar(120),
   value numeric(15, 2) check (value is null or value >= 0),
   notes text,
   stage_id uuid not null references lead_stages(id) on delete restrict,
-  source lead_source not null default 'OTHER',
+  source_id uuid not null references lead_source_options(id),
   source_details varchar(255),
   score int not null default 0 check (score between 0 and 100),
   rating lead_rating,
@@ -267,6 +281,9 @@ create table contacts (
   mobile varchar(40) check (mobile is null or mobile ~ '^\+?[0-9]{10}$'),
   job_title varchar(150), -- shown as "Designation" in the Contacts UI
   department varchar(120),
+  linkedin_url varchar(500),
+  instagram_url varchar(500),
+  twitter_url varchar(500),
   notes text,
   -- Every Contact belongs to exactly one Company and has an internal owner —
   -- enforced here, not just in the UI. lead_id is legacy (superseded by the
@@ -408,6 +425,39 @@ create table deal_contacts (
 );
 create index deal_contacts_opportunity_id_idx on deal_contacts(opportunity_id);
 create index deal_contacts_contact_id_idx on deal_contacts(contact_id);
+
+-- Additive co-owners (Group 1 / A3). The single owner_id column on leads/
+-- opportunities is UNCHANGED and stays the only thing RLS gates on — these
+-- tables are purely additive/display, for "who else is working this deal".
+create table lead_additional_owners (
+  lead_id uuid not null references leads(id) on delete cascade,
+  user_id uuid not null references profiles(id) on delete cascade,
+  primary key (lead_id, user_id)
+);
+
+create table opportunity_additional_owners (
+  opportunity_id uuid not null references opportunities(id) on delete cascade,
+  user_id uuid not null references profiles(id) on delete cascade,
+  primary key (opportunity_id, user_id)
+);
+
+-- Socials (Group 1 / A4): LinkedIn/Instagram/Twitter live as named columns
+-- on leads/contacts directly; anything beyond those three platforms goes
+-- here as a repeatable platform+url row.
+create table social_links (
+  id uuid primary key default gen_random_uuid(),
+  lead_id uuid references leads(id) on delete cascade,
+  contact_id uuid references contacts(id) on delete cascade,
+  platform text not null,
+  url text not null,
+  "order" int not null default 1,
+  created_at timestamptz not null default now(),
+  constraint social_links_exactly_one_parent check (
+    (lead_id is not null and contact_id is null) or (lead_id is null and contact_id is not null)
+  )
+);
+create index social_links_lead_id_idx on social_links(lead_id);
+create index social_links_contact_id_idx on social_links(contact_id);
 
 -- Single product catalog (one list, not forked per sector — see
 -- product_sector above). Line items below may optionally link to a catalog

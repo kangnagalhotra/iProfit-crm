@@ -81,6 +81,15 @@ create policy "pipelines_write_admin" on pipelines for all to authenticated
   using (get_my_role() = 'ADMIN') with check (get_my_role() = 'ADMIN');
 
 -- ---------------------------------------------------------------------------
+-- LEAD SOURCE OPTIONS (Group 1 / A1) — same shape as the stages tables above.
+-- ---------------------------------------------------------------------------
+
+alter table lead_source_options enable row level security;
+create policy "lead_source_options_select" on lead_source_options for select to authenticated using (true);
+create policy "lead_source_options_write" on lead_source_options for all to authenticated
+  using (is_manager_or_admin()) with check (is_manager_or_admin());
+
+-- ---------------------------------------------------------------------------
 -- LEADS
 -- SALES_REP: sees/edits only rows they own; cannot reassign (WITH CHECK keeps
 -- owner_id pinned to themselves on UPDATE); cannot DELETE at all (old
@@ -159,6 +168,52 @@ create policy "lead_contacts_insert" on lead_contacts for insert to authenticate
 
 create policy "lead_contacts_delete" on lead_contacts for delete to authenticated
   using (exists (select 1 from leads l where l.id = lead_contacts.lead_id and (is_manager_or_admin() or l.owner_id = auth.uid())));
+
+-- ---------------------------------------------------------------------------
+-- LEAD / OPPORTUNITY ADDITIONAL OWNERS (Group 1 / A3) — inherit visibility
+-- from the parent row, same shape as lead_contacts above. Purely additive:
+-- the parent's own owner_id = auth.uid() policies are untouched.
+-- ---------------------------------------------------------------------------
+
+alter table lead_additional_owners enable row level security;
+alter table opportunity_additional_owners enable row level security;
+
+create policy "lead_additional_owners_select" on lead_additional_owners for select to authenticated
+  using (exists (select 1 from leads l where l.id = lead_additional_owners.lead_id and (is_manager_or_admin() or l.owner_id = auth.uid())));
+
+create policy "lead_additional_owners_write" on lead_additional_owners for all to authenticated
+  using (exists (select 1 from leads l where l.id = lead_additional_owners.lead_id and (is_manager_or_admin() or l.owner_id = auth.uid())))
+  with check (exists (select 1 from leads l where l.id = lead_additional_owners.lead_id and (is_manager_or_admin() or l.owner_id = auth.uid())));
+
+create policy "opportunity_additional_owners_select" on opportunity_additional_owners for select to authenticated
+  using (exists (select 1 from opportunities o where o.id = opportunity_additional_owners.opportunity_id and (is_manager_or_admin() or o.owner_id = auth.uid())));
+
+create policy "opportunity_additional_owners_write" on opportunity_additional_owners for all to authenticated
+  using (exists (select 1 from opportunities o where o.id = opportunity_additional_owners.opportunity_id and (is_manager_or_admin() or o.owner_id = auth.uid())))
+  with check (exists (select 1 from opportunities o where o.id = opportunity_additional_owners.opportunity_id and (is_manager_or_admin() or o.owner_id = auth.uid())));
+
+-- ---------------------------------------------------------------------------
+-- SOCIAL LINKS (Group 1 / A4) — inherits visibility from whichever parent
+-- (lead or contact) the row belongs to.
+-- ---------------------------------------------------------------------------
+
+alter table social_links enable row level security;
+
+create policy "social_links_select" on social_links for select to authenticated
+  using (
+    (lead_id is not null and exists (select 1 from leads l where l.id = social_links.lead_id and (is_manager_or_admin() or l.owner_id = auth.uid())))
+    or (contact_id is not null and exists (select 1 from contacts c where c.id = social_links.contact_id and (is_manager_or_admin() or c.owner_id = auth.uid())))
+  );
+
+create policy "social_links_write" on social_links for all to authenticated
+  using (
+    (lead_id is not null and exists (select 1 from leads l where l.id = social_links.lead_id and (is_manager_or_admin() or l.owner_id = auth.uid())))
+    or (contact_id is not null and exists (select 1 from contacts c where c.id = social_links.contact_id and (is_manager_or_admin() or c.owner_id = auth.uid())))
+  )
+  with check (
+    (lead_id is not null and exists (select 1 from leads l where l.id = social_links.lead_id and (is_manager_or_admin() or l.owner_id = auth.uid())))
+    or (contact_id is not null and exists (select 1 from contacts c where c.id = social_links.contact_id and (is_manager_or_admin() or c.owner_id = auth.uid())))
+  );
 
 -- ---------------------------------------------------------------------------
 -- PRODUCTS — single catalog, readable by anyone authenticated, writable only
