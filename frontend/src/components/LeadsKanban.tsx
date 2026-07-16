@@ -13,6 +13,7 @@ import { SkeletonKanban } from './Skeleton';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
+import { isMqlReady, BANT_WARNING_MESSAGE } from '../utils/leadQualification';
 
 async function loadAllLeads(): Promise<Lead[]> {
   let page = 1;
@@ -62,20 +63,25 @@ export function LeadsKanban() {
       .finally(() => setLoading(false));
   }, []);
 
-  const handleDrop = useCallback((leadId: string, _from: string, toStageId: string) => {
-    const prev = leads;
+  const handleDrop = useCallback(async (leadId: string, _from: string, toStageId: string) => {
     const prevLead = leads.find((l) => l.id === leadId);
     const newStage = stages.find((s) => s.id === toStageId)!;
+    const movingToQualified = newStage.isWon && prevLead && !prevLead.stage.isWon;
+    if (movingToQualified && !isMqlReady(prevLead!)) {
+      const ok = await confirm(BANT_WARNING_MESSAGE, { title: 'BANT/ICP not completed' });
+      if (!ok) return;
+    }
+    const prev = leads;
     setLeads((ls) => ls.map((l) => (l.id === leadId ? { ...l, stage: newStage } : l)));
     setError('');
     updateLead(leadId, { stageId: toStageId }).then((updated) => {
       setLeads((ls) => ls.map((l) => (l.id === leadId ? updated : l)));
-      if (newStage.isWon && prevLead && !prevLead.stage.isWon) setQualifiedPromptLead(updated);
+      if (movingToQualified) setQualifiedPromptLead(updated);
     }).catch((e) => {
       setLeads(prev); // revert optimistic move
       setError(e.message ?? 'Could not update lead stage');
     });
-  }, [leads, stages]);
+  }, [leads, stages, confirm]);
 
   async function handleDelete(lead: Lead) {
     const name = lead.leadName || [lead.firstName, lead.lastName].filter(Boolean).join(' ') || lead.email || 'this lead';

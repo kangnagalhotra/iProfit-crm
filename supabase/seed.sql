@@ -32,8 +32,8 @@ from pipelines p,
   (values
     ('Discovery',     1, '#025ADF', true,  20,  false, false),
     ('SQL',           2, '#F97316', false, 60,  false, false),
-    ('Proposal Sent', 3, '#F97316', false, 65,  false, false),
-    ('Product Demo',  4, '#8B5CF6', false, 70,  false, false),
+    ('Product Demo',  3, '#8B5CF6', false, 65,  false, false),
+    ('Proposal Sent', 4, '#F97316', false, 70,  false, false),
     ('Negotiation',   5, '#F97316', false, 80,  false, false),
     ('Closed Lost',   6, '#DC2626', false, 0,   false, true),
     ('Closed Won',    7, '#16A34A', false, 100, true,  false)

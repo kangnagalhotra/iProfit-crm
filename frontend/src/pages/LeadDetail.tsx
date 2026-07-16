@@ -32,6 +32,7 @@ import { useConfirm } from '../context/ConfirmContext';
 import { useAuth } from '../context/AuthContext';
 import { timeAgo } from '../utils/timeAgo';
 import { evaluateLeadAutomation } from '../utils/leadAutomation';
+import { isMqlReady, BANT_WARNING_MESSAGE } from '../utils/leadQualification';
 import { useRecordRecentlyViewed } from '../hooks/useRecentlyViewed';
 
 const RATING_LABELS: Record<string, string> = { HOT: 'Hot', WARM: 'Warm', COLD: 'Cold' };
@@ -168,8 +169,13 @@ export function LeadDetail() {
   async function onInlineStageChange(newStageId: string) {
     const prevStage = lead!.stage;
     const newStage = stages.find((s) => s.id === newStageId);
+    const movingToQualified = newStage?.isWon && !prevStage.isWon;
+    if (movingToQualified && !isMqlReady(lead!)) {
+      const ok = await confirm(BANT_WARNING_MESSAGE, { title: 'BANT/ICP not completed' });
+      if (!ok) return;
+    }
     await saveField({ stageId: newStageId });
-    if (newStage?.isWon && !prevStage.isWon) setShowQualifiedPrompt(true);
+    if (movingToQualified) setShowQualifiedPrompt(true);
   }
 
   function copyEmail() {

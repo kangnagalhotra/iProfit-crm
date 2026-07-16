@@ -26,8 +26,10 @@ import { FileUploadList } from './FileUploadList';
 import type { PendingOrUploadedFile } from './FileUploadList';
 import { ConvertToDealModal } from './ConvertToDealModal';
 import { useAuth } from '../context/AuthContext';
+import { useConfirm } from '../context/ConfirmContext';
 import { COUNTRIES } from '../constants/countries';
 import { INDUSTRIES, COMPANY_SIZES, REVENUE_BANDS } from '../constants/companyOptions';
+import { isMqlReady, BANT_WARNING_MESSAGE } from '../utils/leadQualification';
 import {
   stripPhoneDigits, formatPhoneDisplay, isValidPhone, PHONE_ERROR_MESSAGE,
   stripEmailInput, isValidEmail, EMAIL_ERROR_MESSAGE,
@@ -133,6 +135,7 @@ export function LeadForm({
   onSaved: (lead: Lead) => void;
 }) {
   const { user: currentUser } = useAuth();
+  const confirm = useConfirm();
   const isEdit = !!lead;
   const [form, setForm] = useState<LeadFormState>(() => initialState(lead, defaultStageId));
   const [expanded, setExpanded] = useState(isEdit);
@@ -243,11 +246,16 @@ export function LeadForm({
     if (accounts.some((a) => a.id === v)) { set('accountId', v); set('companyName', ''); } else { set('accountId', ''); set('companyName', v); }
   }
 
-  function onStageChange(newStageId: string) {
+  async function onStageChange(newStageId: string) {
     const prevStage = stages.find((s) => s.id === form.stageId);
     const newStage = stages.find((s) => s.id === newStageId);
+    const movingToQualified = newStage?.isWon && !prevStage?.isWon;
+    if (movingToQualified && !isMqlReady(lead ?? ({} as Lead))) {
+      const ok = await confirm(BANT_WARNING_MESSAGE, { title: 'BANT/ICP not completed' });
+      if (!ok) return;
+    }
     set('stageId', newStageId);
-    if (newStage?.isWon && !prevStage?.isWon) setShowQualifiedPrompt(true);
+    if (movingToQualified) setShowQualifiedPrompt(true);
   }
 
   function validateForm(): boolean {

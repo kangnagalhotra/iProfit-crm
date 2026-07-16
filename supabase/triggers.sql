@@ -444,18 +444,12 @@ create trigger opportunities_create_project_upd
 -- it can't be bypassed by going around the UI.
 -- ---------------------------------------------------------------------------
 
+-- BANT/ICP completeness is a soft warning, not a hard block (Group 4 / E2 —
+-- see phase-n-bant-optional-patch.sql). The trigger stays attached (so
+-- there's one place to re-tighten this later if wanted) but no longer
+-- raises — the frontend shows a dismissible confirm instead.
 create function guard_lead_qualification() returns trigger as $$
-declare
-  entering_won boolean;
-  was_won boolean;
 begin
-  select is_won into entering_won from lead_stages where id = new.stage_id;
-  select is_won into was_won from lead_stages where id = old.stage_id;
-  if coalesce(entering_won, false) and not coalesce(was_won, false) then
-    if not coalesce(new.icp_match, false) or new.budget_score is null or new.authority_score is null then
-      raise exception 'Cannot mark this lead Qualified — ICP Match, Budget, and Authority must be confirmed first (MQL validation).';
-    end if;
-  end if;
   return new;
 end;
 $$ language plpgsql;
