@@ -504,6 +504,20 @@ create policy "tasks_delete" on tasks for delete to authenticated
   using (is_manager_or_admin() or assignee_id = auth.uid());
 
 -- ---------------------------------------------------------------------------
+-- TASK CHECKLIST ITEMS (Group 6 / G3) — inherit visibility from the parent
+-- task, same shape as lead_contacts inheriting from leads.
+-- ---------------------------------------------------------------------------
+
+alter table task_checklist_items enable row level security;
+
+create policy "task_checklist_items_select" on task_checklist_items for select to authenticated
+  using (exists (select 1 from tasks t where t.id = task_checklist_items.task_id and (is_manager_or_admin() or t.assignee_id = auth.uid())));
+
+create policy "task_checklist_items_write" on task_checklist_items for all to authenticated
+  using (exists (select 1 from tasks t where t.id = task_checklist_items.task_id and (is_manager_or_admin() or t.assignee_id = auth.uid())))
+  with check (exists (select 1 from tasks t where t.id = task_checklist_items.task_id and (is_manager_or_admin() or t.assignee_id = auth.uid())));
+
+-- ---------------------------------------------------------------------------
 -- ACTIVITIES (notes, calls, emails, meetings, field-update log)
 -- Visibility inherits from whichever parent record (lead/account/
 -- opportunity/task) the activity is linked to — mirrors assertAccess().

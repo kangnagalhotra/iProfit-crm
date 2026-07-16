@@ -309,6 +309,8 @@ export type TaskType = 'TODO' | 'CALL' | 'EMAIL' | 'FOLLOW_UP' | 'MEETING';
 export type TaskStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'WAITING' | 'COMPLETED' | 'CANCELLED';
 export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 
+export interface ChecklistItem { id: string; title: string; isDone: boolean; order: number; }
+
 export interface Task {
   id: string;
   title: string;
@@ -318,6 +320,9 @@ export interface Task {
   dueAt: string;
   notes?: string;
   reminderAt?: string;
+  // Sub-tasks (checklist-style) — own assignee/due date, just a rollup
+  // checklist under this task. Populated by listTasks/getTask.
+  checklist?: ChecklistItem[];
   assignee?: { id: string; fullName: string };
   lead?: { id: string; firstName?: string; lastName?: string; email?: string; mobile?: string };
   account?: { id: string; name: string; phone?: string; email?: string };

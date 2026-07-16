@@ -88,6 +88,11 @@ export function MyActionsPanel({ onChanged }: { onChanged: () => void }) {
               </>
             )}
             <span className="my-action-title"> — {task.title}</span>
+            {task.checklist && task.checklist.length > 0 && (
+              <span className="chip" style={{ marginLeft: 6 }}>
+                {task.checklist.filter((c) => c.isDone).length}/{task.checklist.length} done
+              </span>
+            )}
           </span>
           <span className={`chip ${tone === 'overdue' ? '' : ''}`} style={tone === 'overdue'
             ? { background: '#DC262622', color: '#DC2626' }

@@ -8,6 +8,7 @@ import { TASK_TYPE_LABELS } from '../utils/taskTypeLabels';
 import { listLeads } from '../api/leads';
 import { listAccounts } from '../api/accounts';
 import { listDeals } from '../api/deals';
+import { ChecklistEditor } from './ChecklistEditor';
 
 const TASK_TYPES: TaskType[] = ['TODO', 'CALL', 'EMAIL', 'FOLLOW_UP', 'MEETING'];
 const PRIORITIES: TaskPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
@@ -204,6 +205,10 @@ export function TaskForm({
           <textarea rows={3} value={form.notes} onChange={(e) => set('notes', e.target.value)}
             style={{ width: '100%', padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 6, fontSize: 14, fontFamily: 'inherit' }} />
         </div>
+
+        {isEdit
+          ? <ChecklistEditor taskId={task!.id} />
+          : <div className="helper-text">Save the task to start adding sub-tasks.</div>}
 
         {error && <div className="error">{error}</div>}
         <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>

@@ -4,7 +4,8 @@ import type {
 } from './types';
 
 const SELECT = `*, assignee:profiles(id, full_name), lead:leads(id, first_name, last_name, email, mobile),
-  account:accounts(id, name, phone, email), opportunity:opportunities(id, name, contact:contacts(id, first_name, last_name, email, mobile))`;
+  account:accounts(id, name, phone, email), opportunity:opportunities(id, name, contact:contacts(id, first_name, last_name, email, mobile)),
+  checklistRows:task_checklist_items(id, title, is_done, order)`;
 
 const SORT_COLUMN: Record<string, string> = {
   title: 'title', dueAt: 'due_at', priority: 'priority', status: 'status', createdAt: 'created_at', updatedAt: 'updated_at',
@@ -22,6 +23,12 @@ function mapTask(row: any): Task {
     dueAt: row.due_at,
     notes: row.notes ?? undefined,
     reminderAt: row.reminder_at ?? undefined,
+    checklist: (row.checklistRows ?? [])
+      .slice()
+      .sort((a: any, b: any) => a.order - b.order)
+      .map((c: any) => ({
+        id: c.id, title: c.title, isDone: c.is_done, order: c.order,
+      })),
     assignee: row.assignee ? { id: row.assignee.id, fullName: row.assignee.full_name } : undefined,
     lead: row.lead ? {
       id: row.lead.id,

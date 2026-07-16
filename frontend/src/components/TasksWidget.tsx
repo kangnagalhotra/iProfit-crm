@@ -4,6 +4,7 @@ import type { Task, TaskPriority, TaskStatus } from '../api/types';
 import {
   listTasksFor, completeTask, updateTask, deleteTask as deleteTaskApi,
 } from '../api/tasks';
+import { toggleChecklistItem } from '../api/taskChecklist';
 import { TaskForm } from './TaskForm';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
@@ -25,6 +26,7 @@ export function TasksWidget({
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   function load() {
     setLoading(true);
@@ -61,6 +63,17 @@ export function TasksWidget({
     }
   }
 
+  async function toggleSubtask(task: Task, itemId: string, isDone: boolean) {
+    try {
+      const updated = await toggleChecklistItem(itemId, isDone);
+      setTasks((ts) => ts.map((t) => (t.id === task.id
+        ? { ...t, checklist: t.checklist?.map((c) => (c.id === itemId ? updated : c)) }
+        : t)));
+    } catch (e: any) {
+      toast.error(e.message ?? 'Could not update sub-task');
+    }
+  }
+
   return (
     <div className="card" id="tasks-section">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -87,8 +100,30 @@ export function TasksWidget({
               </span>
               {TASK_TYPE_LABELS[task.type]} · Due {new Date(task.dueAt).toLocaleDateString()}
               {task.assignee && ` · ${task.assignee.fullName}`}
+              {task.checklist && task.checklist.length > 0 && (
+                <button
+                  type="button"
+                  className="chip"
+                  style={{ marginLeft: 6, border: 'none', cursor: 'pointer' }}
+                  onClick={() => setExpandedId((id) => (id === task.id ? null : task.id))}
+                >
+                  {task.checklist.filter((c) => c.isDone).length}/{task.checklist.length} done
+                </button>
+              )}
             </div>
             {task.notes && <div className="task-card-notes">{task.notes}</div>}
+            {expandedId === task.id && task.checklist && (
+              <div style={{ margin: '6px 0' }}>
+                {task.checklist.map((item) => (
+                  <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                    <input type="checkbox" checked={item.isDone} onChange={(e) => toggleSubtask(task, item.id, e.target.checked)} />
+                    <span style={{ textDecoration: item.isDone ? 'line-through' : undefined, color: item.isDone ? 'var(--muted)' : undefined }}>
+                      {item.title}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="task-card-footer">
               <select
                 className="task-status-select"

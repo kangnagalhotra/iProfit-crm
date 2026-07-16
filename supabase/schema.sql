@@ -610,6 +610,19 @@ create index tasks_status_idx on tasks(status);
 create trigger tasks_set_updated_at before update on tasks
   for each row execute function set_updated_at();
 
+-- Sub-tasks (checklist-style, Group 6 / G3) — lightweight checklist items
+-- under a task, not full nested tasks (no assignee/due date/reminder of
+-- their own; those stay on the parent task).
+create table task_checklist_items (
+  id uuid primary key default gen_random_uuid(),
+  task_id uuid not null references tasks(id) on delete cascade,
+  title text not null,
+  is_done boolean not null default false,
+  "order" int not null default 1,
+  created_at timestamptz not null default now()
+);
+create index task_checklist_items_task_id_idx on task_checklist_items(task_id);
+
 -- ---------------------------------------------------------------------------
 -- ACTIVITIES (notes, calls, emails, meetings, field-update log)
 -- ---------------------------------------------------------------------------
