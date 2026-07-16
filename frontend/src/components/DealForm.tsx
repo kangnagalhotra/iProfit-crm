@@ -50,7 +50,7 @@ interface DealFormState {
   dealType: DealType;
   priority: DealPriority;
   source: string;
-  additionalContacts: { contactId: string; role: import('../api/types').DealContactRole }[];
+  additionalContacts: { contactId: string; role: import('../api/types').DealContactRole; roleOther?: string }[];
   partnerAccountId: string;
   nextStep: string;
   nextActivityDate: string;
@@ -143,7 +143,7 @@ export function DealForm({
     });
     Promise.all([listDealContacts(deal.id), listLineItems(deal.id), listAttachments(deal.id)]).then(
       ([dealContacts, lineItems, files]) => {
-        set('additionalContacts', dealContacts.map((dc) => ({ contactId: dc.contactId, role: dc.role })));
+        set('additionalContacts', dealContacts.map((dc) => ({ contactId: dc.contactId, role: dc.role, roleOther: dc.roleOther })));
         set('lineItems', lineItems);
         if (lineItems.length > 0) setAmountTouched(true);
         setAttachments(files.map((f) => ({ kind: 'uploaded', id: f.id, fileName: f.fileName, fileSize: f.fileSize })));

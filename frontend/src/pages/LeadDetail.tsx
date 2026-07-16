@@ -21,6 +21,7 @@ import { ScheduleMeetingModal } from '../components/ScheduleMeetingModal';
 import { LeadQualificationCard } from '../components/LeadQualificationCard';
 import { ConvertToDealModal } from '../components/ConvertToDealModal';
 import { LinkContactsModal } from '../components/LinkContactsModal';
+import { SelectWithOther } from '../components/SelectWithOther';
 import { Icon } from '../components/Icon';
 import { CollapsibleCard } from '../components/CollapsibleCard';
 import { AssociationsPanel } from '../components/AssociationsPanel';
@@ -35,8 +36,25 @@ import { useRecordRecentlyViewed } from '../hooks/useRecentlyViewed';
 
 const RATING_LABELS: Record<string, string> = { HOT: 'Hot', WARM: 'Warm', COLD: 'Cold' };
 const UNQUALIFIED_REASON_LABELS: Record<string, string> = {
-  NO_BUDGET: 'No Budget', NOT_A_FIT: 'Not a Fit', NO_RESPONSE: 'No Response', COMPETITOR: 'Competitor', BAD_DATA: 'Bad Data',
+  NO_BUDGET: 'No Budget', NOT_A_FIT: 'Not a Fit', NO_RESPONSE: 'No Response', COMPETITOR: 'Competitor', BAD_DATA: 'Bad Data', OTHER: 'Other',
 };
+const CONTACT_ROLE_OPTIONS = ['DECISION_MAKER', 'CHAMPION', 'INFLUENCER', 'BLOCKER', 'OTHER'].map((r) => ({ value: r, label: r.replace('_', ' ') }));
+
+function LeadContactRoleCell({ contact, onSave }: { contact: LeadContact; onSave: (role: DealContactRole, roleOther?: string) => void }) {
+  const [roleOther, setRoleOther] = useState(contact.roleOther ?? '');
+  return (
+    <div onClick={(e) => e.stopPropagation()}>
+      <SelectWithOther
+        options={CONTACT_ROLE_OPTIONS}
+        value={contact.role}
+        onChange={(v) => onSave(v as DealContactRole, roleOther)}
+        otherValue={roleOther}
+        onOtherChange={setRoleOther}
+        onOtherBlur={(v) => onSave('OTHER', v)}
+      />
+    </div>
+  );
+}
 
 function initials(lead: Lead) {
   const parts = [lead.firstName, lead.lastName].filter(Boolean) as string[];
@@ -375,7 +393,12 @@ export function LeadDetail() {
           <Row label="Lead Source" value={lead.source?.name} onEmptyClick={canEdit ? () => setShowEditModal(true) : undefined} />
           <Row label="Rating" value={lead.rating ? RATING_LABELS[lead.rating] : undefined} onEmptyClick={canEdit ? () => setShowEditModal(true) : undefined} />
           {lead.unqualifiedReason && (
-            <Row label="Unqualified Reason" value={UNQUALIFIED_REASON_LABELS[lead.unqualifiedReason]} />
+            <Row
+              label="Unqualified Reason"
+              value={lead.unqualifiedReason === 'OTHER' && lead.unqualifiedReasonOther
+                ? `Other — ${lead.unqualifiedReasonOther}`
+                : UNQUALIFIED_REASON_LABELS[lead.unqualifiedReason]}
+            />
           )}
           <EditableRow
             label="Lead Value"
@@ -479,20 +502,14 @@ export function LeadDetail() {
               {
                 header: 'Role',
                 render: (c: LeadContact) => (
-                  <select
-                    value={c.role}
-                    onClick={(e) => e.stopPropagation()}
-                    onChange={(e) => {
-                      const role = e.target.value as DealContactRole;
-                      setLeadContactRole(lead!.id, c.id, role)
+                  <LeadContactRoleCell
+                    contact={c}
+                    onSave={(role, roleOther) => {
+                      setLeadContactRole(lead!.id, c.id, role, roleOther)
                         .then(() => { loadContacts(); toast.success('Contact role updated'); })
                         .catch((err) => toast.error(err.message ?? 'Could not update role'));
                     }}
-                  >
-                    {(['DECISION_MAKER', 'CHAMPION', 'INFLUENCER', 'BLOCKER', 'OTHER'] as DealContactRole[]).map((r) => (
-                      <option key={r} value={r}>{r.replace('_', ' ')}</option>
-                    ))}
-                  </select>
+                  />
                 ),
               },
             ],

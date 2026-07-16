@@ -15,6 +15,7 @@ import { listAttachments, uploadAttachment, deleteAttachment } from '../api/lead
 import { SearchSelect } from './SearchSelect';
 import type { SearchSelectOption } from './SearchSelect';
 import { MultiEntitySelect } from './MultiEntitySelect';
+import { SelectWithOther } from './SelectWithOther';
 import { SocialLinksEditor, validateSocialUrl } from './SocialLinksEditor';
 import type { OtherSocialLink } from './SocialLinksEditor';
 import { CreateUserModal } from './CreateUserModal';
@@ -40,6 +41,7 @@ const UNQUALIFIED_REASONS: { value: LeadUnqualifiedReason; label: string }[] = [
   { value: 'NO_RESPONSE', label: 'No Response' },
   { value: 'COMPETITOR', label: 'Competitor' },
   { value: 'BAD_DATA', label: 'Bad Data' },
+  { value: 'OTHER', label: 'Other' },
 ];
 const INDUSTRY_OPTIONS: SearchSelectOption[] = INDUSTRIES.map((v) => ({ value: v, label: v }));
 const SIZE_OPTIONS: SearchSelectOption[] = COMPANY_SIZES.map((v) => ({ value: v, label: v }));
@@ -79,6 +81,7 @@ interface LeadFormState {
   stageId: string;
   rating: LeadRating | '';
   unqualifiedReason: LeadUnqualifiedReason | '';
+  unqualifiedReasonOther: string;
   tags: string[];
   value: string;
   notes: string;
@@ -114,6 +117,7 @@ function initialState(lead?: Lead, defaultStageId?: string): LeadFormState {
     stageId: lead?.stage.id ?? defaultStageId ?? '',
     rating: lead?.rating ?? '',
     unqualifiedReason: lead?.unqualifiedReason ?? '',
+    unqualifiedReasonOther: lead?.unqualifiedReasonOther ?? '',
     tags: lead?.tags ?? [],
     value: lead?.value ?? '',
     notes: lead?.notes ?? '',
@@ -301,6 +305,7 @@ export function LeadForm({
       stageId: form.stageId || undefined,
       rating: form.rating || undefined,
       unqualifiedReason: selectedStage?.isLost ? (form.unqualifiedReason || undefined) : undefined,
+      unqualifiedReasonOther: selectedStage?.isLost ? (form.unqualifiedReasonOther || undefined) : undefined,
       tags: form.tags,
       value: form.value || undefined,
       notes: form.notes || undefined,
@@ -527,10 +532,13 @@ export function LeadForm({
                   </div>
                   {selectedStage?.isLost && (
                     <div className="field"><label>Unqualified reason*</label>
-                      <select value={form.unqualifiedReason} onChange={(e) => set('unqualifiedReason', e.target.value as LeadUnqualifiedReason | '')}>
-                        <option value="">—</option>
-                        {UNQUALIFIED_REASONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
-                      </select>
+                      <SelectWithOther
+                        options={UNQUALIFIED_REASONS}
+                        value={form.unqualifiedReason}
+                        onChange={(v) => set('unqualifiedReason', v as LeadUnqualifiedReason | '')}
+                        otherValue={form.unqualifiedReasonOther}
+                        onOtherChange={(v) => set('unqualifiedReasonOther', v)}
+                      />
                     </div>
                   )}
                 </div>

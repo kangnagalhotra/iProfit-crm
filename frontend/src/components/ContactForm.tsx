@@ -58,12 +58,20 @@ export function ContactForm({
   const [saving, setSaving] = useState(false);
   const [showCreateCompany, setShowCreateCompany] = useState(false);
   const [showCreateLead, setShowCreateLead] = useState(false);
+  // Company is auto-filled from the Lead/Deal this contact is being created
+  // from (see A6) but stays correctable via "Change company".
+  const [overrideCompany, setOverrideCompany] = useState(false);
 
   useEffect(() => {
     if (!isScoped) listAccounts({ pageSize: 100 }).then((res) => setAccounts(res.data));
     if (!isLeadScoped) listLeads({ pageSize: 100 }).then((res) => setLeads(res.data));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  function enableCompanyOverride() {
+    if (accounts.length === 0) listAccounts({ pageSize: 100 }).then((res) => setAccounts(res.data));
+    setOverrideCompany(true);
+  }
 
   function set<K extends keyof typeof form>(k: K, v: (typeof form)[K]) {
     setForm((f) => ({ ...f, [k]: v }));
@@ -143,7 +151,16 @@ export function ContactForm({
           onChangeOtherLinks={setOtherSocialLinks}
         />
         {socialError && <div className="error" style={{ margin: '4px 0 0' }}>{socialError}</div>}
-        {!isScoped && (
+        {isScoped && !overrideCompany && (
+          <div className="field">
+            <label>Company*</label>
+            <div className="helper-text" style={{ marginTop: 0 }}>
+              Auto-filled from this record.{' '}
+              <button type="button" className="link-btn" onClick={enableCompanyOverride}>Change company</button>
+            </div>
+          </div>
+        )}
+        {(!isScoped || overrideCompany) && (
           <div className="field"><label>Company*</label>
             <SearchSelect
               options={accountOptions}

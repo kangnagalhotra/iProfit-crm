@@ -46,6 +46,7 @@ function mapLead(row: any): Lead {
     score: row.score,
     rating: row.rating ?? undefined,
     unqualifiedReason: row.unqualified_reason ?? undefined,
+    unqualifiedReasonOther: row.unqualified_reason_other ?? undefined,
     tags: row.tags ?? [],
     owner: row.owner ? { id: row.owner.id, fullName: row.owner.full_name } : undefined,
     additionalOwners: (row.additionalOwnersRows ?? [])
@@ -247,7 +248,7 @@ export async function createLead(input: Record<string, any>): Promise<Lead> {
     job_title: rest.jobTitle, linkedin_url: rest.linkedinUrl, instagram_url: rest.instagramUrl,
     twitter_url: rest.twitterUrl, city: rest.city, value: rest.value, notes: rest.notes,
     source_id: rest.sourceId, source_details: rest.sourceDetails, score: rest.score, rating: rest.rating,
-    unqualified_reason: rest.unqualifiedReason, tags: rest.tags,
+    unqualified_reason: rest.unqualifiedReason, unqualified_reason_other: rest.unqualifiedReasonOther, tags: rest.tags,
     owner_id: ownerId, created_by: currentUser?.id, account_id: accountId, stage_id: stageId,
     lead_name: [rest.firstName, rest.lastName].filter(Boolean).join(' ') || undefined,
     last_activity_at: new Date().toISOString(),

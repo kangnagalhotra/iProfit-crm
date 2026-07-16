@@ -3,6 +3,7 @@ import type { Contact } from '../api/types';
 import { listContacts } from '../api/contacts';
 import { MultiEntitySelect } from './MultiEntitySelect';
 import type { SearchSelectOption } from './SearchSelect';
+import { ContactForm } from './ContactForm';
 
 function contactLabel(c: Contact) {
   return [c.firstName, c.lastName].filter(Boolean).join(' ') || c.email || 'Untitled contact';
@@ -25,6 +26,7 @@ export function LinkContactsModal({
   const [showAll, setShowAll] = useState(!accountId);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [showCreateContact, setShowCreateContact] = useState(false);
 
   useEffect(() => {
     listContacts({ pageSize: 200, accountId: showAll ? undefined : accountId }).then((res) => setContacts(res.data));
@@ -45,6 +47,7 @@ export function LinkContactsModal({
   }
 
   return (
+    <>
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h3 style={{ marginTop: 0 }}>Link contacts</h3>
@@ -55,7 +58,14 @@ export function LinkContactsModal({
           </label>
         )}
         <div className="field">
-          <MultiEntitySelect options={options} value={selected} onChange={setSelected} placeholder="Search contacts…" />
+          <MultiEntitySelect
+            options={options}
+            value={selected}
+            onChange={setSelected}
+            placeholder="Search contacts…"
+            onCreateNew={() => setShowCreateContact(true)}
+            createNewLabel="+ Add new contact"
+          />
         </div>
         {error && <div className="error">{error}</div>}
         <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
@@ -64,5 +74,18 @@ export function LinkContactsModal({
         </div>
       </div>
     </div>
+
+    {showCreateContact && (
+      <ContactForm
+        accountId={accountId}
+        onClose={() => setShowCreateContact(false)}
+        onSaved={(newContact) => {
+          setContacts((cs) => [newContact, ...cs]);
+          setSelected((ids) => (ids.includes(newContact.id) ? ids : [...ids, newContact.id]));
+          setShowCreateContact(false);
+        }}
+      />
+    )}
+    </>
   );
 }

@@ -10,7 +10,8 @@ import { listStages } from '../api/stages';
 import { listUsers } from '../api/users';
 import { listAccounts } from '../api/accounts';
 import { listContacts } from '../api/contacts';
-import { listDealContacts } from '../api/dealContacts';
+import { listDealContacts, replaceDealContacts } from '../api/dealContacts';
+import { LinkContactsModal } from '../components/LinkContactsModal';
 import { NotesSection } from '../components/NotesSection';
 import { TasksWidget } from '../components/TasksWidget';
 import { ActivityTimeline } from '../components/ActivityTimeline';
@@ -118,12 +119,18 @@ export function DealDetail() {
   const [forecastJustificationDraft, setForecastJustificationDraft] = useState('');
   const [moreOpen, setMoreOpen] = useState(false);
   const [activityKey, setActivityKey] = useState(0);
+  const [showLinkContacts, setShowLinkContacts] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
+
+  function loadDealContacts() {
+    if (!id) return;
+    listDealContacts(id).then(setDealContacts).catch(() => {});
+  }
 
   useEffect(() => {
     if (!id) return;
     getDeal(id).then(setDeal).catch(() => {});
-    listDealContacts(id).then(setDealContacts).catch(() => {});
+    loadDealContacts();
     Promise.all([
       listUsers(),
       listStages('deal_stages'),
@@ -135,6 +142,7 @@ export function DealDetail() {
       setAccounts(accountRes.data);
       setContacts(contactRes.data);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   useEffect(() => {
@@ -505,6 +513,9 @@ export function DealDetail() {
       />
 
       <CollapsibleCard title={`Contacts by Role (${dealContacts.length + (deal.contact ? 1 : 0)})`} storageKey="collapsible:deal:contacts-by-role">
+        <button className="btn secondary btn-icon" style={{ marginBottom: 12 }} onClick={() => setShowLinkContacts(true)}>
+          <Icon name="person" size={13} /> Link Contact
+        </button>
         {!deal.contact && dealContacts.length === 0 && (
           <p style={{ fontSize: 14, color: 'var(--muted)', marginTop: 0 }}>No contacts linked to this deal yet.</p>
         )}
@@ -585,6 +596,22 @@ export function DealDetail() {
             setShowScheduleMeeting(false);
             setActivityKey((k) => k + 1);
             toast.success('Meeting scheduled — invite downloaded');
+          }}
+        />
+      )}
+
+      {showLinkContacts && (
+        <LinkContactsModal
+          currentContactIds={dealContacts.map((dc) => dc.contactId)}
+          accountId={deal.account?.id}
+          onClose={() => setShowLinkContacts(false)}
+          onSave={async (contactIds) => {
+            const roleByContact = new Map(dealContacts.map((dc) => [dc.contactId, dc.role]));
+            await replaceDealContacts(deal.id, contactIds.map((contactId) => ({
+              contactId, role: roleByContact.get(contactId) ?? 'OTHER',
+            })));
+            loadDealContacts();
+            toast.success('Contacts updated');
           }}
         />
       )}

@@ -7,6 +7,7 @@ function mapDealContact(row: any): DealContact {
   return {
     contactId: row.contact_id,
     role: row.role,
+    roleOther: row.role_other ?? undefined,
     contact: row.contact ? {
       id: row.contact.id,
       firstName: row.contact.first_name ?? undefined,
@@ -24,13 +25,15 @@ export async function listDealContacts(opportunityId: string): Promise<DealConta
 
 export async function replaceDealContacts(
   opportunityId: string,
-  rows: { contactId: string; role: DealContactRole }[],
+  rows: { contactId: string; role: DealContactRole; roleOther?: string }[],
 ): Promise<void> {
   const { error: deleteError } = await supabase.from('deal_contacts').delete().eq('opportunity_id', opportunityId);
   if (deleteError) throw deleteError;
   if (rows.length === 0) return;
   const { error: insertError } = await supabase.from('deal_contacts').insert(
-    rows.map((r) => ({ opportunity_id: opportunityId, contact_id: r.contactId, role: r.role })),
+    rows.map((r) => ({
+      opportunity_id: opportunityId, contact_id: r.contactId, role: r.role, role_other: r.roleOther,
+    })),
   );
   if (insertError) throw insertError;
 }

@@ -33,7 +33,7 @@ create type lead_rating as enum ('HOT', 'WARM', 'COLD');
 create type revenue_band as enum ('LT_1CR', 'CR_1_10', 'CR_10_50', 'CR_50_100', 'CR_100_PLUS');
 
 create type lead_unqualified_reason as enum (
-  'NO_BUDGET', 'NOT_A_FIT', 'NO_RESPONSE', 'COMPETITOR', 'BAD_DATA'
+  'NO_BUDGET', 'NOT_A_FIT', 'NO_RESPONSE', 'COMPETITOR', 'BAD_DATA', 'OTHER'
 );
 
 create type salutation as enum ('MR', 'MS', 'MRS', 'DR', 'PROF');
@@ -233,6 +233,7 @@ create table leads (
   score int not null default 0 check (score between 0 and 100),
   rating lead_rating,
   unqualified_reason lead_unqualified_reason,
+  unqualified_reason_other text,
   email_opt_in boolean not null default true,
   tags text[] not null default '{}',
   owner_id uuid references profiles(id) on delete set null,
@@ -306,6 +307,7 @@ create table lead_contacts (
   lead_id uuid not null references leads(id) on delete cascade,
   contact_id uuid not null references contacts(id) on delete cascade,
   role deal_contact_role not null default 'OTHER',
+  role_other text,
   created_at timestamptz not null default now(),
   primary key (lead_id, contact_id)
 );
@@ -420,6 +422,7 @@ create table deal_contacts (
   opportunity_id uuid not null references opportunities(id) on delete cascade,
   contact_id uuid not null references contacts(id) on delete cascade,
   role deal_contact_role not null,
+  role_other text,
   created_at timestamptz not null default now(),
   unique (opportunity_id, contact_id)
 );

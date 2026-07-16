@@ -6,7 +6,7 @@ export type Salutation = 'MR' | 'MS' | 'MRS' | 'DR' | 'PROF';
 export type RevenueBand = 'LT_1CR' | 'CR_1_10' | 'CR_10_50' | 'CR_50_100' | 'CR_100_PLUS';
 export interface SocialLink { id: string; platform: string; url: string; order: number; }
 export type LeadRating = 'HOT' | 'WARM' | 'COLD';
-export type LeadUnqualifiedReason = 'NO_BUDGET' | 'NOT_A_FIT' | 'NO_RESPONSE' | 'COMPETITOR' | 'BAD_DATA';
+export type LeadUnqualifiedReason = 'NO_BUDGET' | 'NOT_A_FIT' | 'NO_RESPONSE' | 'COMPETITOR' | 'BAD_DATA' | 'OTHER';
 
 export interface User { id: string; fullName: string; email: string; role: Role; }
 
@@ -67,6 +67,7 @@ export interface Lead {
   score: number;
   rating?: LeadRating;
   unqualifiedReason?: LeadUnqualifiedReason;
+  unqualifiedReasonOther?: string;
   tags?: string[];
   owner?: { id: string; fullName: string };
   // Additive co-owners — collaborators beyond the primary owner above.
@@ -233,6 +234,7 @@ export interface Project {
 export interface DealContact {
   contactId: string;
   role: DealContactRole;
+  roleOther?: string;
   contact?: { id: string; firstName?: string; lastName?: string; email?: string };
 }
 
