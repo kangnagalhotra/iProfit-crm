@@ -416,9 +416,15 @@ export function LeadForm({
             <div className="field"><label>Lead value</label>
               <input type="number" min="0" value={form.value} onChange={(e) => set('value', e.target.value)} placeholder="0.00" /></div>
             <div className="field"><label>Lead source*</label>
-              <select value={form.sourceId} onChange={(e) => set('sourceId', e.target.value)}>
-                {sourceOptions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
+              <SelectWithOther
+                options={sourceOptions.map((s) => ({ value: s.id, label: s.name }))}
+                value={form.sourceId}
+                onChange={(v) => set('sourceId', v)}
+                otherValue={form.sourceDetails}
+                onOtherChange={(v) => set('sourceDetails', v)}
+                otherTriggerValue={sourceOptions.find((s) => s.name.toLowerCase() === 'other')?.id ?? '__no_other__'}
+                emptyLabel="Select source"
+              />
             </div>
             <div className="field"><label>Status</label>
               <select value={form.stageId} onChange={(e) => onStageChange(e.target.value)}>
@@ -473,8 +479,6 @@ export function LeadForm({
                 <div className="form-grid-2">
                   <div className="field"><label>Job title</label>
                     <input value={form.jobTitle} onChange={(e) => set('jobTitle', e.target.value)} /></div>
-                  <div className="field"><label>Source details (optional notes)</label>
-                    <input value={form.sourceDetails} onChange={(e) => set('sourceDetails', e.target.value)} placeholder="Campaign name, referrer…" /></div>
                   <div className="field">
                     <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 22 }}>
                       <input type="checkbox" checked={form.emailOptIn} onChange={(e) => set('emailOptIn', e.target.checked)} />
