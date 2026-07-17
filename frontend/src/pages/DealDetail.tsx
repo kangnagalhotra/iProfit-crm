@@ -572,7 +572,7 @@ export function DealDetail() {
         )}
       </CollapsibleCard>
 
-      <ProposalsCard opportunityId={deal.id} />
+      <ProposalsCard opportunityId={deal.id} deal={deal} />
       {deal.stage.isClosedWon && <HealthRenewalCard deal={deal} onDealUpdated={setDeal} />}
       <StageHistoryCard opportunityId={deal.id} />
       {/* Distinct key prefixes — sibling components sharing the same key value

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import type { DealProposal } from '../api/types';
+import type { DealProposal, Opportunity } from '../api/types';
 import { listProposals, addProposal, deleteProposal } from '../api/proposals';
+import { getDefaultProposalTemplate, fillProposalTemplate } from '../api/proposalTemplates';
 import { CollapsibleCard } from './CollapsibleCard';
 import { Icon } from './Icon';
 import { useToast } from '../context/ToastContext';
@@ -15,17 +16,36 @@ function formatValue(value?: string) {
 
 // Versioned proposal/quote history for a deal — append-only so the offer's
 // evolution stays visible (v1 → v2 → …), never overwritten.
-export function ProposalsCard({ opportunityId }: { opportunityId: string }) {
+export function ProposalsCard({ opportunityId, deal }: { opportunityId: string; deal?: Opportunity }) {
   const toast = useToast();
   const confirm = useConfirm();
   const [proposals, setProposals] = useState<DealProposal[]>([]);
   const [adding, setAdding] = useState(false);
-  const [form, setForm] = useState({ sentDate: new Date().toISOString().slice(0, 10), value: '', notes: '' });
+  const [form, setForm] = useState({
+    sentDate: new Date().toISOString().slice(0, 10), value: '', notes: '', templateId: '',
+  });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     listProposals(opportunityId).then(setProposals).catch(() => {});
   }, [opportunityId]);
+
+  async function applyTemplate() {
+    try {
+      const template = await getDefaultProposalTemplate();
+      if (!template) { toast.error('No proposal template is set up yet.'); return; }
+      const filled = fillProposalTemplate(template.body, {
+        dealName: deal?.name,
+        accountName: deal?.account?.name,
+        amount: deal?.amount ? `${deal.currency} ${deal.amount}` : undefined,
+        ownerName: deal?.owner?.fullName,
+      });
+      setAdding(true);
+      setForm((f) => ({ ...f, notes: filled, templateId: template.id }));
+    } catch (e: any) {
+      toast.error(e.message ?? 'Could not load the proposal template');
+    }
+  }
 
   async function submit() {
     if (!form.sentDate) return;
@@ -33,11 +53,13 @@ export function ProposalsCard({ opportunityId }: { opportunityId: string }) {
     setSaving(true);
     try {
       const created = await addProposal(opportunityId, {
-        sentDate: form.sentDate, value: form.value || undefined, notes: form.notes || undefined,
+        sentDate: form.sentDate, value: form.value || undefined, notes: form.notes || undefined, templateId: form.templateId || undefined,
       });
       setProposals((ps) => [created, ...ps]);
       setAdding(false);
-      setForm({ sentDate: new Date().toISOString().slice(0, 10), value: '', notes: '' });
+      setForm({
+        sentDate: new Date().toISOString().slice(0, 10), value: '', notes: '', templateId: '',
+      });
       toast.success(`Proposal v${created.version} logged`);
     } catch (e: any) {
       toast.error(e.message ?? 'Could not log proposal');
@@ -74,7 +96,9 @@ export function ProposalsCard({ opportunityId }: { opportunityId: string }) {
                 <td>v{p.version}</td>
                 <td>{new Date(p.sentDate).toLocaleDateString()}</td>
                 <td>{formatValue(p.value)}</td>
-                <td>{p.notes ?? '—'}</td>
+                <td style={{ maxWidth: 260 }} title={p.notes}>
+                  {p.notes ? `${p.notes.slice(0, 80)}${p.notes.length > 80 ? '…' : ''}` : '—'}
+                </td>
                 <td>
                   <button type="button" className="row-remove-btn" onClick={() => remove(p)} aria-label="Delete proposal">
                     <Icon name="trash" size={14} />
@@ -96,8 +120,10 @@ export function ProposalsCard({ opportunityId }: { opportunityId: string }) {
                 onChange={(e) => setForm((f) => ({ ...f, value: e.target.value }))} /></div>
           </div>
           <div className="field"><label>Notes</label>
-            <input value={form.notes} placeholder="What changed in this version…"
-              onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} /></div>
+            <textarea rows={form.templateId ? 12 : 3} value={form.notes} placeholder="What changed in this version…"
+              onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+              style={{ width: '100%', padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 6, fontSize: 14, fontFamily: 'inherit' }} />
+          </div>
           <div style={{ display: 'flex', gap: 10 }}>
             <button className="btn" onClick={submit} disabled={saving || !form.sentDate}>
               {saving ? 'Saving…' : `Log v${(proposals[0]?.version ?? 0) + 1}`}
@@ -106,9 +132,14 @@ export function ProposalsCard({ opportunityId }: { opportunityId: string }) {
           </div>
         </div>
       ) : (
-        <button className="btn secondary btn-icon" style={{ marginTop: 8 }} onClick={() => setAdding(true)}>
-          <Icon name="plus" size={14} /> Log proposal version
-        </button>
+        <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+          <button className="btn secondary btn-icon" onClick={() => setAdding(true)}>
+            <Icon name="plus" size={14} /> Log proposal version
+          </button>
+          <button className="btn secondary btn-icon" onClick={applyTemplate}>
+            <Icon name="copy" size={14} /> Apply template
+          </button>
+        </div>
       )}
     </CollapsibleCard>
   );

@@ -199,12 +199,15 @@ export interface Product {
   updatedAt: string;
 }
 
+export interface ProposalTemplate { id: string; name: string; body: string; isDefault: boolean; }
+
 export interface DealProposal {
   id: string;
   version: number;
   sentDate: string;
   value?: string;
   notes?: string;
+  templateId?: string;
   createdAt: string;
 }
 

@@ -527,6 +527,17 @@ create index lead_attachments_uploaded_by_idx on lead_attachments(uploaded_by);
 
 -- Versioned proposals/quotes — one row per version sent, never overwritten,
 -- so "how the offer evolved" and proposal→close timing stay reportable.
+-- Standard Proposal Template (Group 5 / F2) — a single {{placeholder}}
+-- text block substituted client-side, not a rich-text engine; ships with
+-- one default row, structured for more templates later.
+create table proposal_templates (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  body text not null,
+  is_default boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
 create table deal_proposals (
   id uuid primary key default gen_random_uuid(),
   opportunity_id uuid not null references opportunities(id) on delete cascade,
@@ -534,6 +545,7 @@ create table deal_proposals (
   sent_date date not null,
   value numeric(15, 2) check (value is null or value >= 0),
   notes text,
+  template_id uuid references proposal_templates(id) on delete set null,
   created_at timestamptz not null default now(),
   unique (opportunity_id, version)
 );

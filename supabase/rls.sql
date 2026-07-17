@@ -436,6 +436,18 @@ create policy "projects_update" on projects for update to authenticated
   );
 
 -- ---------------------------------------------------------------------------
+-- PROPOSAL TEMPLATES — single shared catalog (Group 5 / F2), same shape as
+-- products/stages: readable by anyone, writable only by managers/admins.
+-- ---------------------------------------------------------------------------
+
+alter table proposal_templates enable row level security;
+
+create policy "proposal_templates_select" on proposal_templates for select to authenticated using (true);
+
+create policy "proposal_templates_write" on proposal_templates for all to authenticated
+  using (is_manager_or_admin()) with check (is_manager_or_admin());
+
+-- ---------------------------------------------------------------------------
 -- DEAL_PROPOSALS — child rows of opportunities; access inherits from the
 -- parent deal (identical shape to deal_line_items).
 -- ---------------------------------------------------------------------------

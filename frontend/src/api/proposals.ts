@@ -8,6 +8,7 @@ function mapProposal(row: any): DealProposal {
     sentDate: row.sent_date,
     value: row.value !== null && row.value !== undefined ? String(row.value) : undefined,
     notes: row.notes ?? undefined,
+    templateId: row.template_id ?? undefined,
     createdAt: row.created_at,
   };
 }
@@ -23,19 +24,25 @@ export async function listProposals(opportunityId: string): Promise<DealProposal
 // proposal→close timing stay reportable. Next version = max + 1.
 export async function addProposal(
   opportunityId: string,
-  input: { sentDate: string; value?: string; notes?: string },
+  input: { sentDate: string; value?: string; notes?: string; templateId?: string },
 ): Promise<DealProposal> {
   const { data: latest } = await supabase.from('deal_proposals').select('version')
     .eq('opportunity_id', opportunityId).order('version', { ascending: false }).limit(1).maybeSingle();
   const version = (latest?.version ?? 0) + 1;
 
-  const { data, error } = await supabase.from('deal_proposals').insert({
+  const row: Record<string, any> = {
     opportunity_id: opportunityId,
     version,
     sent_date: input.sentDate,
     value: input.value || null,
     notes: input.notes || null,
-  }).select('*').single();
+  };
+  // Only sent when a template was actually applied — keeps ordinary (no
+  // template) proposal logging working even before phase-p's template_id
+  // column has been migrated in.
+  if (input.templateId) row.template_id = input.templateId;
+
+  const { data, error } = await supabase.from('deal_proposals').insert(row).select('*').single();
   if (error) throw new Error(error.message);
   return mapProposal(data);
 }
