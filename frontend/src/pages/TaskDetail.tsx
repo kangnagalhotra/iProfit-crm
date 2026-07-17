@@ -4,6 +4,7 @@ import type { Task } from '../api/types';
 import { getTask, completeTask } from '../api/tasks';
 import { createActivity } from '../api/activities';
 import { TaskForm } from '../components/TaskForm';
+import { ChecklistEditor } from '../components/ChecklistEditor';
 import { ActivityTimeline } from '../components/ActivityTimeline';
 import { Icon } from '../components/Icon';
 import { SkeletonDetailPage } from '../components/Skeleton';
@@ -110,6 +111,9 @@ export function TaskDetail() {
       </div>
 
       <div className="detail-main">
+      <div className="card">
+        <ChecklistEditor taskId={task.id} />
+      </div>
       <ActivityTimeline key={activityKey} taskId={task.id} showNotes />
       </div>
       </div>
