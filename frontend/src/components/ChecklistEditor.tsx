@@ -7,8 +7,11 @@ import { Icon } from './Icon';
 
 // Sub-tasks (checklist-style) editor for a saved Task — add/toggle/remove/
 // reorder items, each independently markable done, with a rollup "2/4
-// done" count. Items don't have their own assignee/due date; they're pure
-// sub-checks under this task's owner/due date (see phase-o SQL patch).
+// done" count + progress bar. Items don't have their own assignee/due
+// date; they're pure sub-checks under this task's owner/due date (see
+// phase-o SQL patch). Deliberately its own "checklist-*" class namespace
+// rather than the shared ".field" wrapper — ".field input { width: 100% }"
+// was stretching the checkbox itself and shoving the row's layout sideways.
 export function ChecklistEditor({ taskId }: { taskId: string }) {
   const [items, setItems] = useState<ChecklistItem[]>([]);
   const [newTitle, setNewTitle] = useState('');
@@ -48,36 +51,40 @@ export function ChecklistEditor({ taskId }: { taskId: string }) {
 
   if (loading) return null;
   const done = items.filter((i) => i.isDone).length;
+  const pct = items.length > 0 ? Math.round((done / items.length) * 100) : 0;
 
   return (
-    <div className="field">
-      <label>Sub-tasks{items.length > 0 ? ` (${done}/${items.length} done)` : ''}</label>
-      {items.map((item, i) => (
-        <div key={item.id} style={{
-          display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6,
-        }}
-        >
-          <input type="checkbox" checked={item.isDone} onChange={() => toggle(item)} />
-          <span style={{
-            flex: 1,
-            textDecoration: item.isDone ? 'line-through' : undefined,
-            color: item.isDone ? 'var(--muted)' : undefined,
-          }}
-          >
-            {item.title}
-          </span>
-          <button type="button" className="btn secondary btn-icon" onClick={() => move(item, -1)} disabled={i === 0} title="Move up">
-            <span style={{ display: 'inline-flex', transform: 'rotate(180deg)' }}><Icon name="chevronDown" size={12} /></span>
-          </button>
-          <button type="button" className="btn secondary btn-icon" onClick={() => move(item, 1)} disabled={i === items.length - 1} title="Move down">
-            <Icon name="chevronDown" size={12} />
-          </button>
-          <button type="button" className="row-remove-btn" onClick={() => remove(item)} aria-label="Remove sub-task">
-            <Icon name="trash" size={14} />
-          </button>
+    <div className="checklist-editor">
+      <div className="checklist-editor-label">
+        Sub-tasks{items.length > 0 ? ` (${done}/${items.length} done)` : ''}
+      </div>
+      {items.length > 0 && (
+        <div className="checklist-progress-bar">
+          <div className="checklist-progress-fill" style={{ width: `${pct}%` }} />
         </div>
-      ))}
-      <div style={{ display: 'flex', gap: 8 }}>
+      )}
+      {items.length > 0 && (
+        <div className="checklist-items">
+          {items.map((item, i) => (
+            <div key={item.id} className="checklist-item">
+              <input type="checkbox" className="checklist-checkbox" checked={item.isDone} onChange={() => toggle(item)} />
+              <span className={`checklist-item-title${item.isDone ? ' done' : ''}`}>{item.title}</span>
+              <div className="checklist-item-actions">
+                <button type="button" className="checklist-move-btn" onClick={() => move(item, -1)} disabled={i === 0} title="Move up">
+                  <span style={{ display: 'inline-flex', transform: 'rotate(180deg)' }}><Icon name="chevronDown" size={12} /></span>
+                </button>
+                <button type="button" className="checklist-move-btn" onClick={() => move(item, 1)} disabled={i === items.length - 1} title="Move down">
+                  <Icon name="chevronDown" size={12} />
+                </button>
+                <button type="button" className="checklist-move-btn" onClick={() => remove(item)} aria-label="Remove sub-task" title="Remove">
+                  <Icon name="trash" size={13} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="checklist-add-row">
         <input
           value={newTitle}
           onChange={(e) => setNewTitle(e.target.value)}

@@ -165,6 +165,23 @@ tr.clickable-row:hover td { background: var(--pale); }
 .row-remove-btn { background: none; border: none; color: var(--muted); cursor: pointer; padding: 4px; display: flex; }
 .row-remove-btn:hover { color: #b91c1c; }
 
+.checklist-editor-label { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+.checklist-progress-bar { height: 4px; background: var(--pale); border-radius: 2px; overflow: hidden; margin-bottom: 10px; }
+.checklist-progress-fill { height: 100%; background: #16A34A; transition: width .2s ease; }
+.checklist-items { display: flex; flex-direction: column; margin-bottom: 10px; }
+.checklist-item { display: flex; align-items: center; gap: 10px; padding: 7px 6px; border-radius: 6px; }
+.checklist-item:hover { background: var(--pale); }
+.checklist-checkbox { flex: none; width: 16px; height: 16px; margin: 0; cursor: pointer; }
+.checklist-item-title { flex: 1; min-width: 0; font-size: 14px; word-break: break-word; }
+.checklist-item-title.done { text-decoration: line-through; color: var(--muted); }
+.checklist-item-actions { display: flex; gap: 2px; flex: none; opacity: 0; transition: opacity .1s ease; }
+.checklist-item:hover .checklist-item-actions, .checklist-item:focus-within .checklist-item-actions { opacity: 1; }
+.checklist-move-btn { background: none; border: none; color: var(--muted); cursor: pointer; padding: 5px; border-radius: 4px; display: flex; }
+.checklist-move-btn:hover:not(:disabled) { background: var(--line); color: var(--navy-text); }
+.checklist-move-btn:disabled { opacity: .3; cursor: default; }
+.checklist-add-row { display: flex; gap: 8px; }
+.checklist-add-row input { flex: 1; padding: 9px 11px; border: 1px solid var(--line); border-radius: var(--radius-sm); font-size: 14px; }
+
 .line-items-editor { margin-top: 4px; }
 .line-items-header-row, .line-items-row { display: grid; grid-template-columns: 2fr 70px 100px 100px 28px; gap: 8px; align-items: center; }
 .line-items-header-row { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .02em; margin-bottom: 6px; }
