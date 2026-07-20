@@ -3,9 +3,14 @@ import type { DealProposal, Opportunity } from '../api/types';
 import { listProposals, addProposal, deleteProposal } from '../api/proposals';
 import { getDefaultProposalTemplate, fillProposalTemplate } from '../api/proposalTemplates';
 import { CollapsibleCard } from './CollapsibleCard';
+import { TypeformEmbed } from './TypeformEmbed';
+import { buildProposalHiddenFields } from '../utils/proposalFormPrefill';
 import { Icon } from './Icon';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
+
+// Extracted from https://form.typeform.com/to/YCw5Q08h
+const PROPOSAL_TYPEFORM_ID = 'YCw5Q08h';
 
 function formatValue(value?: string) {
   if (!value) return '—';
@@ -25,10 +30,28 @@ export function ProposalsCard({ opportunityId, deal }: { opportunityId: string; 
     sentDate: new Date().toISOString().slice(0, 10), value: '', notes: '', templateId: '',
   });
   const [saving, setSaving] = useState(false);
+  const [showTypeform, setShowTypeform] = useState(false);
+  const [markingSent, setMarkingSent] = useState(false);
 
   useEffect(() => {
     listProposals(opportunityId).then(setProposals).catch(() => {});
   }, [opportunityId]);
+
+  async function markProposalSent() {
+    setMarkingSent(true);
+    try {
+      const created = await addProposal(opportunityId, {
+        sentDate: new Date().toISOString().slice(0, 10),
+        notes: 'Sent via the proposal form',
+      });
+      setProposals((ps) => [created, ...ps]);
+      toast.success(`Proposal v${created.version} marked as sent`);
+    } catch (e: any) {
+      toast.error(e.message ?? 'Could not log the proposal');
+    } finally {
+      setMarkingSent(false);
+    }
+  }
 
   async function applyTemplate() {
     try {
@@ -132,12 +155,28 @@ export function ProposalsCard({ opportunityId, deal }: { opportunityId: string; 
           </div>
         </div>
       ) : (
-        <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+        <div style={{ display: 'flex', gap: 10, marginTop: 8, flexWrap: 'wrap' }}>
           <button className="btn secondary btn-icon" onClick={() => setAdding(true)}>
             <Icon name="plus" size={14} /> Log proposal version
           </button>
           <button className="btn secondary btn-icon" onClick={applyTemplate}>
             <Icon name="copy" size={14} /> Apply template
+          </button>
+          <button className="btn secondary btn-icon" onClick={() => setShowTypeform((v) => !v)}>
+            <Icon name="note" size={14} /> {showTypeform ? 'Hide proposal form' : 'Open proposal form'}
+          </button>
+        </div>
+      )}
+
+      {showTypeform && !adding && (
+        <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--line)' }}>
+          <div className="helper-text" style={{ marginTop: 0, marginBottom: 10 }}>
+            Fills in what it can from this deal (company, contact, value, owner). Submissions are recorded on
+            Typeform's side — click "Mark proposal as sent" below once you've sent it to log it here too.
+          </div>
+          <TypeformEmbed formId={PROPOSAL_TYPEFORM_ID} hiddenFields={deal ? buildProposalHiddenFields(deal) : undefined} />
+          <button className="btn secondary btn-icon" style={{ marginTop: 10 }} onClick={markProposalSent} disabled={markingSent}>
+            <Icon name="check" size={14} /> {markingSent ? 'Logging…' : 'Mark proposal as sent'}
           </button>
         </div>
       )}
