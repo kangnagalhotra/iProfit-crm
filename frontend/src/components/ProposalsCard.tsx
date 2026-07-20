@@ -220,16 +220,16 @@ export function ProposalsCard({ opportunityId, deal }: { opportunityId: string; 
       ) : (
         <div style={{ display: 'flex', gap: 10, marginTop: 8, flexWrap: 'wrap' }}>
           <button className="btn btn-icon" onClick={newWizardProposal} disabled={creatingWizard} title="Template: Standard Proposal (Detailed Form)">
-            <Icon name="plus" size={14} /> {creatingWizard ? 'Starting…' : 'New Proposal'}
+            <Icon name="note" size={14} /> {creatingWizard ? 'Starting…' : 'Open proposal form'}
           </button>
           <button className="btn secondary btn-icon" onClick={() => setAdding(true)}>
-            <Icon name="plus" size={14} /> Log proposal version
+            <Icon name="plus" size={14} /> Add new proposal (manual)
           </button>
           <button className="btn secondary btn-icon" onClick={applyTemplate}>
             <Icon name="copy" size={14} /> Apply template
           </button>
           <button className="btn secondary btn-icon" onClick={() => setShowTypeform((v) => !v)}>
-            <Icon name="note" size={14} /> {showTypeform ? 'Hide proposal form' : 'Open proposal form'}
+            <Icon name="inbox" size={14} /> {showTypeform ? 'Hide external form' : 'External form (Typeform)'}
           </button>
         </div>
       )}
