@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import type { DealStage, Lead, LeadStage, Opportunity } from '../api/types';
+import type { DealStage, Lead, Opportunity } from '../api/types';
 import { listLeads } from '../api/leads';
 import { listDeals } from '../api/deals';
 import { listStages } from '../api/stages';
@@ -50,7 +50,6 @@ interface PipelineColumn {
 export function PipelineBoard() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [deals, setDeals] = useState<Opportunity[]>([]);
-  const [leadStages, setLeadStages] = useState<LeadStage[]>([]);
   const [dealStages, setDealStages] = useState<DealStage[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -58,12 +57,10 @@ export function PipelineBoard() {
     Promise.all([
       loadAllLeads(),
       loadAllDeals(),
-      listStages('lead_stages'),
       listStages('deal_stages'),
-    ]).then(([leadRows, dealRows, leadStageRes, dealStageRes]) => {
+    ]).then(([leadRows, dealRows, dealStageRes]) => {
       setLeads(leadRows);
       setDeals(dealRows);
-      setLeadStages(leadStageRes as LeadStage[]);
       setDealStages((dealStageRes as DealStage[]).slice().sort((a, b) => a.order - b.order));
     }).finally(() => setLoading(false));
   }, []);
@@ -103,10 +100,13 @@ export function PipelineBoard() {
       <div className="kanban">
         {columns.map((col) => {
           const count = (col.leads?.length ?? 0) + (col.deals?.length ?? 0);
+          const totalValue = (col.leads ?? []).reduce((sum, l) => sum + (l.value ? parseFloat(l.value) : 0), 0)
+            + (col.deals ?? []).reduce((sum, d) => sum + (d.amount ? parseFloat(d.amount) : 0), 0);
           return (
             <div className="kanban-col" key={col.id}>
               <div className="kanban-col-fixed">
                 <h4>{col.label} <span className="count">({count})</span></h4>
+                {totalValue > 0 && <div className="stage-subtitle">{formatValue(String(totalValue))}</div>}
               </div>
               <div className="kanban-col-cards">
                 {count === 0 && (

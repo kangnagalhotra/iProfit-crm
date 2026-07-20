@@ -129,6 +129,7 @@ export function LeadsKanban() {
         onDrop={handleDrop}
         renderColumnHeader={(col) => {
           const stage = stages.find((s) => s.id === col.id)!;
+          const totalValue = col.items.reduce((sum, l) => sum + (l.value ? parseFloat(l.value) : 0), 0);
           return (
             <StageColumnHeader
               stage={stage}
@@ -140,6 +141,7 @@ export function LeadsKanban() {
               onChanged={(updated) => setStages((s) => s.map((st) => (st.id === updated.id ? updated : st)))}
               onDeleted={(id) => setStages((s) => s.filter((st) => st.id !== id))}
               onReordered={setStages}
+              subtitle={totalValue > 0 ? formatValue(String(totalValue)) ?? undefined : undefined}
             />
           );
         }}
