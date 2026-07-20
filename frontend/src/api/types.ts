@@ -199,7 +199,7 @@ export interface Product {
   updatedAt: string;
 }
 
-export type ProposalTemplateKind = 'TEXT' | 'WIZARD';
+export type ProposalTemplateKind = 'TEXT' | 'WIZARD' | 'EXTERNAL';
 export interface ProposalTemplate { id: string; name: string; body: string; kind: ProposalTemplateKind; isDefault: boolean; }
 
 export interface DealProposal {

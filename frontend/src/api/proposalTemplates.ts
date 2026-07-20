@@ -27,6 +27,29 @@ export async function getWizardProposalTemplate(): Promise<ProposalTemplate | nu
   return data ? mapTemplate(data) : null;
 }
 
+// The single "imported external form" URL (Typeform/Google Forms/JotForm/
+// etc.) a team can configure instead of a hardcoded one — at most one
+// EXTERNAL-kind row exists at a time.
+export async function getExternalProposalTemplate(): Promise<ProposalTemplate | null> {
+  const { data, error } = await supabase.from('proposal_templates').select('*').eq('kind', 'EXTERNAL').limit(1).maybeSingle();
+  if (error) throw error;
+  return data ? mapTemplate(data) : null;
+}
+
+export async function saveExternalProposalTemplate(url: string): Promise<ProposalTemplate> {
+  const existing = await getExternalProposalTemplate();
+  if (existing) {
+    const { data, error } = await supabase.from('proposal_templates').update({ body: url }).eq('id', existing.id).select().single();
+    if (error) throw new Error(error.message);
+    return mapTemplate(data);
+  }
+  const { data, error } = await supabase.from('proposal_templates').insert({
+    name: 'Imported Proposal Form', kind: 'EXTERNAL', body: url, is_default: false,
+  }).select().single();
+  if (error) throw new Error(error.message);
+  return mapTemplate(data);
+}
+
 // Fills {{deal_name}}, {{account_name}}, {{amount}}, {{owner_name}} from the
 // current deal — anything not available just renders as an empty string
 // rather than leaving the raw token in place.

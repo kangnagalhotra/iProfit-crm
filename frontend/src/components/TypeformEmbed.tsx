@@ -22,6 +22,13 @@ function loadEmbedScript(): Promise<void> {
   return scriptPromise;
 }
 
+// Detects a Typeform URL among imported external form URLs (any provider)
+// so it can get the richer native embed below instead of a plain iframe.
+export function extractTypeformId(url: string): string | null {
+  const match = url.match(/typeform\.com\/to\/([a-zA-Z0-9]+)/i);
+  return match ? match[1] : null;
+}
+
 export function TypeformEmbed({ formId, hiddenFields }: { formId: string; hiddenFields?: string }) {
   useEffect(() => {
     loadEmbedScript().catch(() => {});

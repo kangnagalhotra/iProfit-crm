@@ -537,7 +537,9 @@ create table proposal_templates (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   body text not null,
-  kind text not null default 'TEXT' check (kind in ('TEXT', 'WIZARD')),
+  -- 'EXTERNAL' body holds an imported third-party form URL (Typeform,
+  -- Google Forms, etc.) — see phase-r-external-proposal-form-patch.sql.
+  kind text not null default 'TEXT' check (kind in ('TEXT', 'WIZARD', 'EXTERNAL')),
   is_default boolean not null default false,
   created_at timestamptz not null default now()
 );

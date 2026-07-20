@@ -1,20 +1,20 @@
 import { useEffect, useState } from 'react';
-import type { DealProposal, Opportunity } from '../api/types';
+import type { DealProposal, Opportunity, ProposalTemplate } from '../api/types';
 import {
   listProposals, addProposal, deleteProposal, createProposalDraft,
 } from '../api/proposals';
-import { getDefaultProposalTemplate, fillProposalTemplate, getWizardProposalTemplate } from '../api/proposalTemplates';
+import {
+  getDefaultProposalTemplate, fillProposalTemplate, getWizardProposalTemplate,
+  getExternalProposalTemplate, saveExternalProposalTemplate,
+} from '../api/proposalTemplates';
 import { CollapsibleCard } from './CollapsibleCard';
-import { TypeformEmbed } from './TypeformEmbed';
+import { TypeformEmbed, extractTypeformId } from './TypeformEmbed';
 import { ProposalWizardModal } from './ProposalWizardModal';
 import { buildProposalHiddenFields } from '../utils/proposalFormPrefill';
 import { Icon } from './Icon';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 import { useAuth } from '../context/AuthContext';
-
-// Extracted from https://form.typeform.com/to/YCw5Q08h
-const PROPOSAL_TYPEFORM_ID = 'YCw5Q08h';
 
 function formatValue(value?: string) {
   if (!value) return '—';
@@ -35,14 +35,39 @@ export function ProposalsCard({ opportunityId, deal }: { opportunityId: string; 
     sentDate: new Date().toISOString().slice(0, 10), value: '', notes: '', templateId: '',
   });
   const [saving, setSaving] = useState(false);
-  const [showTypeform, setShowTypeform] = useState(false);
   const [markingSent, setMarkingSent] = useState(false);
   const [creatingWizard, setCreatingWizard] = useState(false);
   const [wizardProposal, setWizardProposal] = useState<DealProposal | null>(null);
+  const [externalTemplate, setExternalTemplate] = useState<ProposalTemplate | null>(null);
+  const [showExternalForm, setShowExternalForm] = useState(false);
+  const [editingImportUrl, setEditingImportUrl] = useState(false);
+  const [importUrlDraft, setImportUrlDraft] = useState('');
+  const [savingImport, setSavingImport] = useState(false);
 
   useEffect(() => {
     listProposals(opportunityId).then(setProposals).catch(() => {});
   }, [opportunityId]);
+
+  useEffect(() => {
+    getExternalProposalTemplate().then(setExternalTemplate).catch(() => {});
+  }, []);
+
+  async function saveImportUrl() {
+    const url = importUrlDraft.trim();
+    if (!url) return;
+    setSavingImport(true);
+    try {
+      const saved = await saveExternalProposalTemplate(url);
+      setExternalTemplate(saved);
+      setEditingImportUrl(false);
+      setShowExternalForm(true);
+      toast.success('Form imported');
+    } catch (e: any) {
+      toast.error(e.message ?? 'Could not save that form URL');
+    } finally {
+      setSavingImport(false);
+    }
+  }
 
   async function markProposalSent() {
     setMarkingSent(true);
@@ -228,22 +253,78 @@ export function ProposalsCard({ opportunityId, deal }: { opportunityId: string; 
           <button className="btn secondary btn-icon" onClick={applyTemplate}>
             <Icon name="copy" size={14} /> Apply template
           </button>
-          <button className="btn secondary btn-icon" onClick={() => setShowTypeform((v) => !v)}>
-            <Icon name="inbox" size={14} /> {showTypeform ? 'Hide external form' : 'External form (Typeform)'}
-          </button>
+          {externalTemplate ? (
+            <button className="btn secondary btn-icon" onClick={() => setShowExternalForm((v) => !v)}>
+              <Icon name="inbox" size={14} /> {showExternalForm ? 'Hide imported form' : 'Open imported form'}
+            </button>
+          ) : (
+            <button className="btn secondary btn-icon" onClick={() => { setEditingImportUrl(true); setShowExternalForm(true); }}>
+              <Icon name="inbox" size={14} /> Import form
+            </button>
+          )}
         </div>
       )}
 
-      {showTypeform && !adding && (
+      {showExternalForm && !adding && (
         <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--line)' }}>
-          <div className="helper-text" style={{ marginTop: 0, marginBottom: 10 }}>
-            Fills in what it can from this deal (company, contact, value, owner). Submissions are recorded on
-            Typeform's side — click "Mark proposal as sent" below once you've sent it to log it here too.
-          </div>
-          <TypeformEmbed formId={PROPOSAL_TYPEFORM_ID} hiddenFields={deal ? buildProposalHiddenFields(deal) : undefined} />
-          <button className="btn secondary btn-icon" style={{ marginTop: 10 }} onClick={markProposalSent} disabled={markingSent}>
-            <Icon name="check" size={14} /> {markingSent ? 'Logging…' : 'Mark proposal as sent'}
-          </button>
+          {editingImportUrl || !externalTemplate ? (
+            <div>
+              <div className="helper-text" style={{ marginTop: 0, marginBottom: 8 }}>
+                Paste the link to your own form — Typeform, Google Forms, JotForm, Microsoft Forms, or any other
+                provider. If it's a Typeform link it gets the richer native embed; otherwise it's shown in an
+                iframe with a fallback link to open it directly.
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  type="url"
+                  placeholder="https://…"
+                  value={importUrlDraft}
+                  onChange={(e) => setImportUrlDraft(e.target.value)}
+                  style={{ flex: 1, padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 6, fontSize: 14 }}
+                />
+                <button className="btn" onClick={saveImportUrl} disabled={savingImport || !importUrlDraft.trim()}>
+                  {savingImport ? 'Saving…' : 'Save'}
+                </button>
+                {externalTemplate && (
+                  <button className="btn secondary" onClick={() => { setEditingImportUrl(false); setImportUrlDraft(''); }}>Cancel</button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div className="helper-text" style={{ marginTop: 0, marginBottom: 10 }}>
+                Fills in what it can from this deal (company, contact, value, owner) when supported. Submissions are
+                recorded on the form provider's side — click "Mark proposal as sent" below once you've sent it to
+                log it here too.
+              </div>
+              {extractTypeformId(externalTemplate.body) ? (
+                <TypeformEmbed
+                  formId={extractTypeformId(externalTemplate.body)!}
+                  hiddenFields={deal ? buildProposalHiddenFields(deal) : undefined}
+                />
+              ) : (
+                <iframe
+                  src={externalTemplate.body}
+                  title="Imported proposal form"
+                  style={{ width: '100%', height: 600, border: '1px solid var(--line)', borderRadius: 8 }}
+                />
+              )}
+              <div style={{ display: 'flex', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
+                <button className="btn secondary btn-icon" onClick={markProposalSent} disabled={markingSent}>
+                  <Icon name="check" size={14} /> {markingSent ? 'Logging…' : 'Mark proposal as sent'}
+                </button>
+                <a className="btn secondary btn-icon" href={externalTemplate.body} target="_blank" rel="noreferrer">
+                  <Icon name="external-link" size={14} /> Open in new tab
+                </a>
+                <button
+                  className="btn secondary btn-icon"
+                  onClick={() => { setImportUrlDraft(externalTemplate.body); setEditingImportUrl(true); }}
+                >
+                  <Icon name="edit" size={14} /> Change form
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </CollapsibleCard>
