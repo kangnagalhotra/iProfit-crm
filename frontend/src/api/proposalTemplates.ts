@@ -3,7 +3,7 @@ import type { ProposalTemplate } from './types';
 
 function mapTemplate(row: any): ProposalTemplate {
   return {
-    id: row.id, name: row.name, body: row.body, isDefault: row.is_default,
+    id: row.id, name: row.name, body: row.body, kind: row.kind ?? 'TEXT', isDefault: row.is_default,
   };
 }
 
@@ -15,6 +15,14 @@ export async function listProposalTemplates(): Promise<ProposalTemplate[]> {
 
 export async function getDefaultProposalTemplate(): Promise<ProposalTemplate | null> {
   const { data, error } = await supabase.from('proposal_templates').select('*').eq('is_default', true).limit(1).maybeSingle();
+  if (error) throw error;
+  return data ? mapTemplate(data) : null;
+}
+
+// The single "Detailed Form" wizard template (see proposalWizardSchema.ts
+// for its actual section/field structure, which lives in code, not here).
+export async function getWizardProposalTemplate(): Promise<ProposalTemplate | null> {
+  const { data, error } = await supabase.from('proposal_templates').select('*').eq('kind', 'WIZARD').limit(1).maybeSingle();
   if (error) throw error;
   return data ? mapTemplate(data) : null;
 }

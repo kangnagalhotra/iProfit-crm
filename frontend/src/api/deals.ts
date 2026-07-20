@@ -4,7 +4,7 @@ import { listStageHistory } from './dealStageHistory';
 import { setOpportunityAdditionalOwners } from './additionalOwners';
 
 const SELECT = `*, pipeline:pipelines(id, name), stage:deal_stages(*), owner:profiles!opportunities_owner_id_fkey(id, full_name),
-  account:accounts!opportunities_account_id_fkey(id, name, stage:account_stages(name, color)), lead:leads(id, first_name, last_name, email),
+  account:accounts!opportunities_account_id_fkey(id, name, description, stage:account_stages(name, color)), lead:leads(id, first_name, last_name, email),
   contact:contacts(id, first_name, last_name, email, mobile, phone),
   partner_account:accounts!opportunities_partner_account_id_fkey(id, name),
   additionalOwnersRows:opportunity_additional_owners(user:profiles(id, full_name))`;
@@ -52,7 +52,7 @@ function mapDeal(row: any): Opportunity {
       .filter((r: any) => r.user)
       .map((r: any) => ({ id: r.user.id, fullName: r.user.full_name })),
     account: row.account ? {
-      id: row.account.id, name: row.account.name,
+      id: row.account.id, name: row.account.name, description: row.account.description ?? undefined,
       stage: row.account.stage ? { name: row.account.stage.name, color: row.account.stage.color } : undefined,
     } : undefined,
     lead: row.lead ? {

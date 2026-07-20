@@ -199,7 +199,8 @@ export interface Product {
   updatedAt: string;
 }
 
-export interface ProposalTemplate { id: string; name: string; body: string; isDefault: boolean; }
+export type ProposalTemplateKind = 'TEXT' | 'WIZARD';
+export interface ProposalTemplate { id: string; name: string; body: string; kind: ProposalTemplateKind; isDefault: boolean; }
 
 export interface DealProposal {
   id: string;
@@ -208,6 +209,8 @@ export interface DealProposal {
   value?: string;
   notes?: string;
   templateId?: string;
+  // Full 9-section wizard submission; undefined for simple/free-text versions.
+  content?: Record<string, any>;
   createdAt: string;
 }
 
@@ -291,7 +294,7 @@ export interface Opportunity {
   stage: DealStage;
   owner?: { id: string; fullName: string };
   additionalOwners?: { id: string; fullName: string }[];
-  account?: { id: string; name: string; stage?: { name: string; color: string } };
+  account?: { id: string; name: string; description?: string; stage?: { name: string; color: string } };
   lead?: { id: string; firstName?: string; lastName?: string; email?: string };
   contact?: { id: string; firstName?: string; lastName?: string; email?: string; mobile?: string; phone?: string };
   archivedAt?: string;

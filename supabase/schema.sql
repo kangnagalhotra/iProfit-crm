@@ -530,10 +530,14 @@ create index lead_attachments_uploaded_by_idx on lead_attachments(uploaded_by);
 -- Standard Proposal Template (Group 5 / F2) — a single {{placeholder}}
 -- text block substituted client-side, not a rich-text engine; ships with
 -- one default row, structured for more templates later.
+-- `kind = 'WIZARD'` marks a richer, multi-section template (the actual
+-- section/field schema for those lives in frontend/src/utils/
+-- proposalWizardSchema.ts, not the DB) alongside the plain-text 'TEXT' kind.
 create table proposal_templates (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   body text not null,
+  kind text not null default 'TEXT' check (kind in ('TEXT', 'WIZARD')),
   is_default boolean not null default false,
   created_at timestamptz not null default now()
 );
@@ -546,6 +550,9 @@ create table deal_proposals (
   value numeric(15, 2) check (value is null or value >= 0),
   notes text,
   template_id uuid references proposal_templates(id) on delete set null,
+  -- Full wizard submission (9-section content), null for simple/free-text
+  -- proposal versions.
+  content jsonb,
   created_at timestamptz not null default now(),
   unique (opportunity_id, version)
 );

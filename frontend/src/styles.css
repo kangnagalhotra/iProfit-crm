@@ -147,6 +147,31 @@ tr.clickable-row:hover td { background: var(--pale); }
 .modal { width: 440px; background: var(--surface); height: 100%; padding: var(--space-7); overflow-y: auto; box-shadow: var(--shadow-xl); }
 .modal.modal-wide { width: 640px; }
 
+/* Detailed Proposal Wizard — a full-screen overlay rather than the usual
+   right-side drawer, since a 9-section form with 2-column grids and
+   repeatable line items doesn't fit a 440-640px panel. */
+.wizard-overlay { position: fixed; inset: 0; background: rgba(16,24,40,.5); z-index: 55; display: flex; justify-content: center; overflow-y: auto; padding: 32px 16px; }
+.wizard-panel { width: 100%; max-width: 920px; height: fit-content; background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--shadow-xl); padding: 28px 28px 24px; }
+.wizard-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 16px; }
+.wizard-progress-track { height: 6px; background: var(--pale); border-radius: 99px; overflow: hidden; }
+.wizard-progress-fill { height: 100%; background: var(--blue); transition: width .2s ease; }
+.wizard-progress-label { font-size: 12px; color: var(--muted); margin: 8px 0 18px; }
+.wizard-section-nav { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 18px; }
+.wizard-nav-pill { font-size: 11.5px; font-weight: 600; padding: 6px 10px; border-radius: 99px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); cursor: pointer; }
+.wizard-nav-pill.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+.wizard-nav-pill.done { border-color: #16A34A; color: #16A34A; }
+.wizard-banner.error { background: #FDECEA; border: 1px solid #C0392B; color: #8B2A1F; border-radius: var(--radius-md); padding: 14px 16px; font-size: 13.5px; margin-bottom: 16px; }
+.wizard-choice-group { display: flex; flex-wrap: wrap; gap: 8px; }
+.wizard-choice-pill { font-family: inherit; font-size: 12.5px; padding: 7px 13px; border-radius: 99px; border: 1px solid var(--line); cursor: pointer; background: var(--surface); color: var(--navy-text); }
+.wizard-choice-pill.selected { background: var(--blue); color: #fff; border-color: var(--blue); }
+.wizard-line-items { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.wizard-line-item { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: center; padding: 10px; background: var(--pale); border-radius: 8px; }
+.wizard-add-line-btn { margin-top: 8px; background: none; border: none; color: var(--blue); font-size: 12.5px; font-weight: 650; cursor: pointer; padding: 6px 0; }
+.wizard-approval-block { border: 1px solid var(--line); border-radius: 8px; padding: 16px; margin-bottom: 14px; background: var(--pale); }
+.wizard-approval-block h4 { margin: 0 0 10px; font-size: 13px; }
+.wizard-checklist-row { display: flex; align-items: center; gap: 10px; font-weight: 500; font-size: 13px; cursor: pointer; padding: 4px 0; }
+.wizard-footer { display: flex; justify-content: space-between; margin-top: 16px; }
+
 .form-section { border-top: 1px solid var(--line); padding-top: var(--space-5); margin-top: var(--space-5); }
 .form-section:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
 .form-section-header { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }

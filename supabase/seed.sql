@@ -147,3 +147,15 @@ Accepted by: _______________________   Date: _______________
 $body$,
   true
 where not exists (select 1 from proposal_templates);
+
+-- ---------------------------------------------------------------------------
+-- Detailed Proposal Wizard template marker row (Group 6 addendum) — the
+-- actual section/field schema lives in frontend/src/utils/
+-- proposalWizardSchema.ts, not here.
+-- ---------------------------------------------------------------------------
+
+insert into proposal_templates (name, kind, body, is_default)
+select 'Standard Proposal (Detailed Form)', 'WIZARD',
+  'Structured multi-section proposal — filled out via the in-app wizard, not this free-text body.',
+  false
+where not exists (select 1 from proposal_templates where name = 'Standard Proposal (Detailed Form)');
