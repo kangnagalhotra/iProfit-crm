@@ -285,9 +285,16 @@ export function ProposalsCard({ opportunityId, deal }: { opportunityId: string; 
                 <button className="btn" onClick={saveImportUrl} disabled={savingImport || !importUrlDraft.trim()}>
                   {savingImport ? 'Saving…' : 'Save'}
                 </button>
-                {externalTemplate && (
-                  <button className="btn secondary" onClick={() => { setEditingImportUrl(false); setImportUrlDraft(''); }}>Cancel</button>
-                )}
+                <button
+                  className="btn secondary"
+                  onClick={() => {
+                    setEditingImportUrl(false);
+                    setImportUrlDraft('');
+                    if (!externalTemplate) setShowExternalForm(false);
+                  }}
+                >
+                  Cancel
+                </button>
               </div>
             </div>
           ) : (
