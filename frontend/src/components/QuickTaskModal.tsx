@@ -81,7 +81,11 @@ export function QuickTaskModal({
   const [assigneeId, setAssigneeId] = useState('');
   const [users, setUsers] = useState<User[]>([]);
   const [addFollowUp, setAddFollowUp] = useState(false);
-  const [followUpType, setFollowUpType] = useState(type);
+  // Defaults to whatever was just logged (a Call's natural follow-up is
+  // another Call, etc.) — except Other Activity, which is too generic a
+  // guess for what comes next, so it falls back to the most common
+  // follow-up type instead. Always editable either way.
+  const [followUpType, setFollowUpType] = useState<'CALL' | 'EMAIL' | 'MEETING' | 'OTHER'>(type === 'OTHER' ? 'CALL' : type);
   const [followUpDate, setFollowUpDate] = useState(defaultScheduleDate());
   const [followUpTime, setFollowUpTime] = useState('10:00');
   const [saving, setSaving] = useState(false);
