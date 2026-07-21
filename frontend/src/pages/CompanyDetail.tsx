@@ -314,13 +314,6 @@ export function CompanyDetail() {
               placeholder="Search owner…"
             />
           </EditableRow>
-          <Row label="Website" value={account.domain ? (
-            <a href={websiteUrl(account.domain)} target="_blank" rel="noreferrer">
-              {websiteUrl(account.domain).replace(/^https:\/\//, '')}
-            </a>
-          ) : undefined}
-          onEmptyClick={() => setShowEditModal(true)}
-          />
           <Row label="Industry" value={account.industry} onEmptyClick={() => setShowEditModal(true)} />
           <Row label="Number of employees" value={account.sizeBucket} onEmptyClick={() => setShowEditModal(true)} />
           <EditableRow
