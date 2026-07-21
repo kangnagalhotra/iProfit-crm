@@ -244,10 +244,6 @@ export function CompanyDetail() {
               )}
               <div className="detail-meta-row">
                 <span className="record-type-badge">Company</span>
-                <span className="chip" style={{ background: account.stage.color + '22', color: account.stage.color }}>{account.stage.name}</span>
-                {account.stage.isCustomerStage && account.stage.name !== 'Customer' && (
-                  <span className="chip" style={{ background: '#16A34A22', color: '#16A34A' }}>Customer</span>
-                )}
                 {account.owner && (
                   <span className="owner-chip">
                     <span className="avatar avatar-sm">{initials(account.owner.fullName)}</span>
@@ -268,7 +264,6 @@ export function CompanyDetail() {
                 <div className="dropdown-menu">
                   <button onClick={() => { setMoreOpen(false); setShowEditModal(true); }}>Edit Details</button>
                   <button onClick={() => { setMoreOpen(false); setEditingField('owner'); scrollToKeyInfo(); }}>Change Owner</button>
-                  <button onClick={() => { setMoreOpen(false); setEditingField('stage'); scrollToKeyInfo(); }}>Change Lifecycle Stage</button>
                   {canManageStatus && account.stage.name === 'Customer' && (
                     <button onClick={() => { setMoreOpen(false); markStrategicAccount(); }}>Mark Strategic Account</button>
                   )}
@@ -289,35 +284,6 @@ export function CompanyDetail() {
           </div>
         </div>
 
-        <div className="quick-actions">
-          <button
-            type="button"
-            className={`quick-action${account.email ? '' : ' disabled'}`}
-            disabled={!account.email}
-            title={account.email ? `Log an email to ${account.email}` : 'No email on file'}
-            onClick={() => setQuickTaskType('EMAIL')}
-          >
-            <span className="icon"><Icon name="mail" size={18} /></span>Email
-          </button>
-          <button
-            type="button"
-            className={`quick-action${account.phone ? '' : ' disabled'}`}
-            disabled={!account.phone}
-            title={account.phone ? `Log a call to ${account.phone}` : 'No phone number on file'}
-            onClick={() => setQuickTaskType('CALL')}
-          >
-            <span className="icon"><Icon name="phone" size={18} /></span>Call
-          </button>
-          <button className="quick-action" onClick={scrollToNotes}>
-            <span className="icon"><Icon name="note" size={18} /></span>Note
-          </button>
-          <button className="quick-action" onClick={scrollToTasks}>
-            <span className="icon"><Icon name="check" size={18} /></span>Task
-          </button>
-          <button className="quick-action" onClick={() => setQuickTaskType('MEETING')}>
-            <span className="icon"><Icon name="calendar" size={18} /></span>Meeting
-          </button>
-        </div>
       </div>
 
       {account.lastInactivityAlertAt && !account.stage.isInactiveStage && (
@@ -372,19 +338,6 @@ export function CompanyDetail() {
               <option value="">—</option>
               {REVENUE_BANDS.map((b) => <option key={b.value} value={b.value}>{b.label}</option>)}
             </select>
-          </EditableRow>
-          <EditableRow
-            label="Lifecycle Stage"
-            value={<span className="chip" style={{ background: account.stage.color + '22', color: account.stage.color }}>{account.stage.name}</span>}
-            editing={editingField === 'stage'}
-            onStartEdit={() => setEditingField('stage')}
-          >
-            <SearchSelect
-              options={stages.map((s) => ({ value: s.id, label: s.name }))}
-              value={account.stage.id}
-              onChange={(v) => saveField({ stageId: v })}
-              placeholder="Search lifecycle stage…"
-            />
           </EditableRow>
           <Row
             label="Lead Status"
