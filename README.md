@@ -32,7 +32,15 @@ supabase/phase-f-deal-lockdown-and-workflow-patch.sql
 Deploy the Edge Functions with the Supabase CLI:
 
 ```bash
-supabase functions deploy resolve-company pick-owner bulk-import create-user
+supabase functions deploy resolve-company pick-owner bulk-import create-user ai-assist
+```
+
+The `ai-assist` function (Deal/Lead "AI Assistant" — Summarize / Draft
+follow-up / Suggest next step) needs an Anthropic API key set as a secret,
+which is never exposed to the frontend:
+
+```bash
+supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
 ```
 
 ### 2. Frontend

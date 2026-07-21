@@ -700,6 +700,22 @@ create table assignment_state (
 );
 
 -- ---------------------------------------------------------------------------
+-- AI ASSIST LOG (Phase T) — backs both the ai-assist Edge Function's rate
+-- limit (count recent rows per user) and its usage log. Written only by the
+-- function's service-role client.
+-- ---------------------------------------------------------------------------
+
+create table ai_assist_log (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references profiles(id) on delete cascade,
+  action text not null check (action in ('summarize', 'followup', 'nextstep')),
+  lead_id uuid references leads(id) on delete set null,
+  opportunity_id uuid references opportunities(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create index ai_assist_log_user_id_created_at_idx on ai_assist_log(user_id, created_at);
+
+-- ---------------------------------------------------------------------------
 -- STORAGE — deal attachments (private bucket; access via RLS on
 -- storage.objects, see rls.sql). Path convention: {opportunity_id}/{uuid}-{filename}.
 -- ---------------------------------------------------------------------------

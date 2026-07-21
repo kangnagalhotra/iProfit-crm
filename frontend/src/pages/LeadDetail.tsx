@@ -17,6 +17,7 @@ import { EditableRow } from '../components/EditableRow';
 import { SearchSelect } from '../components/SearchSelect';
 import { LeadForm } from '../components/LeadForm';
 import { QuickTaskModal } from '../components/QuickTaskModal';
+import { AiAssistCard } from '../components/AiAssistCard';
 import { LeadQualificationCard } from '../components/LeadQualificationCard';
 import { ConvertToDealModal } from '../components/ConvertToDealModal';
 import { LinkContactsModal } from '../components/LinkContactsModal';
@@ -521,6 +522,7 @@ export function LeadDetail() {
           },
         ] as AssociationGroup[]}
       />
+      <AiAssistCard leadId={lead.id} contactName={name} contactEmail={lead.email} contactPhone={lead.mobile} />
       {/* Distinct key prefixes — sibling components sharing the same key value
           makes React reconciliation duplicate/omit cards on re-render. */}
       <ActivityTimeline key={`activity-${activityKey}`} leadId={lead.id} />

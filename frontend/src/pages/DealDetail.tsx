@@ -19,6 +19,7 @@ import { EditableRow } from '../components/EditableRow';
 import { SearchSelect } from '../components/SearchSelect';
 import { DealForm } from '../components/DealForm';
 import { QuickTaskModal } from '../components/QuickTaskModal';
+import { AiAssistCard } from '../components/AiAssistCard';
 import { Icon } from '../components/Icon';
 import { CollapsibleCard } from '../components/CollapsibleCard';
 import { AssociationsPanel } from '../components/AssociationsPanel';
@@ -572,6 +573,12 @@ export function DealDetail() {
       </CollapsibleCard>
 
       <ProposalsCard opportunityId={deal.id} deal={deal} />
+      <AiAssistCard
+        dealId={deal.id}
+        contactName={deal.contact ? [deal.contact.firstName, deal.contact.lastName].filter(Boolean).join(' ') : undefined}
+        contactEmail={deal.contact?.email}
+        contactPhone={deal.contact?.mobile}
+      />
       {deal.stage.isClosedWon && <HealthRenewalCard deal={deal} onDealUpdated={setDeal} />}
       <StageHistoryCard opportunityId={deal.id} />
       {/* Distinct key prefixes — sibling components sharing the same key value

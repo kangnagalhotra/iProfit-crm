@@ -659,6 +659,14 @@ create policy "lead_attachments_storage_delete" on storage.objects for delete to
 
 alter table assignment_state enable row level security;
 
+-- ai_assist_log: written only by the ai-assist Edge Function (service role);
+-- reps read their own usage, managers/admins read everyone's.
+alter table ai_assist_log enable row level security;
+create policy "ai_assist_log_select_own_or_manager" on ai_assist_log for select to authenticated
+  using (user_id = auth.uid() or exists (
+    select 1 from profiles where id = auth.uid() and role in ('ADMIN', 'SALES_MANAGER')
+  ));
+
 -- ---------------------------------------------------------------------------
 -- MERGE ACCOUNTS (companies) — admin/manager only. Repoints every dependent
 -- row (leads, contacts, opportunities, tasks, activities, support tickets)

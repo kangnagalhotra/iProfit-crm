@@ -45,19 +45,20 @@ const textareaStyle = {
 // here needs to write to `activities` directly.
 export function QuickTaskModal({
   type, leadId, accountId, opportunityId, contactId, defaultTitle,
-  contactName, contactEmail, contactPhone, onClose, onSaved,
+  contactName, contactEmail, contactPhone, initialNotes, onClose, onSaved,
 }: {
   type: 'CALL' | 'EMAIL' | 'MEETING';
   leadId?: string; accountId?: string; opportunityId?: string; contactId?: string;
   defaultTitle: string;
   contactName?: string; contactEmail?: string; contactPhone?: string;
+  initialNotes?: string;
   onClose: () => void;
   onSaved: (task: Task, activityType: ActivityType) => void;
 }) {
   const { user } = useAuth();
   const [mode, setMode] = useState<'happened' | 'schedule'>('happened');
   const [title, setTitle] = useState(defaultTitle);
-  const [notes, setNotes] = useState('');
+  const [notes, setNotes] = useState(initialNotes ?? '');
   const [date, setDate] = useState(defaultScheduleDate());
   const [time, setTime] = useState('10:00');
   const [duration, setDuration] = useState(30);
