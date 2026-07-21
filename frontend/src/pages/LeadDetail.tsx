@@ -18,6 +18,9 @@ import { SearchSelect } from '../components/SearchSelect';
 import { LeadForm } from '../components/LeadForm';
 import { QuickTaskModal } from '../components/QuickTaskModal';
 import { AiAssistCard } from '../components/AiAssistCard';
+import { EngagementScoreCell } from '../components/EngagementScoreCell';
+import { DispositionReasonModal } from '../components/DispositionReasonModal';
+import { UNQUALIFIED_REASONS } from '../utils/leadUnqualifiedReasons';
 import { LeadQualificationCard } from '../components/LeadQualificationCard';
 import { ConvertToDealModal } from '../components/ConvertToDealModal';
 import { LinkContactsModal } from '../components/LinkContactsModal';
@@ -117,6 +120,7 @@ export function LeadDetail() {
   const [editingField, setEditingField] = useState<string | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [quickTaskType, setQuickTaskType] = useState<'CALL' | 'EMAIL' | 'MEETING' | null>(null);
+  const [pendingLeadStageId, setPendingLeadStageId] = useState<string | null>(null);
   const [showConvertModal, setShowConvertModal] = useState(false);
   const [showQualifiedPrompt, setShowQualifiedPrompt] = useState(false);
   const [convertedDeal, setConvertedDeal] = useState<{ id: string; name: string } | null>(null);
@@ -173,8 +177,21 @@ export function LeadDetail() {
       const ok = await confirm(BANT_WARNING_MESSAGE, { title: 'BANT/ICP not completed' });
       if (!ok) return;
     }
+    if (newStage?.isLost) {
+      setPendingLeadStageId(newStageId);
+      return;
+    }
     await saveField({ stageId: newStageId });
     if (movingToQualified) setShowQualifiedPrompt(true);
+  }
+
+  async function confirmUnqualifiedReason(reason: string, other: string) {
+    const stageId = pendingLeadStageId;
+    setPendingLeadStageId(null);
+    if (!stageId) return;
+    await saveField({
+      stageId, unqualifiedReason: reason, unqualifiedReasonOther: reason === 'OTHER' ? other : undefined,
+    });
   }
 
   function copyEmail() {
@@ -395,7 +412,7 @@ export function LeadDetail() {
               placeholder="Search stage…"
             />
           </EditableRow>
-          <Row label="Engagement Score" value={<span className="chip">{lead.score}/100</span>} />
+          <Row label="Engagement Score" value={<EngagementScoreCell kind="lead" id={lead.id} score={lead.score} />} />
           <Row label="Lead Source" value={lead.source?.name} onEmptyClick={canEdit ? () => setShowEditModal(true) : undefined} />
           <Row label="Rating" value={lead.rating ? RATING_LABELS[lead.rating] : undefined} onEmptyClick={canEdit ? () => setShowEditModal(true) : undefined} />
           {lead.unqualifiedReason && (
@@ -538,6 +555,15 @@ export function LeadDetail() {
           onSaved={(updated) => {
             setLead(updated); setShowEditModal(false); setActivityKey((k) => k + 1); toast.success('Lead updated');
           }}
+        />
+      )}
+
+      {pendingLeadStageId && (
+        <DispositionReasonModal
+          title="Why is this lead unqualified?"
+          options={UNQUALIFIED_REASONS}
+          onConfirm={confirmUnqualifiedReason}
+          onCancel={() => setPendingLeadStageId(null)}
         />
       )}
 

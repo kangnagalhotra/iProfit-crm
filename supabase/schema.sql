@@ -242,7 +242,10 @@ create table leads (
   last_activity_at timestamptz,
   -- BANT qualification (Budget/Authority/Need/Timeline), each 0-10; shown as
   -- a summed score out of 40 on the Lead Qualification card. Separate and
-  -- unrelated to the 0-100 `score` column above (manual lead-score field).
+  -- unrelated to the 0-100 `score` column above (computed engagement score —
+  -- see refresh_engagement_on_activity()/recompute_engagement_scores() in
+  -- triggers.sql, never hand-edited — BANT/ICP fit only feeds into it as
+  -- one weighted component, see compute_lead_score()).
   budget_score smallint check (budget_score is null or budget_score between 0 and 10),
   authority_score smallint check (authority_score is null or authority_score between 0 and 10),
   need_score smallint check (need_score is null or need_score between 0 and 10),

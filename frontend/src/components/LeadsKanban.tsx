@@ -14,6 +14,8 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 import { isMqlReady, BANT_WARNING_MESSAGE } from '../utils/leadQualification';
+import { DispositionReasonModal } from './DispositionReasonModal';
+import { UNQUALIFIED_REASONS } from '../utils/leadUnqualifiedReasons';
 
 async function loadAllLeads(): Promise<Lead[]> {
   let page = 1;
@@ -56,12 +58,29 @@ export function LeadsKanban() {
   const [formState, setFormState] = useState<{ lead?: Lead; defaultStageId?: string } | null>(null);
   const [convertingLead, setConvertingLead] = useState<Lead | null>(null);
   const [qualifiedPromptLead, setQualifiedPromptLead] = useState<Lead | null>(null);
+  const [pendingDrop, setPendingDrop] = useState<{ leadId: string; stageId: string } | null>(null);
 
   useEffect(() => {
     Promise.all([loadAllLeads(), listStages('lead_stages')])
       .then(([leadRows, stageRes]) => { setLeads(leadRows); setStages(stageRes as LeadStage[]); })
       .finally(() => setLoading(false));
   }, []);
+
+  const commitStageChange = useCallback((leadId: string, toStageId: string, extra?: Record<string, any>) => {
+    const newStage = stages.find((s) => s.id === toStageId)!;
+    const prevLead = leads.find((l) => l.id === leadId);
+    const movingToQualified = newStage.isWon && prevLead && !prevLead.stage.isWon;
+    const prev = leads;
+    setLeads((ls) => ls.map((l) => (l.id === leadId ? { ...l, stage: newStage } : l)));
+    setError('');
+    updateLead(leadId, { stageId: toStageId, ...extra }).then((updated) => {
+      setLeads((ls) => ls.map((l) => (l.id === leadId ? updated : l)));
+      if (movingToQualified) setQualifiedPromptLead(updated);
+    }).catch((e) => {
+      setLeads(prev); // revert optimistic move
+      setError(e.message ?? 'Could not update lead stage');
+    });
+  }, [leads, stages]);
 
   const handleDrop = useCallback(async (leadId: string, _from: string, toStageId: string) => {
     const prevLead = leads.find((l) => l.id === leadId);
@@ -71,17 +90,12 @@ export function LeadsKanban() {
       const ok = await confirm(BANT_WARNING_MESSAGE, { title: 'BANT/ICP not completed' });
       if (!ok) return;
     }
-    const prev = leads;
-    setLeads((ls) => ls.map((l) => (l.id === leadId ? { ...l, stage: newStage } : l)));
-    setError('');
-    updateLead(leadId, { stageId: toStageId }).then((updated) => {
-      setLeads((ls) => ls.map((l) => (l.id === leadId ? updated : l)));
-      if (movingToQualified) setQualifiedPromptLead(updated);
-    }).catch((e) => {
-      setLeads(prev); // revert optimistic move
-      setError(e.message ?? 'Could not update lead stage');
-    });
-  }, [leads, stages, confirm]);
+    if (newStage.isLost) {
+      setPendingDrop({ leadId, stageId: toStageId });
+      return;
+    }
+    commitStageChange(leadId, toStageId);
+  }, [leads, stages, confirm, commitStageChange]);
 
   async function handleDelete(lead: Lead) {
     const name = lead.leadName || [lead.firstName, lead.lastName].filter(Boolean).join(' ') || lead.email || 'this lead';
@@ -257,6 +271,21 @@ export function LeadsKanban() {
             </div>
           </div>
         </div>
+      )}
+
+      {pendingDrop && (
+        <DispositionReasonModal
+          title="Why is this lead unqualified?"
+          options={UNQUALIFIED_REASONS}
+          onConfirm={(reason, other) => {
+            const { leadId, stageId } = pendingDrop;
+            setPendingDrop(null);
+            commitStageChange(leadId, stageId, {
+              unqualifiedReason: reason, unqualifiedReasonOther: reason === 'OTHER' ? other : undefined,
+            });
+          }}
+          onCancel={() => setPendingDrop(null)}
+        />
       )}
     </div>
   );

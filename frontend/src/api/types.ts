@@ -62,8 +62,10 @@ export interface Lead {
   stage: LeadStage;
   source?: { id: string; name: string };
   sourceDetails?: string;
-  // 0-100 manual field, unrelated to the BANT budget/authority/need/timeline
-  // sum below (separate concept, separate scale).
+  // 0-100 computed engagement score (activity weighting + BANT/ICP fit +
+  // recency decay — see compute_lead_score() in triggers.sql, never
+  // hand-edited). Separate concept/scale from the BANT budget/authority/
+  // need/timeline sum below, which is one input into it.
   score: number;
   rating?: LeadRating;
   unqualifiedReason?: LeadUnqualifiedReason;

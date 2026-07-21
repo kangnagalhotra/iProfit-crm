@@ -20,6 +20,9 @@ import { SearchSelect } from '../components/SearchSelect';
 import { DealForm } from '../components/DealForm';
 import { QuickTaskModal } from '../components/QuickTaskModal';
 import { AiAssistCard } from '../components/AiAssistCard';
+import { EngagementScoreCell } from '../components/EngagementScoreCell';
+import { DispositionReasonModal } from '../components/DispositionReasonModal';
+import { DEAL_LOSS_REASONS, DEAL_LOSS_REASON_OTHER } from '../utils/dealLossReasons';
 import { Icon } from '../components/Icon';
 import { CollapsibleCard } from '../components/CollapsibleCard';
 import { AssociationsPanel } from '../components/AssociationsPanel';
@@ -114,6 +117,7 @@ export function DealDetail() {
   const [editingField, setEditingField] = useState<string | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [quickTaskType, setQuickTaskType] = useState<'CALL' | 'EMAIL' | 'MEETING' | null>(null);
+  const [pendingDealStageId, setPendingDealStageId] = useState<string | null>(null);
   const [forecastDraft, setForecastDraft] = useState<ForecastCategory | null>(null);
   const [forecastJustificationDraft, setForecastJustificationDraft] = useState('');
   const [moreOpen, setMoreOpen] = useState(false);
@@ -169,6 +173,23 @@ export function DealDetail() {
     } catch (e: any) {
       toast.error(e.message ?? 'Could not update deal');
     }
+  }
+
+  function onInlineStageChange(newStageId: string) {
+    const newStage = stages.find((s) => s.id === newStageId);
+    if (newStage?.isClosedLost) {
+      setPendingDealStageId(newStageId);
+      return;
+    }
+    saveField({ stageId: newStageId });
+  }
+
+  function confirmLossReason(reason: string, other: string) {
+    const stageId = pendingDealStageId;
+    setPendingDealStageId(null);
+    if (!stageId) return;
+    const label = DEAL_LOSS_REASONS.find((r) => r.value === reason)?.label ?? reason;
+    saveField({ stageId, lossReason: reason === DEAL_LOSS_REASON_OTHER ? other : label });
   }
 
   // Forecast override: picking something MORE optimistic than the
@@ -392,7 +413,7 @@ export function DealDetail() {
             <SearchSelect
               options={stages.map((s) => ({ value: s.id, label: s.name }))}
               value={deal.stage.id}
-              onChange={(v) => saveField({ stageId: v })}
+              onChange={(v) => v && onInlineStageChange(v)}
               placeholder="Search stage…"
             />
           </EditableRow>
@@ -407,7 +428,7 @@ export function DealDetail() {
               </span>
             )}
           />
-          <Row label="Engagement Score" value={<span className="chip">{deal.score}/100</span>} />
+          <Row label="Engagement Score" value={<EngagementScoreCell kind="deal" id={deal.id} score={deal.score} />} />
           <EditableRow
             label="Forecast Category"
             value={(
@@ -612,6 +633,16 @@ export function DealDetail() {
           contactPhone={deal.contact?.mobile}
           onClose={() => setQuickTaskType(null)}
           onSaved={onQuickTaskSaved}
+        />
+      )}
+
+      {pendingDealStageId && (
+        <DispositionReasonModal
+          title="Why is this deal closed lost?"
+          options={DEAL_LOSS_REASONS}
+          otherTriggerValue={DEAL_LOSS_REASON_OTHER}
+          onConfirm={confirmLossReason}
+          onCancel={() => setPendingDealStageId(null)}
         />
       )}
 

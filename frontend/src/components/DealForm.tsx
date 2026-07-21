@@ -23,11 +23,12 @@ import { LineItemsEditor } from './LineItemsEditor';
 import { TagsInput } from './TagsInput';
 import { FileUploadList } from './FileUploadList';
 import type { PendingOrUploadedFile } from './FileUploadList';
+import { SelectWithOther } from './SelectWithOther';
+import { DEAL_LOSS_REASONS, DEAL_LOSS_REASON_OTHER } from '../utils/dealLossReasons';
 
 const DEAL_TYPES: DealType[] = ['NEW_BUSINESS', 'EXISTING_BUSINESS', 'RENEWAL', 'UPSELL'];
 const DEAL_PRIORITIES: DealPriority[] = ['LOW', 'MEDIUM', 'HIGH'];
 const CURRENCIES: Currency[] = ['USD', 'EUR', 'GBP', 'INR'];
-const LOST_REASONS = ['Price', 'Competitor', 'No Budget', 'Bad Timing', 'No Decision'];
 const DECISION_TIMEFRAMES: { value: DecisionTimeframe; label: string }[] = [
   { value: 'LESS_THAN_1_MONTH', label: '< 1 month' },
   { value: 'ONE_TO_3_MONTHS', label: '1–3 months' },
@@ -55,7 +56,8 @@ interface DealFormState {
   nextStep: string;
   nextActivityDate: string;
   competitor: string;
-  lossReason: string;
+  lossReasonCode: string;
+  lossReasonOther: string;
   lineItems: LineItem[];
   budgetConfirmed: '' | 'YES' | 'NO';
   decisionTimeframe: string;
@@ -66,6 +68,10 @@ interface DealFormState {
 }
 
 function initialState(deal: Opportunity): DealFormState {
+  // A recognized preset pre-selects that option; any other existing text
+  // (legacy free-text entries predating the Other option) pre-fills the
+  // Other box instead of being silently dropped.
+  const knownReason = deal.lossReason && DEAL_LOSS_REASONS.some((r) => r.value === deal.lossReason);
   return {
     name: deal.name ?? '',
     amount: deal.amount ?? '',
@@ -86,7 +92,8 @@ function initialState(deal: Opportunity): DealFormState {
     nextStep: deal.nextStep ?? '',
     nextActivityDate: deal.nextActivityDate ? deal.nextActivityDate.slice(0, 10) : '',
     competitor: deal.competitor ?? '',
-    lossReason: deal.lossReason ?? '',
+    lossReasonCode: deal.lossReason ? (knownReason ? deal.lossReason : DEAL_LOSS_REASON_OTHER) : '',
+    lossReasonOther: deal.lossReason && !knownReason ? deal.lossReason : '',
     lineItems: [],
     budgetConfirmed: deal.budgetConfirmed === true ? 'YES' : deal.budgetConfirmed === false ? 'NO' : '',
     decisionTimeframe: deal.decisionTimeframe ?? '',
@@ -190,9 +197,15 @@ export function DealForm({
     if (!form.name.trim()) { setError('Deal name is required.'); return; }
     if (Number(form.amount) < 0) { setError('Value cannot be negative.'); return; }
     if (form.expectedRevenue !== '' && Number(form.expectedRevenue) < 0) { setError('Expected revenue cannot be negative.'); return; }
-    if (selectedStage?.isClosedLost && !form.lossReason.trim()) {
-      setError('Lost reason is required for a closed-lost stage.');
-      return;
+    if (selectedStage?.isClosedLost) {
+      if (!form.lossReasonCode) {
+        setError('Lost reason is required for a closed-lost stage.');
+        return;
+      }
+      if (form.lossReasonCode === DEAL_LOSS_REASON_OTHER && !form.lossReasonOther.trim()) {
+        setError('Please specify the lost reason.');
+        return;
+      }
     }
 
     setSaving(true);
@@ -216,7 +229,9 @@ export function DealForm({
         nextStep: form.nextStep || undefined,
         nextActivityDate: form.nextActivityDate || undefined,
         competitor: form.competitor || undefined,
-        lossReason: selectedStage?.isClosedLost ? form.lossReason : undefined,
+        lossReason: selectedStage?.isClosedLost
+          ? (form.lossReasonCode === DEAL_LOSS_REASON_OTHER ? form.lossReasonOther.trim() : form.lossReasonCode)
+          : undefined,
         budgetConfirmed: form.budgetConfirmed === '' ? undefined : form.budgetConfirmed === 'YES',
         decisionTimeframe: form.decisionTimeframe || undefined,
         painPoint: form.painPoint || undefined,
@@ -383,10 +398,14 @@ export function DealForm({
                   <input value={form.competitor} onChange={(e) => set('competitor', e.target.value)} /></div>
                 {selectedStage?.isClosedLost && (
                   <div className="field field-span-2"><label>Lost reason*</label>
-                    <select value={form.lossReason} onChange={(e) => set('lossReason', e.target.value)}>
-                      <option value="">—</option>
-                      {LOST_REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
-                    </select>
+                    <SelectWithOther
+                      options={DEAL_LOSS_REASONS}
+                      value={form.lossReasonCode}
+                      onChange={(v) => set('lossReasonCode', v)}
+                      otherValue={form.lossReasonOther}
+                      onOtherChange={(v) => set('lossReasonOther', v)}
+                      otherTriggerValue={DEAL_LOSS_REASON_OTHER}
+                    />
                   </div>
                 )}
               </div>

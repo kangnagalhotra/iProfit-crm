@@ -16,6 +16,7 @@ import { SearchSelect } from './SearchSelect';
 import type { SearchSelectOption } from './SearchSelect';
 import { MultiEntitySelect } from './MultiEntitySelect';
 import { SelectWithOther } from './SelectWithOther';
+import { UNQUALIFIED_REASONS } from '../utils/leadUnqualifiedReasons';
 import { SocialLinksEditor, validateSocialUrl } from './SocialLinksEditor';
 import type { OtherSocialLink } from './SocialLinksEditor';
 import { CreateUserModal } from './CreateUserModal';
@@ -37,14 +38,6 @@ import {
 
 const RATINGS: LeadRating[] = ['HOT', 'WARM', 'COLD'];
 const CURRENCIES: Currency[] = ['USD', 'EUR', 'GBP', 'INR'];
-const UNQUALIFIED_REASONS: { value: LeadUnqualifiedReason; label: string }[] = [
-  { value: 'NO_BUDGET', label: 'No Budget' },
-  { value: 'NOT_A_FIT', label: 'Not a Fit' },
-  { value: 'NO_RESPONSE', label: 'No Response' },
-  { value: 'COMPETITOR', label: 'Competitor' },
-  { value: 'BAD_DATA', label: 'Bad Data' },
-  { value: 'OTHER', label: 'Other' },
-];
 const INDUSTRY_OPTIONS: SearchSelectOption[] = INDUSTRIES.map((v) => ({ value: v, label: v }));
 const SIZE_OPTIONS: SearchSelectOption[] = COMPANY_SIZES.map((v) => ({ value: v, label: v }));
 

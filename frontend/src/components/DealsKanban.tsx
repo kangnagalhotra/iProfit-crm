@@ -14,6 +14,8 @@ import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 import { closedWonHandoverMessage } from '../utils/dealAutomation';
 import { idleDays, ROTTING_WARN_DAYS, STALLED_AFTER_DAYS } from '../utils/nextBestAction';
+import { DispositionReasonModal } from './DispositionReasonModal';
+import { DEAL_LOSS_REASONS, DEAL_LOSS_REASON_OTHER } from '../utils/dealLossReasons';
 
 async function loadAllDeals(): Promise<Opportunity[]> {
   let page = 1;
@@ -53,6 +55,7 @@ export function DealsKanban() {
   const [addingStage, setAddingStage] = useState(false);
   const [newStageName, setNewStageName] = useState('');
   const [editingDeal, setEditingDeal] = useState<Opportunity | null>(null);
+  const [pendingDrop, setPendingDrop] = useState<{ dealId: string; stageId: string } | null>(null);
 
   useEffect(() => {
     Promise.all([loadAllDeals(), listStages('deal_stages')])
@@ -60,13 +63,13 @@ export function DealsKanban() {
       .finally(() => setLoading(false));
   }, []);
 
-  const handleDrop = useCallback((dealId: string, _from: string, toStageId: string) => {
+  const commitStageChange = useCallback((dealId: string, toStageId: string, extra?: Record<string, any>) => {
     const prev = deals;
     const prevStage = prev.find((d) => d.id === dealId)?.stage;
     const newStage = stages.find((s) => s.id === toStageId)!;
     setDeals((ds) => ds.map((d) => (d.id === dealId ? { ...d, stage: newStage } : d)));
     setError('');
-    updateDeal(dealId, { stageId: toStageId }).then(() => {
+    updateDeal(dealId, { stageId: toStageId, ...extra }).then(() => {
       const msg = closedWonHandoverMessage(prevStage, newStage);
       if (msg) toast.success(msg);
     }).catch((e) => {
@@ -74,6 +77,15 @@ export function DealsKanban() {
       setError(e.message ?? 'Could not update deal stage');
     });
   }, [deals, stages, toast]);
+
+  const handleDrop = useCallback((dealId: string, _from: string, toStageId: string) => {
+    const newStage = stages.find((s) => s.id === toStageId)!;
+    if (newStage.isClosedLost) {
+      setPendingDrop({ dealId, stageId: toStageId });
+      return;
+    }
+    commitStageChange(dealId, toStageId);
+  }, [stages, commitStageChange]);
 
   async function handleDelete(deal: Opportunity) {
     const ok = await confirm(`Delete "${deal.name}"? This cannot be undone.`, { title: 'Delete deal' });
@@ -226,6 +238,21 @@ export function DealsKanban() {
             const handoverMsg = closedWonHandoverMessage(editingDeal.stage, saved.stage);
             if (handoverMsg) toast.success(handoverMsg);
           }}
+        />
+      )}
+
+      {pendingDrop && (
+        <DispositionReasonModal
+          title="Why is this deal closed lost?"
+          options={DEAL_LOSS_REASONS}
+          otherTriggerValue={DEAL_LOSS_REASON_OTHER}
+          onConfirm={(reason, other) => {
+            const { dealId, stageId } = pendingDrop;
+            setPendingDrop(null);
+            const label = DEAL_LOSS_REASONS.find((r) => r.value === reason)?.label ?? reason;
+            commitStageChange(dealId, stageId, { lossReason: reason === DEAL_LOSS_REASON_OTHER ? other : label });
+          }}
+          onCancel={() => setPendingDrop(null)}
         />
       )}
     </div>
