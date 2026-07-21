@@ -1,3 +1,5 @@
+import { SearchSelect } from './SearchSelect';
+
 export interface FilterFieldOption {
   value: string;
   label: string;
@@ -21,14 +23,14 @@ export function FilterBar({
   return (
     <div className="filter-bar">
       {fields.map((f) => (
-        <select
-          key={f.key}
-          value={values[f.key] ?? ''}
-          onChange={(e) => onChange({ ...values, [f.key]: e.target.value })}
-        >
-          <option value="">{f.label}: All</option>
-          {f.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
+        <div key={f.key} className="filter-bar-field">
+          <SearchSelect
+            options={f.options}
+            value={values[f.key] ?? ''}
+            onChange={(v) => onChange({ ...values, [f.key]: v })}
+            placeholder={`${f.label}: All`}
+          />
+        </div>
       ))}
       {hasActive && (
         <button

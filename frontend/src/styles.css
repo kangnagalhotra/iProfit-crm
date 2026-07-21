@@ -532,8 +532,8 @@ th.sortable:focus-visible { outline: none; box-shadow: inset var(--focus-ring); 
 .column-visibility-item input { cursor: pointer; }
 .column-visibility-item input:disabled { cursor: not-allowed; }
 
-.filter-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
-.filter-bar select { padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); font-size: 13px; }
+.filter-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; align-items: flex-start; }
+.filter-bar-field { width: 180px; }
 
 .saved-view-chip-wrap { display: inline-flex; align-items: center; gap: 4px; }
 .saved-view-actions { display: inline-flex; align-items: center; gap: 2px; }
