@@ -242,13 +242,23 @@ export function QuickTaskModal({
           {addFollowUp && (
             <div style={{ marginTop: 8 }}>
               <div style={{ display: 'flex', gap: 10 }}>
-                <div className="field" style={{ flex: 1 }}><label>Follow-up type</label>
-                  <select value={followUpType} onChange={(e) => setFollowUpType(e.target.value as typeof type)}>
-                    <option value="CALL">Call</option>
-                    <option value="EMAIL">Email</option>
-                    <option value="MEETING">Meeting</option>
-                    <option value="OTHER">Other Activity</option>
-                  </select>
+                <div className="field" style={{ flex: 1 }}>
+                  <label>Follow-up type</label>
+                  {type === 'OTHER' ? (
+                    <select value={followUpType} onChange={(e) => setFollowUpType(e.target.value as typeof type)}>
+                      <option value="CALL">Call</option>
+                      <option value="EMAIL">Email</option>
+                      <option value="MEETING">Meeting</option>
+                      <option value="OTHER">Other Activity</option>
+                    </select>
+                  ) : (
+                    // Follow-up naturally matches what was just logged — a Call's
+                    // follow-up is another Call, etc. — so this is fixed, not a
+                    // choice, when the original type is one of these three.
+                    <div style={{ padding: '9px 11px', color: 'var(--muted)' }}>
+                      {followUpType === 'CALL' ? 'Call' : followUpType === 'EMAIL' ? 'Email' : 'Meeting'}
+                    </div>
+                  )}
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
