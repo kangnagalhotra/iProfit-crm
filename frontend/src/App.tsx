@@ -13,6 +13,7 @@ import { DealsList } from './pages/DealsList';
 import { DealDetail } from './pages/DealDetail';
 import { ProductsList } from './pages/ProductsList';
 import { Reports } from './pages/Reports';
+import { RepPerformance } from './pages/RepPerformance';
 import { ClientHealth } from './pages/ClientHealth';
 import { SettingsAutomation } from './pages/SettingsAutomation';
 import { SettingsLeadSources } from './pages/SettingsLeadSources';
@@ -39,6 +40,7 @@ const NAV_LINKS: { to: string; label: string; icon: IconName; end?: boolean }[] 
   { to: '/products', label: 'Products', icon: 'inbox' },
   { to: '/pipeline', label: 'Pipeline', icon: 'columns' },
   { to: '/reports', label: 'Reports', icon: 'filter' },
+  { to: '/rep-performance', label: 'Rep Performance', icon: 'clock' },
   { to: '/client-health', label: 'Client Health', icon: 'headset' },
   { to: '/customer-success', label: 'Customer Success', icon: 'headset' },
   { to: '/support-tickets', label: 'Support Tickets', icon: 'ticket' },
@@ -109,6 +111,7 @@ export function App() {
       <Route path="/deals/:id" element={<Protected><DealDetail /></Protected>} />
       <Route path="/products" element={<Protected><ProductsList /></Protected>} />
       <Route path="/reports" element={<Protected><Reports /></Protected>} />
+      <Route path="/rep-performance" element={<Protected><RepPerformance /></Protected>} />
       <Route path="/client-health" element={<Protected><ClientHealth /></Protected>} />
       <Route path="/settings/automation" element={<Protected><SettingsAutomation /></Protected>} />
       <Route path="/settings/lead-sources" element={<Protected><SettingsLeadSources /></Protected>} />
