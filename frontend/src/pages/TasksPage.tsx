@@ -89,6 +89,7 @@ export function TasksPage() {
   const [dueFilter, setDueFilter] = useState<DueFilter>('');
   const [priorityFilter, setPriorityFilter] = useState<TaskPriority | ''>('');
   const [ownerFilter, setOwnerFilter] = useState('');
+  const [sourceFilter, setSourceFilter] = useState<'MANUAL' | 'QUICK_ACTION' | ''>('');
   const [view, setView] = useState<ListView>('board');
   const [showForm, setShowForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -116,6 +117,7 @@ export function TasksPage() {
     dueFilter: dueFilter || undefined,
     priority: priorityFilter || undefined,
     assigneeId: ownerFilter || undefined,
+    createdVia: sourceFilter || undefined,
   };
 
   const load = useCallback(() => {
@@ -126,11 +128,11 @@ export function TasksPage() {
       .then((data) => { setTasks(data.data); setTotal(data.total); setSelected(new Set()); })
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, dueFilter, priorityFilter, ownerFilter, page, pageSize, sortBy, sortDir]);
+  }, [search, dueFilter, priorityFilter, ownerFilter, sourceFilter, page, pageSize, sortBy, sortDir]);
 
   useEffect(() => { loadSummary(); }, []);
   useEffect(() => { if (view === 'board') load(); }, [load, view]);
-  useEffect(() => { setPage(1); }, [search, dueFilter, priorityFilter, ownerFilter]);
+  useEffect(() => { setPage(1); }, [search, dueFilter, priorityFilter, ownerFilter, sourceFilter]);
 
   function toggleSort(field: SortBy) {
     if (sortBy === field) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
@@ -234,6 +236,12 @@ export function TasksPage() {
                 style={{ padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 6 }}>
                 <option value="">All owners</option>
                 {users.map((u) => <option key={u.id} value={u.id}>{u.fullName}</option>)}
+              </select>
+              <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value as 'MANUAL' | 'QUICK_ACTION' | '')}
+                style={{ padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 6 }}>
+                <option value="">All sources</option>
+                <option value="MANUAL">Manual</option>
+                <option value="QUICK_ACTION">Quick action</option>
               </select>
               <ExportMenu
                 columns={EXPORT_COLUMNS}

@@ -10,6 +10,7 @@ import { SearchSelect } from '../components/SearchSelect';
 import type { SearchSelectOption } from '../components/SearchSelect';
 import { MultiEntitySelect } from '../components/MultiEntitySelect';
 import { ContactForm } from '../components/ContactForm';
+import { QuickTaskModal } from '../components/QuickTaskModal';
 import { Icon } from '../components/Icon';
 import { CollapsibleCard } from '../components/CollapsibleCard';
 import { SkeletonDetailPage } from '../components/Skeleton';
@@ -43,6 +44,7 @@ export function ContactDetail() {
   const [users, setUsers] = useState<User[]>([]);
   const [editingField, setEditingField] = useState<string | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [quickTaskType, setQuickTaskType] = useState<'CALL' | 'EMAIL' | 'MEETING' | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -130,24 +132,27 @@ export function ContactDetail() {
           </div>
 
           <div className="quick-actions">
-            <a
+            <button
+              type="button"
               className={`quick-action${contact.email ? '' : ' disabled'}`}
-              href={contact.email ? `mailto:${contact.email}` : undefined}
-              aria-disabled={!contact.email}
-              tabIndex={contact.email ? 0 : -1}
-              title={contact.email ? `Email ${contact.email}` : 'No email on file'}
+              disabled={!contact.email}
+              title={contact.email ? `Log an email to ${contact.email}` : 'No email on file'}
+              onClick={() => setQuickTaskType('EMAIL')}
             >
               <span className="icon"><Icon name="mail" size={18} /></span>Email
-            </a>
-            <a
+            </button>
+            <button
+              type="button"
               className={`quick-action${contact.mobile ? '' : ' disabled'}`}
-              href={contact.mobile ? `tel:${contact.mobile}` : undefined}
-              aria-disabled={!contact.mobile}
-              tabIndex={contact.mobile ? 0 : -1}
-              title={contact.mobile ? `Call ${contact.mobile}` : 'No mobile number on file'}
+              disabled={!contact.mobile}
+              title={contact.mobile ? `Log a call to ${contact.mobile}` : 'No mobile number on file'}
+              onClick={() => setQuickTaskType('CALL')}
             >
               <span className="icon"><Icon name="phone" size={18} /></span>Call
-            </a>
+            </button>
+            <button className="quick-action" onClick={() => setQuickTaskType('MEETING')}>
+              <span className="icon"><Icon name="calendar" size={18} /></span>Meeting
+            </button>
           </div>
         </div>
 
@@ -273,6 +278,22 @@ export function ContactDetail() {
           contact={contact}
           onClose={() => setShowEditModal(false)}
           onSaved={(updated) => { setContact(updated); setShowEditModal(false); toast.success('Contact updated'); }}
+        />
+      )}
+
+      {quickTaskType && (
+        <QuickTaskModal
+          type={quickTaskType}
+          contactId={contact.id}
+          defaultTitle={`${quickTaskType === 'CALL' ? 'Call' : quickTaskType === 'EMAIL' ? 'Email' : 'Meeting'} with ${contactName(contact)}`}
+          contactName={contactName(contact)}
+          contactEmail={contact.email}
+          contactPhone={contact.mobile}
+          onClose={() => setQuickTaskType(null)}
+          onSaved={(task) => {
+            setQuickTaskType(null);
+            toast.success(task.status === 'COMPLETED' ? 'Logged' : 'Task scheduled');
+          }}
         />
       )}
     </div>

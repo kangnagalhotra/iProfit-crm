@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import type {
-  Account, ActivityType, Contact, DealContact, DealContactRole, DealStage, ForecastCategory, Opportunity, User,
+  Account, ActivityType, Contact, DealContact, DealContactRole, DealStage, ForecastCategory, Opportunity, Task, User,
 } from '../api/types';
 import {
   getDeal, updateDeal, createDeal, deleteDeal,
@@ -18,8 +18,7 @@ import { ActivityTimeline } from '../components/ActivityTimeline';
 import { EditableRow } from '../components/EditableRow';
 import { SearchSelect } from '../components/SearchSelect';
 import { DealForm } from '../components/DealForm';
-import { AddActivityModal } from '../components/AddActivityModal';
-import { ScheduleMeetingModal } from '../components/ScheduleMeetingModal';
+import { QuickTaskModal } from '../components/QuickTaskModal';
 import { Icon } from '../components/Icon';
 import { CollapsibleCard } from '../components/CollapsibleCard';
 import { AssociationsPanel } from '../components/AssociationsPanel';
@@ -113,8 +112,7 @@ export function DealDetail() {
   const [dealContacts, setDealContacts] = useState<DealContact[]>([]);
   const [editingField, setEditingField] = useState<string | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [showAddActivity, setShowAddActivity] = useState(false);
-  const [showScheduleMeeting, setShowScheduleMeeting] = useState(false);
+  const [quickTaskType, setQuickTaskType] = useState<'CALL' | 'EMAIL' | 'MEETING' | null>(null);
   const [forecastDraft, setForecastDraft] = useState<ForecastCategory | null>(null);
   const [forecastJustificationDraft, setForecastJustificationDraft] = useState('');
   const [moreOpen, setMoreOpen] = useState(false);
@@ -190,11 +188,13 @@ export function DealDetail() {
     saveField({ forecastCategory: value, forecastJustification: null });
   }
 
-  async function onActivityLogged(activityType: ActivityType) {
-    setShowAddActivity(false);
+  async function onQuickTaskSaved(task: Task, activityType: ActivityType) {
+    setQuickTaskType(null);
     setActivityKey((k) => k + 1);
-    toast.success('Activity added');
-    // Activity-based stage advancement — toast with Undo, never silent.
+    toast.success(task.status === 'COMPLETED' ? 'Logged' : 'Task scheduled');
+    // Activity-based stage advancement — only for things that already
+    // happened, not a future scheduled task. Toast with Undo, never silent.
+    if (task.status !== 'COMPLETED') return;
     const result = await evaluateStageAutomation(deal!, activityType);
     const refreshed = await getDeal(deal!.id).catch(() => null);
     if (refreshed) setDeal(refreshed);
@@ -272,7 +272,7 @@ export function DealDetail() {
           <div className="detail-header-actions">
             <button className="btn btn-icon" onClick={() => setShowEditModal(true)}><Icon name="edit" size={14} /> Edit Details</button>
             <button className="btn secondary btn-icon" onClick={scrollToTasks}><Icon name="check" size={14} /> Add Task</button>
-            <button className="btn secondary btn-icon" onClick={() => setShowScheduleMeeting(true)}><Icon name="calendar" size={14} /> Schedule Meeting</button>
+            <button className="btn secondary btn-icon" onClick={() => setQuickTaskType('MEETING')}><Icon name="calendar" size={14} /> Schedule Meeting</button>
             <div className="dropdown-wrap" ref={moreRef}>
               <button className="btn secondary btn-icon" onClick={() => setMoreOpen((o) => !o)}><Icon name="dots" size={14} /> More Actions</button>
               {moreOpen && (
@@ -282,8 +282,7 @@ export function DealDetail() {
                   <button onClick={() => { setMoreOpen(false); setEditingField('stage'); scrollToKeyInfo(); }}>Change Status</button>
                   <button onClick={() => { setMoreOpen(false); scrollToNotes(); }}>Add Note</button>
                   <button onClick={() => { setMoreOpen(false); scrollToTasks(); }}>Add Task</button>
-                  <button onClick={() => { setMoreOpen(false); setShowAddActivity(true); }}>Add Activity</button>
-                  <button onClick={() => { setMoreOpen(false); setShowScheduleMeeting(true); }}>Schedule Meeting</button>
+                  <button onClick={() => { setMoreOpen(false); setQuickTaskType('MEETING'); }}>Schedule Meeting</button>
                   <button onClick={() => { setMoreOpen(false); duplicateRecord(); }}>Duplicate Record</button>
                   <button onClick={() => { setMoreOpen(false); saveField({ archivedAt: deal.archivedAt ? null : new Date().toISOString() }); }}>
                     {deal.archivedAt ? 'Unarchive Record' : 'Archive Record'}
@@ -296,31 +295,31 @@ export function DealDetail() {
         </div>
 
         <div className="quick-actions">
-          <a
+          <button
+            type="button"
             className={`quick-action${deal.contact?.email ? '' : ' disabled'}`}
-            href={deal.contact?.email ? `mailto:${deal.contact.email}` : undefined}
-            aria-disabled={!deal.contact?.email}
-            tabIndex={deal.contact?.email ? 0 : -1}
-            title={deal.contact?.email ? `Email ${deal.contact.email}` : 'No email on file'}
+            disabled={!deal.contact?.email}
+            title={deal.contact?.email ? `Log an email to ${deal.contact.email}` : 'No email on file'}
+            onClick={() => setQuickTaskType('EMAIL')}
           >
             <span className="icon"><Icon name="mail" size={18} /></span>Email
-          </a>
-          <a
+          </button>
+          <button
+            type="button"
             className={`quick-action${deal.contact?.mobile ? '' : ' disabled'}`}
-            href={deal.contact?.mobile ? `tel:${deal.contact.mobile}` : undefined}
-            aria-disabled={!deal.contact?.mobile}
-            tabIndex={deal.contact?.mobile ? 0 : -1}
-            title={deal.contact?.mobile ? `Call ${deal.contact.mobile}` : 'No mobile number on file'}
+            disabled={!deal.contact?.mobile}
+            title={deal.contact?.mobile ? `Log a call to ${deal.contact.mobile}` : 'No mobile number on file'}
+            onClick={() => setQuickTaskType('CALL')}
           >
             <span className="icon"><Icon name="phone" size={18} /></span>Call
-          </a>
+          </button>
           <button className="quick-action" onClick={scrollToNotes}>
             <span className="icon"><Icon name="note" size={18} /></span>Note
           </button>
           <button className="quick-action" onClick={scrollToTasks}>
             <span className="icon"><Icon name="check" size={18} /></span>Task
           </button>
-          <button className="quick-action" onClick={() => setShowScheduleMeeting(true)}>
+          <button className="quick-action" onClick={() => setQuickTaskType('MEETING')}>
             <span className="icon"><Icon name="calendar" size={18} /></span>Meeting
           </button>
         </div>
@@ -578,7 +577,7 @@ export function DealDetail() {
       {/* Distinct key prefixes — sibling components sharing the same key value
           makes React reconciliation duplicate/omit cards on re-render. */}
       <ActivityTimeline key={`activity-${activityKey}`} opportunityId={deal.id} />
-      <TasksWidget key={`tasks-${activityKey}`} opportunityId={deal.id} />
+      <TasksWidget key={`tasks-${activityKey}`} opportunityId={deal.id} onChanged={() => setActivityKey((k) => k + 1)} />
       <NotesSection opportunityId={deal.id} />
       </div>
       </div>
@@ -595,26 +594,17 @@ export function DealDetail() {
         />
       )}
 
-      {showAddActivity && (
-        <AddActivityModal
+      {quickTaskType && (
+        <QuickTaskModal
+          type={quickTaskType}
           opportunityId={deal.id}
-          onClose={() => setShowAddActivity(false)}
-          onSaved={onActivityLogged}
-        />
-      )}
-
-      {showScheduleMeeting && (
-        <ScheduleMeetingModal
-          opportunityId={deal.id}
-          defaultTitle={`Meeting with ${deal.contact ? [deal.contact.firstName, deal.contact.lastName].filter(Boolean).join(' ') || deal.contact.email : deal.name}`}
-          attendeeName={deal.contact ? [deal.contact.firstName, deal.contact.lastName].filter(Boolean).join(' ') : undefined}
-          attendeeEmail={deal.contact?.email}
-          onClose={() => setShowScheduleMeeting(false)}
-          onScheduled={() => {
-            setShowScheduleMeeting(false);
-            setActivityKey((k) => k + 1);
-            toast.success('Meeting scheduled — invite downloaded');
-          }}
+          contactId={deal.contact?.id}
+          defaultTitle={`${quickTaskType === 'CALL' ? 'Call' : quickTaskType === 'EMAIL' ? 'Email' : 'Meeting'} with ${deal.contact ? [deal.contact.firstName, deal.contact.lastName].filter(Boolean).join(' ') || deal.contact.email : deal.name}`}
+          contactName={deal.contact ? [deal.contact.firstName, deal.contact.lastName].filter(Boolean).join(' ') : undefined}
+          contactEmail={deal.contact?.email}
+          contactPhone={deal.contact?.mobile}
+          onClose={() => setQuickTaskType(null)}
+          onSaved={onQuickTaskSaved}
         />
       )}
 

@@ -16,8 +16,7 @@ import { ActivityTimeline } from '../components/ActivityTimeline';
 import { EditableRow } from '../components/EditableRow';
 import { SearchSelect } from '../components/SearchSelect';
 import { LeadForm } from '../components/LeadForm';
-import { AddActivityModal } from '../components/AddActivityModal';
-import { ScheduleMeetingModal } from '../components/ScheduleMeetingModal';
+import { QuickTaskModal } from '../components/QuickTaskModal';
 import { LeadQualificationCard } from '../components/LeadQualificationCard';
 import { ConvertToDealModal } from '../components/ConvertToDealModal';
 import { LinkContactsModal } from '../components/LinkContactsModal';
@@ -116,8 +115,7 @@ export function LeadDetail() {
   const [stages, setStages] = useState<LeadStage[]>([]);
   const [editingField, setEditingField] = useState<string | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [showAddActivity, setShowAddActivity] = useState(false);
-  const [showScheduleMeeting, setShowScheduleMeeting] = useState(false);
+  const [quickTaskType, setQuickTaskType] = useState<'CALL' | 'EMAIL' | 'MEETING' | null>(null);
   const [showConvertModal, setShowConvertModal] = useState(false);
   const [showQualifiedPrompt, setShowQualifiedPrompt] = useState(false);
   const [convertedDeal, setConvertedDeal] = useState<{ id: string; name: string } | null>(null);
@@ -197,12 +195,14 @@ export function LeadDetail() {
     }
   }
 
-  async function onActivityLogged(activityType: import('../api/types').ActivityType) {
-    setShowAddActivity(false);
+  async function onQuickTaskSaved(task: import('../api/types').Task, activityType: import('../api/types').ActivityType) {
+    setQuickTaskType(null);
     setActivityKey((k) => k + 1);
-    toast.success('Activity added');
+    toast.success(task.status === 'COMPLETED' ? 'Logged' : 'Task scheduled');
     // Lead progression automation (New -> Attempted Contact -> Contacted) —
-    // toast with Undo, never silent; Qualified stays gated behind MQL.
+    // only for things that already happened, not a future scheduled task.
+    // Toast with Undo, never silent; Qualified stays gated behind MQL.
+    if (task.status !== 'COMPLETED') return;
     const result = await evaluateLeadAutomation(lead!, activityType, stages);
     const refreshed = await getLead(lead!.id).catch(() => null);
     if (refreshed) setLead(refreshed);
@@ -304,7 +304,7 @@ export function LeadDetail() {
               </button>
             )}
             <button className="btn secondary btn-icon" onClick={scrollToTasks}><Icon name="check" size={14} /> Add Task</button>
-            <button className="btn secondary btn-icon" onClick={() => setShowScheduleMeeting(true)}><Icon name="calendar" size={14} /> Schedule Meeting</button>
+            <button className="btn secondary btn-icon" onClick={() => setQuickTaskType('MEETING')}><Icon name="calendar" size={14} /> Schedule Meeting</button>
             <div className="dropdown-wrap" ref={moreRef}>
               <button className="btn secondary btn-icon" onClick={() => setMoreOpen((o) => !o)}><Icon name="dots" size={14} /> More Actions</button>
               {moreOpen && (
@@ -314,8 +314,7 @@ export function LeadDetail() {
                   {canEdit && <button onClick={() => { setMoreOpen(false); setEditingField('stage'); scrollToKeyInfo(); }}>Change Status</button>}
                   <button onClick={() => { setMoreOpen(false); scrollToNotes(); }}>Add Note</button>
                   <button onClick={() => { setMoreOpen(false); scrollToTasks(); }}>Add Task</button>
-                  <button onClick={() => { setMoreOpen(false); setShowAddActivity(true); }}>Add Activity</button>
-                  <button onClick={() => { setMoreOpen(false); setShowScheduleMeeting(true); }}>Schedule Meeting</button>
+                  <button onClick={() => { setMoreOpen(false); setQuickTaskType('MEETING'); }}>Schedule Meeting</button>
                   <button onClick={() => { setMoreOpen(false); duplicateRecord(); }}>Duplicate Record</button>
                   <button onClick={() => { setMoreOpen(false); saveField({ archivedAt: lead.archivedAt ? null : new Date().toISOString() }); }}>
                     {lead.archivedAt ? 'Unarchive Record' : 'Archive Record'}
@@ -328,31 +327,31 @@ export function LeadDetail() {
         </div>
 
         <div className="quick-actions">
-          <a
+          <button
+            type="button"
             className={`quick-action${lead.email ? '' : ' disabled'}`}
-            href={lead.email ? `mailto:${lead.email}` : undefined}
-            aria-disabled={!lead.email}
-            tabIndex={lead.email ? 0 : -1}
-            title={lead.email ? `Email ${lead.email}` : 'No email on file'}
+            disabled={!lead.email}
+            title={lead.email ? `Log an email to ${lead.email}` : 'No email on file'}
+            onClick={() => setQuickTaskType('EMAIL')}
           >
             <span className="icon"><Icon name="mail" size={18} /></span>Email
-          </a>
-          <a
+          </button>
+          <button
+            type="button"
             className={`quick-action${lead.mobile ? '' : ' disabled'}`}
-            href={lead.mobile ? `tel:${lead.mobile}` : undefined}
-            aria-disabled={!lead.mobile}
-            tabIndex={lead.mobile ? 0 : -1}
-            title={lead.mobile ? `Call ${lead.mobile}` : 'No mobile number on file'}
+            disabled={!lead.mobile}
+            title={lead.mobile ? `Log a call to ${lead.mobile}` : 'No mobile number on file'}
+            onClick={() => setQuickTaskType('CALL')}
           >
             <span className="icon"><Icon name="phone" size={18} /></span>Call
-          </a>
+          </button>
           <button className="quick-action" onClick={scrollToNotes}>
             <span className="icon"><Icon name="note" size={18} /></span>Note
           </button>
           <button className="quick-action" onClick={scrollToTasks}>
             <span className="icon"><Icon name="check" size={18} /></span>Task
           </button>
-          <button className="quick-action" onClick={() => setShowScheduleMeeting(true)}>
+          <button className="quick-action" onClick={() => setQuickTaskType('MEETING')}>
             <span className="icon"><Icon name="calendar" size={18} /></span>Meeting
           </button>
         </div>
@@ -525,7 +524,7 @@ export function LeadDetail() {
       {/* Distinct key prefixes — sibling components sharing the same key value
           makes React reconciliation duplicate/omit cards on re-render. */}
       <ActivityTimeline key={`activity-${activityKey}`} leadId={lead.id} />
-      <TasksWidget key={`tasks-${activityKey}`} leadId={lead.id} />
+      <TasksWidget key={`tasks-${activityKey}`} leadId={lead.id} onChanged={() => setActivityKey((k) => k + 1)} />
       <NotesSection leadId={lead.id} />
       </div>
       </div>
@@ -540,26 +539,16 @@ export function LeadDetail() {
         />
       )}
 
-      {showAddActivity && (
-        <AddActivityModal
+      {quickTaskType && (
+        <QuickTaskModal
+          type={quickTaskType}
           leadId={lead.id}
-          onClose={() => setShowAddActivity(false)}
-          onSaved={onActivityLogged}
-        />
-      )}
-
-      {showScheduleMeeting && (
-        <ScheduleMeetingModal
-          leadId={lead.id}
-          defaultTitle={`Meeting with ${name}`}
-          attendeeName={name}
-          attendeeEmail={lead.email}
-          onClose={() => setShowScheduleMeeting(false)}
-          onScheduled={() => {
-            setShowScheduleMeeting(false);
-            setActivityKey((k) => k + 1);
-            toast.success('Meeting scheduled — invite downloaded');
-          }}
+          defaultTitle={`${quickTaskType === 'CALL' ? 'Call' : quickTaskType === 'EMAIL' ? 'Email' : 'Meeting'} with ${name}`}
+          contactName={name}
+          contactEmail={lead.email}
+          contactPhone={lead.mobile}
+          onClose={() => setQuickTaskType(null)}
+          onSaved={onQuickTaskSaved}
         />
       )}
 

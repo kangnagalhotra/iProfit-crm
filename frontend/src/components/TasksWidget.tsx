@@ -19,8 +19,8 @@ function priorityColor(p: TaskPriority) {
 }
 
 export function TasksWidget({
-  leadId, accountId, opportunityId,
-}: { leadId?: string; accountId?: string; opportunityId?: string }) {
+  leadId, accountId, opportunityId, onChanged,
+}: { leadId?: string; accountId?: string; opportunityId?: string; onChanged?: () => void }) {
   const toast = useToast();
   const confirm = useConfirm();
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -46,6 +46,7 @@ export function TasksWidget({
         ? await completeTask(task.id)
         : await updateTask(task.id, { status });
       setTasks((ts) => ts.map((t) => (t.id === task.id ? data : t)));
+      onChanged?.();
     } catch (e: any) {
       toast.error(e.message ?? 'Could not update task');
     }
@@ -58,6 +59,7 @@ export function TasksWidget({
       await deleteTaskApi(id);
       setTasks((ts) => ts.filter((t) => t.id !== id));
       toast.success('Task deleted');
+      onChanged?.();
     } catch (e: any) {
       toast.error(e.message ?? 'Could not delete task');
     }
@@ -143,7 +145,7 @@ export function TasksWidget({
           accountId={accountId}
           opportunityId={opportunityId}
           onClose={() => setShowForm(false)}
-          onSaved={() => { setShowForm(false); load(); toast.success('Task added'); }}
+          onSaved={() => { setShowForm(false); load(); toast.success('Task added'); onChanged?.(); }}
         />
       )}
     </div>

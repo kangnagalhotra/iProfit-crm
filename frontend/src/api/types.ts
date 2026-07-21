@@ -333,6 +333,8 @@ export interface Task {
   lead?: { id: string; firstName?: string; lastName?: string; email?: string; mobile?: string };
   account?: { id: string; name: string; phone?: string; email?: string };
   opportunity?: { id: string; name: string; contact?: { firstName?: string; lastName?: string; email?: string; mobile?: string } };
+  contact?: { id: string; firstName?: string; lastName?: string; email?: string; mobile?: string };
+  createdVia: 'MANUAL' | 'QUICK_ACTION';
   completedAt?: string;
   createdAt: string;
   updatedAt: string;

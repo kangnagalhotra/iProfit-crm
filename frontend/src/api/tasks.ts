@@ -5,6 +5,7 @@ import type {
 
 const SELECT = `*, assignee:profiles(id, full_name), lead:leads(id, first_name, last_name, email, mobile),
   account:accounts(id, name, phone, email), opportunity:opportunities(id, name, contact:contacts(id, first_name, last_name, email, mobile)),
+  contact:contacts(id, first_name, last_name, email, mobile),
   checklistRows:task_checklist_items(id, title, is_done, order)`;
 
 const SORT_COLUMN: Record<string, string> = {
@@ -50,6 +51,14 @@ function mapTask(row: any): Task {
         mobile: row.opportunity.contact.mobile ?? undefined,
       } : undefined,
     } : undefined,
+    contact: row.contact ? {
+      id: row.contact.id,
+      firstName: row.contact.first_name ?? undefined,
+      lastName: row.contact.last_name ?? undefined,
+      email: row.contact.email ?? undefined,
+      mobile: row.contact.mobile ?? undefined,
+    } : undefined,
+    createdVia: row.created_via ?? 'MANUAL',
     completedAt: row.completed_at ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -69,6 +78,7 @@ export interface ListTasksParams {
   page?: number; pageSize?: number; sortBy?: string; sortDir?: 'asc' | 'desc';
   search?: string; status?: TaskStatus; priority?: string; assigneeId?: string;
   dueFilter?: 'today' | 'overdue' | 'upcoming';
+  createdVia?: 'MANUAL' | 'QUICK_ACTION';
 }
 
 export async function listTasks(params: ListTasksParams = {}): Promise<Paginated<Task>> {
@@ -79,6 +89,7 @@ export async function listTasks(params: ListTasksParams = {}): Promise<Paginated
   if (params.assigneeId) query = query.eq('assignee_id', params.assigneeId);
   if (params.status) query = query.eq('status', params.status);
   if (params.priority) query = query.eq('priority', params.priority);
+  if (params.createdVia) query = query.eq('created_via', params.createdVia);
   if (params.search) {
     const term = `%${params.search}%`;
     query = query.or(`title.ilike.${term},notes.ilike.${term}`);
@@ -153,6 +164,7 @@ function toRow(input: Record<string, any>) {
     title: input.title, type: input.type, priority: input.priority, status: input.status,
     due_at: input.dueAt, notes: input.notes, reminder_at: input.reminderAt, assignee_id: input.assigneeId,
     lead_id: input.leadId, account_id: input.accountId, opportunity_id: input.opportunityId,
+    contact_id: input.contactId, created_via: input.createdVia,
   };
   Object.keys(row).forEach((k) => { if (row[k] === undefined) delete row[k]; });
   return row;

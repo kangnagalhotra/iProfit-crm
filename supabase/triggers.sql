@@ -294,6 +294,38 @@ $$ language plpgsql security definer set search_path = public;
 create trigger tasks_log_changes after update on tasks
   for each row execute function log_task_changes();
 
+-- Phase S: quick-action logging unification. Completing a Call/Email/Meeting
+-- task (however it was created) auto-inserts a linked activities row via the
+-- pre-existing activities.task_id FK, so engagement scoring / stage
+-- automation / renewal tracking (all keyed off activities inserts) keep
+-- working without the rep ever seeing a second, duplicate log entry.
+create or replace function log_completed_task_as_activity() returns trigger as $$
+declare
+  activity_kind activity_type;
+begin
+  if new.status <> 'COMPLETED' then return new; end if;
+  if new.type::text not in ('CALL', 'EMAIL', 'MEETING') then return new; end if;
+  -- task_type and activity_type are separate enums with the same labels for
+  -- Call/Email/Meeting — cast via text rather than a direct enum-to-enum
+  -- comparison/assignment, which Postgres rejects outright.
+  activity_kind := new.type::text::activity_type;
+  if exists (select 1 from activities where task_id = new.id and type = activity_kind) then return new; end if;
+
+  insert into activities (type, body, occurred_at, creator_id, lead_id, account_id, opportunity_id, task_id)
+  values (
+    activity_kind,
+    coalesce(new.notes, initcap(lower(new.type::text)) || ' logged: ' || new.title),
+    coalesce(new.completed_at, now()),
+    new.assignee_id,
+    new.lead_id, new.account_id, new.opportunity_id, new.id
+  );
+  return new;
+end;
+$$ language plpgsql security definer set search_path = public;
+create trigger tasks_log_completed_activity
+  after insert or update on tasks
+  for each row execute function log_completed_task_as_activity();
+
 -- ---------------------------------------------------------------------------
 -- DEAL WON -> promote the linked company to "Active Customer" (never
 -- downgrades a company already further along, e.g. "Strategic Account").

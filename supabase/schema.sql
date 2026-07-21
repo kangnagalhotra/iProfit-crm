@@ -621,6 +621,12 @@ create table tasks (
   lead_id uuid references leads(id) on delete set null,
   account_id uuid references accounts(id) on delete set null,
   opportunity_id uuid references opportunities(id) on delete set null,
+  -- contact_id / created_via: Phase S (quick-action logging unification) —
+  -- lets a task be linked to a bare Contact (not just Lead/Deal/Company) and
+  -- distinguishes reps who log via the quick-action shortcuts from manual
+  -- task creation, for reporting.
+  contact_id uuid references contacts(id) on delete set null,
+  created_via text not null default 'MANUAL' check (created_via in ('MANUAL', 'QUICK_ACTION')),
   completed_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -628,6 +634,7 @@ create table tasks (
 create index tasks_assignee_id_idx on tasks(assignee_id);
 create index tasks_due_at_idx on tasks(due_at);
 create index tasks_status_idx on tasks(status);
+create index tasks_contact_id_idx on tasks(contact_id);
 create trigger tasks_set_updated_at before update on tasks
   for each row execute function set_updated_at();
 

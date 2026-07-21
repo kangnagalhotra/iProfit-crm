@@ -20,8 +20,7 @@ import { SearchSelect } from '../components/SearchSelect';
 import { CompanyForm } from '../components/CompanyForm';
 import { ContactForm } from '../components/ContactForm';
 import { MergeCompanyModal } from '../components/MergeCompanyModal';
-import { AddActivityModal } from '../components/AddActivityModal';
-import { ScheduleMeetingModal } from '../components/ScheduleMeetingModal';
+import { QuickTaskModal } from '../components/QuickTaskModal';
 import { Icon } from '../components/Icon';
 import { CollapsibleCard } from '../components/CollapsibleCard';
 import { AssociationsPanel } from '../components/AssociationsPanel';
@@ -108,8 +107,7 @@ export function CompanyDetail() {
   const [associatedContacts, setAssociatedContacts] = useState<Contact[]>([]);
   const [editingField, setEditingField] = useState<string | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [showAddActivity, setShowAddActivity] = useState(false);
-  const [showScheduleMeeting, setShowScheduleMeeting] = useState(false);
+  const [quickTaskType, setQuickTaskType] = useState<'CALL' | 'EMAIL' | 'MEETING' | null>(null);
   const [showContactForm, setShowContactForm] = useState(false);
   const [showMergeModal, setShowMergeModal] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -263,7 +261,7 @@ export function CompanyDetail() {
           <div className="detail-header-actions">
             <button className="btn btn-icon" onClick={() => setShowEditModal(true)}><Icon name="edit" size={14} /> Edit Details</button>
             <button className="btn secondary btn-icon" onClick={scrollToTasks}><Icon name="check" size={14} /> Add Task</button>
-            <button className="btn secondary btn-icon" onClick={() => setShowScheduleMeeting(true)}><Icon name="calendar" size={14} /> Schedule Meeting</button>
+            <button className="btn secondary btn-icon" onClick={() => setQuickTaskType('MEETING')}><Icon name="calendar" size={14} /> Schedule Meeting</button>
             <div className="dropdown-wrap" ref={moreRef}>
               <button className="btn secondary btn-icon" onClick={() => setMoreOpen((o) => !o)}><Icon name="dots" size={14} /> More Actions</button>
               {moreOpen && (
@@ -276,8 +274,7 @@ export function CompanyDetail() {
                   )}
                   <button onClick={() => { setMoreOpen(false); scrollToNotes(); }}>Add Note</button>
                   <button onClick={() => { setMoreOpen(false); scrollToTasks(); }}>Add Task</button>
-                  <button onClick={() => { setMoreOpen(false); setShowAddActivity(true); }}>Add Activity</button>
-                  <button onClick={() => { setMoreOpen(false); setShowScheduleMeeting(true); }}>Schedule Meeting</button>
+                  <button onClick={() => { setMoreOpen(false); setQuickTaskType('MEETING'); }}>Schedule Meeting</button>
                   <button onClick={() => { setMoreOpen(false); duplicateRecord(); }}>Duplicate Record</button>
                   {canManageStatus && (
                     <button onClick={() => { setMoreOpen(false); setShowMergeModal(true); }}>Merge into…</button>
@@ -293,31 +290,31 @@ export function CompanyDetail() {
         </div>
 
         <div className="quick-actions">
-          <a
+          <button
+            type="button"
             className={`quick-action${account.email ? '' : ' disabled'}`}
-            href={account.email ? `mailto:${account.email}` : undefined}
-            aria-disabled={!account.email}
-            tabIndex={account.email ? 0 : -1}
-            title={account.email ? `Email ${account.email}` : 'No email on file'}
+            disabled={!account.email}
+            title={account.email ? `Log an email to ${account.email}` : 'No email on file'}
+            onClick={() => setQuickTaskType('EMAIL')}
           >
             <span className="icon"><Icon name="mail" size={18} /></span>Email
-          </a>
-          <a
+          </button>
+          <button
+            type="button"
             className={`quick-action${account.phone ? '' : ' disabled'}`}
-            href={account.phone ? `tel:${account.phone}` : undefined}
-            aria-disabled={!account.phone}
-            tabIndex={account.phone ? 0 : -1}
-            title={account.phone ? `Call ${account.phone}` : 'No phone number on file'}
+            disabled={!account.phone}
+            title={account.phone ? `Log a call to ${account.phone}` : 'No phone number on file'}
+            onClick={() => setQuickTaskType('CALL')}
           >
             <span className="icon"><Icon name="phone" size={18} /></span>Call
-          </a>
+          </button>
           <button className="quick-action" onClick={scrollToNotes}>
             <span className="icon"><Icon name="note" size={18} /></span>Note
           </button>
           <button className="quick-action" onClick={scrollToTasks}>
             <span className="icon"><Icon name="check" size={18} /></span>Task
           </button>
-          <button className="quick-action" onClick={() => setShowScheduleMeeting(true)}>
+          <button className="quick-action" onClick={() => setQuickTaskType('MEETING')}>
             <span className="icon"><Icon name="calendar" size={18} /></span>Meeting
           </button>
         </div>
@@ -481,7 +478,7 @@ export function CompanyDetail() {
         relatedLeadIds={associatedLeads.map((l) => l.id)}
         relatedOpportunityIds={associatedDeals.map((d) => d.id)}
       />
-      <TasksWidget key={`tasks-${activityKey}`} accountId={account.id} />
+      <TasksWidget key={`tasks-${activityKey}`} accountId={account.id} onChanged={() => setActivityKey((k) => k + 1)} />
       <SupportTicketsWidget key={`tickets-${activityKey}`} accountId={account.id} />
       <NotesSection accountId={account.id} />
       </div>
@@ -497,25 +494,19 @@ export function CompanyDetail() {
         />
       )}
 
-      {showAddActivity && (
-        <AddActivityModal
+      {quickTaskType && (
+        <QuickTaskModal
+          type={quickTaskType}
           accountId={account.id}
-          onClose={() => setShowAddActivity(false)}
-          onSaved={() => { setShowAddActivity(false); setActivityKey((k) => k + 1); toast.success('Activity added'); }}
-        />
-      )}
-
-      {showScheduleMeeting && (
-        <ScheduleMeetingModal
-          accountId={account.id}
-          defaultTitle={`Meeting with ${account.name}`}
-          attendeeName={account.name}
-          attendeeEmail={account.email}
-          onClose={() => setShowScheduleMeeting(false)}
-          onScheduled={() => {
-            setShowScheduleMeeting(false);
+          defaultTitle={`${quickTaskType === 'CALL' ? 'Call' : quickTaskType === 'EMAIL' ? 'Email' : 'Meeting'} with ${account.name}`}
+          contactName={account.name}
+          contactEmail={account.email}
+          contactPhone={account.phone}
+          onClose={() => setQuickTaskType(null)}
+          onSaved={(task) => {
+            setQuickTaskType(null);
             setActivityKey((k) => k + 1);
-            toast.success('Meeting scheduled — invite downloaded');
+            toast.success(task.status === 'COMPLETED' ? 'Logged' : 'Task scheduled');
           }}
         />
       )}
