@@ -346,7 +346,12 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
 .detail-header { display: flex; align-items: flex-start; gap: 16px; }
 .avatar { width: 56px; height: 56px; border-radius: 50%; background: var(--pale); color: var(--navy-text);
   display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px; flex-shrink: 0; }
-.detail-header h2 { margin: 0; font-size: 22px; font-weight: 700; }
+/* The name/website/meta column is a flex item — without min-width:0 a flex
+   item won't shrink below its content's intrinsic width, so a long company
+   name/domain/email (no natural break points) pushes past the card edge
+   instead of wrapping. */
+.detail-header > div:not(.avatar) { min-width: 0; flex: 1; }
+.detail-header h2, .detail-header a { overflow-wrap: anywhere; }
 .copy-btn { background: none; border: none; cursor: pointer; color: var(--muted); padding: 2px; vertical-align: middle; }
 .copy-btn:hover { color: var(--ink); }
 
