@@ -6,4 +6,5 @@ export const TASK_TYPE_LABELS: Record<TaskType, string> = {
   EMAIL: 'Email',
   FOLLOW_UP: 'Follow-up',
   MEETING: 'Meeting',
+  OTHER: 'Other',
 };

@@ -15,6 +15,7 @@ const ACTIVITY_ICONS: Record<ActivityType, IconName> = {
   MEETING: 'calendar',
   NOTE: 'note',
   FIELD_UPDATE: 'edit',
+  OTHER: 'dots',
 };
 
 const TASK_TYPE_ICONS: Record<TaskType, IconName> = {
@@ -23,6 +24,7 @@ const TASK_TYPE_ICONS: Record<TaskType, IconName> = {
   MEETING: 'calendar',
   TODO: 'check',
   FOLLOW_UP: 'checklist',
+  OTHER: 'dots',
 };
 
 function creatorInitials(name: string) {
@@ -38,7 +40,7 @@ type TimelineEntry = {
   detail?: string;
   who: string;
   at: string;
-  open: boolean;
+  badge: 'upcoming' | 'completed' | 'cancelled';
 };
 
 function fromActivity(a: Activity): TimelineEntry {
@@ -48,7 +50,7 @@ function fromActivity(a: Activity): TimelineEntry {
     title: a.body,
     who: a.creator.fullName,
     at: a.occurredAt,
-    open: false,
+    badge: 'completed',
   };
 }
 
@@ -59,16 +61,19 @@ function fromTask(t: Task): TimelineEntry {
     title: t.title,
     detail: t.notes,
     who: t.assignee?.fullName ?? 'Unassigned',
-    at: t.completedAt ?? t.dueAt,
-    open: t.status !== 'COMPLETED' && t.status !== 'CANCELLED',
+    at: t.dueAt,
+    badge: t.status === 'CANCELLED' ? 'cancelled' : 'upcoming',
   };
 }
 
-// Merges two sources into one date-ordered feed: Call/Email/Meeting/To-Do
-// entries come from the tasks table (both open and completed — logging one
-// via a quick action creates exactly one task, never a separate activity
-// entry too), while Notes and system Field-Update audit rows still come
-// from the activities table, which they've always owned.
+// Merges two sources into one date-ordered feed, each entry clearly badged
+// Upcoming vs Completed: Call/Email/Meeting/Other/To-Do entries that are
+// still pending come from the tasks table (a Task means "still pending" —
+// completed ones never appear here, see QuickTaskModal/TasksWidget), while
+// completed Call/Email/Meeting/Other logs and Notes/Field-Updates come from
+// the activities table, which is the definitive "what happened" log
+// regardless of whether it was logged fresh or derived from completing a
+// scheduled task.
 export function ActivityTimeline({
   leadId, accountId, opportunityId, taskId, relatedLeadIds, relatedOpportunityIds, showNotes = false,
 }: {
@@ -85,16 +90,11 @@ export function ActivityTimeline({
     Promise.all([
       listActivities({
         leadId, accountId, opportunityId, taskId, relatedLeadIds, relatedOpportunityIds,
-      }).then((data) => data.filter((a) => {
-        if (a.type === 'FIELD_UPDATE') return true;
-        if (a.type === 'NOTE') return showNotes;
-        // CALL/EMAIL/MEETING now come from tasks below — never shown twice.
-        return false;
-      })),
+      }).then((data) => data.filter((a) => a.type !== 'NOTE' || showNotes)),
       // taskId-scoped usage (a task's own audit trail) has no matching
       // lead/account/opportunity to fetch tasks for — skip it there.
       (leadId || accountId || opportunityId)
-        ? listTasksFor({ leadId, accountId, opportunityId })
+        ? listTasksFor({ leadId, accountId, opportunityId }).then((tasks) => tasks.filter((t) => t.status !== 'COMPLETED'))
         : Promise.resolve([] as Task[]),
     ]).then(([activities, tasks]) => {
       const merged = [...activities.map(fromActivity), ...tasks.map(fromTask)]
@@ -120,12 +120,22 @@ export function ActivityTimeline({
           <div className="activity-body">
             <div className="activity-text">
               {entry.title}
-              {entry.open && <span className="chip" style={{ marginLeft: 8 }}>Open · due {new Date(entry.at).toLocaleDateString()}</span>}
+              <span
+                className="chip"
+                style={{
+                  marginLeft: 8,
+                  background: entry.badge === 'upcoming' ? '#F59E0B22' : entry.badge === 'cancelled' ? '#6B728022' : '#16A34A22',
+                  color: entry.badge === 'upcoming' ? '#B45309' : entry.badge === 'cancelled' ? '#6B7280' : '#16A34A',
+                }}
+              >
+                {entry.badge === 'upcoming' ? `Upcoming · due ${new Date(entry.at).toLocaleDateString()}`
+                  : entry.badge === 'cancelled' ? 'Cancelled' : 'Completed'}
+              </span>
             </div>
             {entry.detail && <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 2 }}>{entry.detail}</div>}
             <div className="activity-meta">
               <span className="avatar avatar-sm">{creatorInitials(entry.who)}</span>
-              <span>{entry.who} · {entry.open ? 'scheduled' : timeAgo(entry.at)}</span>
+              <span>{entry.who} · {entry.badge === 'upcoming' ? 'scheduled' : timeAgo(entry.at)}</span>
             </div>
           </div>
         </div>

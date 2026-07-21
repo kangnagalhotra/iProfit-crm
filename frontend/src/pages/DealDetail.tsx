@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import type {
-  Account, ActivityType, Contact, DealContact, DealContactRole, DealStage, ForecastCategory, Opportunity, Task, User,
+  Account, ActivityType, Contact, DealContact, DealContactRole, DealStage, ForecastCategory, Opportunity, User,
 } from '../api/types';
 import {
   getDeal, updateDeal, createDeal, deleteDeal,
@@ -116,7 +116,7 @@ export function DealDetail() {
   const [dealContacts, setDealContacts] = useState<DealContact[]>([]);
   const [editingField, setEditingField] = useState<string | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [quickTaskType, setQuickTaskType] = useState<'CALL' | 'EMAIL' | 'MEETING' | null>(null);
+  const [quickTaskType, setQuickTaskType] = useState<'CALL' | 'EMAIL' | 'MEETING' | 'OTHER' | null>(null);
   const [pendingDealStageId, setPendingDealStageId] = useState<string | null>(null);
   const [forecastDraft, setForecastDraft] = useState<ForecastCategory | null>(null);
   const [forecastJustificationDraft, setForecastJustificationDraft] = useState('');
@@ -210,13 +210,13 @@ export function DealDetail() {
     saveField({ forecastCategory: value, forecastJustification: null });
   }
 
-  async function onQuickTaskSaved(task: Task, activityType: ActivityType) {
+  async function onQuickTaskSaved(activityType: ActivityType, wasCompleted: boolean) {
     setQuickTaskType(null);
     setActivityKey((k) => k + 1);
-    toast.success(task.status === 'COMPLETED' ? 'Logged' : 'Task scheduled');
+    toast.success(wasCompleted ? 'Logged' : 'Task scheduled');
     // Activity-based stage advancement — only for things that already
     // happened, not a future scheduled task. Toast with Undo, never silent.
-    if (task.status !== 'COMPLETED') return;
+    if (!wasCompleted) return;
     const result = await evaluateStageAutomation(deal!, activityType);
     const refreshed = await getDeal(deal!.id).catch(() => null);
     if (refreshed) setDeal(refreshed);
@@ -343,6 +343,9 @@ export function DealDetail() {
           </button>
           <button className="quick-action" onClick={() => setQuickTaskType('MEETING')}>
             <span className="icon"><Icon name="calendar" size={18} /></span>Meeting
+          </button>
+          <button className="quick-action" onClick={() => setQuickTaskType('OTHER')}>
+            <span className="icon"><Icon name="dots" size={18} /></span>Other
           </button>
         </div>
       </div>
@@ -627,7 +630,7 @@ export function DealDetail() {
           type={quickTaskType}
           opportunityId={deal.id}
           contactId={deal.contact?.id}
-          defaultTitle={`${quickTaskType === 'CALL' ? 'Call' : quickTaskType === 'EMAIL' ? 'Email' : 'Meeting'} with ${deal.contact ? [deal.contact.firstName, deal.contact.lastName].filter(Boolean).join(' ') || deal.contact.email : deal.name}`}
+          defaultTitle={`${quickTaskType === 'CALL' ? 'Call' : quickTaskType === 'EMAIL' ? 'Email' : quickTaskType === 'MEETING' ? 'Meeting' : 'Activity'} with ${deal.contact ? [deal.contact.firstName, deal.contact.lastName].filter(Boolean).join(' ') || deal.contact.email : deal.name}`}
           contactName={deal.contact ? [deal.contact.firstName, deal.contact.lastName].filter(Boolean).join(' ') : undefined}
           contactEmail={deal.contact?.email}
           contactPhone={deal.contact?.mobile}

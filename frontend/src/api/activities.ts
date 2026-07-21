@@ -14,7 +14,7 @@ function mapActivity(row: any): Activity {
 }
 
 export interface ActivityParent {
-  leadId?: string; accountId?: string; opportunityId?: string; taskId?: string;
+  leadId?: string; accountId?: string; opportunityId?: string; contactId?: string; taskId?: string;
   // Company-only: roll up activity from this account's associated leads/deals
   // too, so the account timeline shows the full customer history, not just
   // activities logged directly against the account itself.
@@ -37,12 +37,19 @@ export async function listActivities(parent: ActivityParent): Promise<Activity[]
   return (data ?? []).map(mapActivity);
 }
 
-export async function createActivity(input: ActivityParent & { type: ActivityType; body: string }): Promise<Activity> {
+export async function createActivity(
+  input: ActivityParent & { type: ActivityType; body: string; occurredAt?: string },
+): Promise<Activity> {
   const currentUser = (await supabase.auth.getUser()).data.user;
   const row: Record<string, any> = {
     type: input.type, body: input.body, creator_id: currentUser?.id,
-    lead_id: input.leadId, account_id: input.accountId, opportunity_id: input.opportunityId, task_id: input.taskId,
+    lead_id: input.leadId, account_id: input.accountId, opportunity_id: input.opportunityId,
+    contact_id: input.contactId, task_id: input.taskId,
   };
+  // Omitted entirely (rather than sent as undefined) so the column's own
+  // `default now()` applies — matches "defaults to now, editable if logging
+  // something that happened earlier."
+  if (input.occurredAt) row.occurred_at = input.occurredAt;
   const { data, error } = await supabase.from('activities').insert(row).select(SELECT).single();
   if (error) throw new Error(error.message);
   return mapActivity(data);

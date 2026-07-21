@@ -304,20 +304,20 @@ declare
   activity_kind activity_type;
 begin
   if new.status <> 'COMPLETED' then return new; end if;
-  if new.type::text not in ('CALL', 'EMAIL', 'MEETING') then return new; end if;
+  if new.type::text not in ('CALL', 'EMAIL', 'MEETING', 'OTHER') then return new; end if;
   -- task_type and activity_type are separate enums with the same labels for
-  -- Call/Email/Meeting — cast via text rather than a direct enum-to-enum
-  -- comparison/assignment, which Postgres rejects outright.
+  -- Call/Email/Meeting/Other — cast via text rather than a direct
+  -- enum-to-enum comparison/assignment, which Postgres rejects outright.
   activity_kind := new.type::text::activity_type;
   if exists (select 1 from activities where task_id = new.id and type = activity_kind) then return new; end if;
 
-  insert into activities (type, body, occurred_at, creator_id, lead_id, account_id, opportunity_id, task_id)
+  insert into activities (type, body, occurred_at, creator_id, lead_id, account_id, opportunity_id, contact_id, task_id)
   values (
     activity_kind,
     coalesce(new.notes, initcap(lower(new.type::text)) || ' logged: ' || new.title),
     coalesce(new.completed_at, now()),
     new.assignee_id,
-    new.lead_id, new.account_id, new.opportunity_id, new.id
+    new.lead_id, new.account_id, new.opportunity_id, new.contact_id, new.id
   );
   return new;
 end;
@@ -614,7 +614,7 @@ begin
   if l is null then return 0; end if;
 
   select least(60, coalesce(sum(case type
-      when 'CALL' then 10 when 'MEETING' then 12 when 'EMAIL' then 6 when 'NOTE' then 3 else 0 end), 0))
+      when 'CALL' then 10 when 'MEETING' then 12 when 'EMAIL' then 6 when 'OTHER' then 5 when 'NOTE' then 3 else 0 end), 0))
   into engagement
   from activities where lead_id = p_lead_id;
 
@@ -647,7 +647,7 @@ begin
   if o is null then return 0; end if;
 
   select least(60, coalesce(sum(case type
-      when 'CALL' then 10 when 'MEETING' then 12 when 'EMAIL' then 6 when 'NOTE' then 3 else 0 end), 0))
+      when 'CALL' then 10 when 'MEETING' then 12 when 'EMAIL' then 6 when 'OTHER' then 5 when 'NOTE' then 3 else 0 end), 0))
   into engagement
   from activities where opportunity_id = p_opportunity_id;
 
@@ -714,6 +714,7 @@ declare
   call_count int;
   meeting_count int;
   email_count int;
+  other_count int;
   note_count int;
   engagement numeric;
   fit numeric;
@@ -727,12 +728,13 @@ begin
     count(*) filter (where type = 'CALL'),
     count(*) filter (where type = 'MEETING'),
     count(*) filter (where type = 'EMAIL'),
+    count(*) filter (where type = 'OTHER'),
     count(*) filter (where type = 'NOTE')
-  into call_count, meeting_count, email_count, note_count
+  into call_count, meeting_count, email_count, other_count, note_count
   from activities where lead_id = p_lead_id;
 
   engagement := least(60, coalesce(call_count, 0) * 10 + coalesce(meeting_count, 0) * 12
-    + coalesce(email_count, 0) * 6 + coalesce(note_count, 0) * 3);
+    + coalesce(email_count, 0) * 6 + coalesce(other_count, 0) * 5 + coalesce(note_count, 0) * 3);
 
   fit := least(25,
     (case when l.icp_match then 5 else 0 end)
@@ -753,7 +755,7 @@ begin
     'total', l.score,
     'engagement', round(engagement), 'engagementMax', 60,
     'callCount', coalesce(call_count, 0), 'meetingCount', coalesce(meeting_count, 0),
-    'emailCount', coalesce(email_count, 0), 'noteCount', coalesce(note_count, 0),
+    'emailCount', coalesce(email_count, 0), 'otherCount', coalesce(other_count, 0), 'noteCount', coalesce(note_count, 0),
     'fit', round(fit), 'fitMax', 25,
     'icpMatch', l.icp_match, 'budgetScore', l.budget_score, 'authorityScore', l.authority_score,
     'needScore', l.need_score, 'timelineScore', l.timeline_score,
@@ -769,6 +771,7 @@ declare
   call_count int;
   meeting_count int;
   email_count int;
+  other_count int;
   note_count int;
   engagement numeric;
   has_proposal boolean;
@@ -783,12 +786,13 @@ begin
     count(*) filter (where type = 'CALL'),
     count(*) filter (where type = 'MEETING'),
     count(*) filter (where type = 'EMAIL'),
+    count(*) filter (where type = 'OTHER'),
     count(*) filter (where type = 'NOTE')
-  into call_count, meeting_count, email_count, note_count
+  into call_count, meeting_count, email_count, other_count, note_count
   from activities where opportunity_id = p_opportunity_id;
 
   engagement := least(60, coalesce(call_count, 0) * 10 + coalesce(meeting_count, 0) * 12
-    + coalesce(email_count, 0) * 6 + coalesce(note_count, 0) * 3);
+    + coalesce(email_count, 0) * 6 + coalesce(other_count, 0) * 5 + coalesce(note_count, 0) * 3);
 
   has_proposal := exists (select 1 from deal_proposals dp where dp.opportunity_id = p_opportunity_id);
   momentum := least(25,
@@ -809,7 +813,7 @@ begin
     'total', o.score,
     'engagement', round(engagement), 'engagementMax', 60,
     'callCount', coalesce(call_count, 0), 'meetingCount', coalesce(meeting_count, 0),
-    'emailCount', coalesce(email_count, 0), 'noteCount', coalesce(note_count, 0),
+    'emailCount', coalesce(email_count, 0), 'otherCount', coalesce(other_count, 0), 'noteCount', coalesce(note_count, 0),
     'momentum', round(momentum), 'momentumMax', 25,
     'hasProposal', has_proposal, 'budgetConfirmed', o.budget_confirmed,
     'nextStepSet', o.next_step is not null, 'decisionTimeframeSet', o.decision_timeframe is not null,

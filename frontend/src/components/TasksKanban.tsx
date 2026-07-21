@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import type { Task, TaskStatus } from '../api/types';
-import { listTasks, updateTask, deleteTask } from '../api/tasks';
+import {
+  listTasks, updateTask, deleteTask, completeTask,
+} from '../api/tasks';
 import { Kanban } from './kanban/Kanban';
 import type { KanbanColumn } from './kanban/Kanban';
 import { StageColumnHeader } from './kanban/StageColumnHeader';
@@ -11,11 +13,15 @@ import { SkeletonKanban } from './Skeleton';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 
+// No Completed column — a Task means "still pending"; once completed it
+// moves to the Activity Log (see ActivityTimeline), never lingers on the
+// board. Reps mark a task done via the card's own Complete button below,
+// which removes it from the board immediately rather than dragging it into
+// a "completed pile" column.
 const STATUS_COLUMNS: { id: TaskStatus; name: string; color: string }[] = [
   { id: 'NOT_STARTED', name: 'Not Started', color: '#6B7280' },
   { id: 'IN_PROGRESS', name: 'In Progress', color: '#0EA5E9' },
   { id: 'WAITING', name: 'Waiting', color: '#F59E0B' },
-  { id: 'COMPLETED', name: 'Completed', color: '#16A34A' },
   { id: 'CANCELLED', name: 'Cancelled', color: '#DC2626' },
 ];
 
@@ -90,6 +96,16 @@ export function TasksKanban() {
     }
   }
 
+  async function handleComplete(task: Task) {
+    try {
+      await completeTask(task.id);
+      setTasks((ts) => ts.filter((t) => t.id !== task.id));
+      toast.success('Task completed — logged to the Activity Log');
+    } catch (e: any) {
+      toast.error(e.message ?? 'Could not complete task');
+    }
+  }
+
   if (loading) return <SkeletonKanban columns={STATUS_COLUMNS.length} />;
 
   const statusIds = STATUS_COLUMNS.map((s) => s.id);
@@ -156,6 +172,11 @@ export function TasksKanban() {
                 </div>
               </Link>
               <div className="kanban-card-actions">
+                <button
+                  title="Mark complete"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleComplete(task); }}
+                ><Icon name="check" size={13} /></button>
                 <button
                   title="View"
                   onPointerDown={(e) => e.stopPropagation()}

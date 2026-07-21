@@ -456,10 +456,10 @@ export function CompanyDetail() {
           contactEmail={account.email}
           contactPhone={account.phone}
           onClose={() => setQuickTaskType(null)}
-          onSaved={(task) => {
+          onSaved={(_activityType, wasCompleted) => {
             setQuickTaskType(null);
             setActivityKey((k) => k + 1);
-            toast.success(task.status === 'COMPLETED' ? 'Logged' : 'Task scheduled');
+            toast.success(wasCompleted ? 'Logged' : 'Task scheduled');
           }}
         />
       )}

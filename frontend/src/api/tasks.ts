@@ -79,6 +79,11 @@ export interface ListTasksParams {
   search?: string; status?: TaskStatus; priority?: string; assigneeId?: string;
   dueFilter?: 'today' | 'overdue' | 'upcoming';
   createdVia?: 'MANUAL' | 'QUICK_ACTION';
+  // A Task means "still pending" — completed ones move to the Activity Log
+  // (see ActivityTimeline) and should never surface in a task list/board.
+  // Opt-in (not a default) so callers that genuinely want full historical
+  // data — e.g. the CSV export — are unaffected.
+  excludeCompleted?: boolean;
 }
 
 export async function listTasks(params: ListTasksParams = {}): Promise<Paginated<Task>> {
@@ -88,6 +93,7 @@ export async function listTasks(params: ListTasksParams = {}): Promise<Paginated
 
   if (params.assigneeId) query = query.eq('assignee_id', params.assigneeId);
   if (params.status) query = query.eq('status', params.status);
+  if (params.excludeCompleted) query = query.neq('status', 'COMPLETED');
   if (params.priority) query = query.eq('priority', params.priority);
   if (params.createdVia) query = query.eq('created_via', params.createdVia);
   if (params.search) {
@@ -145,17 +151,19 @@ export async function getTask(id: string): Promise<Task> {
   return mapTask(data);
 }
 
+// No "completed" count — a Task means "still pending," so this summary
+// (and every card built from it) only ever reflects pending work. Completed
+// work lives in the Activity Log, not here.
 export async function getTaskSummary(): Promise<TaskSummary> {
   const { now, startOfToday, startOfTomorrow } = dueFilterRange();
-  const [total, open, completed, overdue, dueToday] = await Promise.all([
-    supabase.from('tasks').select('id', { count: 'exact', head: true }),
+  const [total, open, overdue, dueToday] = await Promise.all([
+    supabase.from('tasks').select('id', { count: 'exact', head: true }).neq('status', 'COMPLETED'),
     supabase.from('tasks').select('id', { count: 'exact', head: true }).in('status', OPEN_STATUSES),
-    supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('status', 'COMPLETED'),
     supabase.from('tasks').select('id', { count: 'exact', head: true }).lt('due_at', now).not('status', 'in', '(COMPLETED,CANCELLED)'),
     supabase.from('tasks').select('id', { count: 'exact', head: true }).gte('due_at', startOfToday).lt('due_at', startOfTomorrow).not('status', 'in', '(COMPLETED,CANCELLED)'),
   ]);
   return {
-    total: total.count ?? 0, open: open.count ?? 0, completed: completed.count ?? 0, overdue: overdue.count ?? 0, dueToday: dueToday.count ?? 0,
+    total: total.count ?? 0, open: open.count ?? 0, overdue: overdue.count ?? 0, dueToday: dueToday.count ?? 0,
   };
 }
 

@@ -44,7 +44,7 @@ export function ContactDetail() {
   const [users, setUsers] = useState<User[]>([]);
   const [editingField, setEditingField] = useState<string | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [quickTaskType, setQuickTaskType] = useState<'CALL' | 'EMAIL' | 'MEETING' | null>(null);
+  const [quickTaskType, setQuickTaskType] = useState<'CALL' | 'EMAIL' | 'MEETING' | 'OTHER' | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -152,6 +152,9 @@ export function ContactDetail() {
             </button>
             <button className="quick-action" onClick={() => setQuickTaskType('MEETING')}>
               <span className="icon"><Icon name="calendar" size={18} /></span>Meeting
+            </button>
+            <button className="quick-action" onClick={() => setQuickTaskType('OTHER')}>
+              <span className="icon"><Icon name="dots" size={18} /></span>Other
             </button>
           </div>
         </div>
@@ -285,14 +288,14 @@ export function ContactDetail() {
         <QuickTaskModal
           type={quickTaskType}
           contactId={contact.id}
-          defaultTitle={`${quickTaskType === 'CALL' ? 'Call' : quickTaskType === 'EMAIL' ? 'Email' : 'Meeting'} with ${contactName(contact)}`}
+          defaultTitle={`${quickTaskType === 'CALL' ? 'Call' : quickTaskType === 'EMAIL' ? 'Email' : quickTaskType === 'MEETING' ? 'Meeting' : 'Activity'} with ${contactName(contact)}`}
           contactName={contactName(contact)}
           contactEmail={contact.email}
           contactPhone={contact.mobile}
           onClose={() => setQuickTaskType(null)}
-          onSaved={(task) => {
+          onSaved={(_activityType, wasCompleted) => {
             setQuickTaskType(null);
-            toast.success(task.status === 'COMPLETED' ? 'Logged' : 'Task scheduled');
+            toast.success(wasCompleted ? 'Logged' : 'Task scheduled');
           }}
         />
       )}

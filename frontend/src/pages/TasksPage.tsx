@@ -123,7 +123,7 @@ export function TasksPage() {
   const load = useCallback(() => {
     setLoading(true);
     listTasks({
-      ...queryParams, page, pageSize, sortBy, sortDir,
+      ...queryParams, excludeCompleted: true, page, pageSize, sortBy, sortDir,
     })
       .then((data) => { setTasks(data.data); setTotal(data.total); setSelected(new Set()); })
       .finally(() => setLoading(false));
@@ -257,13 +257,12 @@ export function TasksPage() {
         </div>
       </div>
 
-      <MyActionsPanel key={actionsKey} onChanged={() => { load(); loadSummary(); }} />
+      <MyActionsPanel key={`actions-${actionsKey}`} onChanged={() => { load(); loadSummary(); }} />
 
       {summary && (
         <div className="metric-cards">
           <div className="metric-card"><div className="metric-value">{summary.total}</div><div className="metric-label">Total Tasks</div></div>
           <div className="metric-card"><div className="metric-value">{summary.open}</div><div className="metric-label">Open Tasks</div></div>
-          <div className="metric-card"><div className="metric-value">{summary.completed}</div><div className="metric-label">Completed Tasks</div></div>
           <div className="metric-card overdue"><div className="metric-value">{summary.overdue}</div><div className="metric-label">Overdue Tasks</div></div>
           <div className="metric-card"><div className="metric-value">{summary.dueToday}</div><div className="metric-label">Due Today</div></div>
         </div>
@@ -402,7 +401,7 @@ export function TasksPage() {
           </>
         )
       ) : (
-        <TasksKanban key={kanbanKey} />
+        <TasksKanban key={`kanban-${kanbanKey}`} />
       )}
 
       {showForm && (

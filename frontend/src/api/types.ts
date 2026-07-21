@@ -23,7 +23,7 @@ export interface LeadStage extends Stage {
   isLost: boolean;
 }
 
-export type ActivityType = 'CALL' | 'EMAIL' | 'MEETING' | 'NOTE' | 'FIELD_UPDATE';
+export type ActivityType = 'CALL' | 'EMAIL' | 'MEETING' | 'NOTE' | 'FIELD_UPDATE' | 'OTHER';
 
 export interface Activity {
   id: string;
@@ -313,7 +313,7 @@ export interface ImportOpportunitiesResult {
   summary: { total: number; createdCount: number; errorCount: number };
 }
 
-export type TaskType = 'TODO' | 'CALL' | 'EMAIL' | 'FOLLOW_UP' | 'MEETING';
+export type TaskType = 'TODO' | 'CALL' | 'EMAIL' | 'FOLLOW_UP' | 'MEETING' | 'OTHER';
 export type TaskStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'WAITING' | 'COMPLETED' | 'CANCELLED';
 export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 
@@ -345,7 +345,6 @@ export interface Task {
 export interface TaskSummary {
   total: number;
   open: number;
-  completed: number;
   overdue: number;
   dueToday: number;
 }

@@ -119,7 +119,7 @@ export function LeadDetail() {
   const [stages, setStages] = useState<LeadStage[]>([]);
   const [editingField, setEditingField] = useState<string | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [quickTaskType, setQuickTaskType] = useState<'CALL' | 'EMAIL' | 'MEETING' | null>(null);
+  const [quickTaskType, setQuickTaskType] = useState<'CALL' | 'EMAIL' | 'MEETING' | 'OTHER' | null>(null);
   const [pendingLeadStageId, setPendingLeadStageId] = useState<string | null>(null);
   const [showConvertModal, setShowConvertModal] = useState(false);
   const [showQualifiedPrompt, setShowQualifiedPrompt] = useState(false);
@@ -213,14 +213,14 @@ export function LeadDetail() {
     }
   }
 
-  async function onQuickTaskSaved(task: import('../api/types').Task, activityType: import('../api/types').ActivityType) {
+  async function onQuickTaskSaved(activityType: import('../api/types').ActivityType, wasCompleted: boolean) {
     setQuickTaskType(null);
     setActivityKey((k) => k + 1);
-    toast.success(task.status === 'COMPLETED' ? 'Logged' : 'Task scheduled');
+    toast.success(wasCompleted ? 'Logged' : 'Task scheduled');
     // Lead progression automation (New -> Attempted Contact -> Contacted) —
     // only for things that already happened, not a future scheduled task.
     // Toast with Undo, never silent; Qualified stays gated behind MQL.
-    if (task.status !== 'COMPLETED') return;
+    if (!wasCompleted) return;
     const result = await evaluateLeadAutomation(lead!, activityType, stages);
     const refreshed = await getLead(lead!.id).catch(() => null);
     if (refreshed) setLead(refreshed);
@@ -371,6 +371,9 @@ export function LeadDetail() {
           </button>
           <button className="quick-action" onClick={() => setQuickTaskType('MEETING')}>
             <span className="icon"><Icon name="calendar" size={18} /></span>Meeting
+          </button>
+          <button className="quick-action" onClick={() => setQuickTaskType('OTHER')}>
+            <span className="icon"><Icon name="dots" size={18} /></span>Other
           </button>
         </div>
       </div>
@@ -571,7 +574,7 @@ export function LeadDetail() {
         <QuickTaskModal
           type={quickTaskType}
           leadId={lead.id}
-          defaultTitle={`${quickTaskType === 'CALL' ? 'Call' : quickTaskType === 'EMAIL' ? 'Email' : 'Meeting'} with ${name}`}
+          defaultTitle={`${quickTaskType === 'CALL' ? 'Call' : quickTaskType === 'EMAIL' ? 'Email' : quickTaskType === 'MEETING' ? 'Meeting' : 'Activity'} with ${name}`}
           contactName={name}
           contactEmail={lead.email}
           contactPhone={lead.mobile}

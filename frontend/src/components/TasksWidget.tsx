@@ -30,8 +30,10 @@ export function TasksWidget({
 
   function load() {
     setLoading(true);
+    // A Task means "still pending" — once completed, it moves to the
+    // Activity Log (see ActivityTimeline) and should never linger here.
     listTasksFor({ leadId, accountId, opportunityId })
-      .then(setTasks)
+      .then((data) => setTasks(data.filter((t) => t.status !== 'COMPLETED')))
       .finally(() => setLoading(false));
   }
 
@@ -45,7 +47,10 @@ export function TasksWidget({
       const data = status === 'COMPLETED'
         ? await completeTask(task.id)
         : await updateTask(task.id, { status });
-      setTasks((ts) => ts.map((t) => (t.id === task.id ? data : t)));
+      // Completing a task moves it to the Activity Log (a linked activity is
+      // auto-created server-side) — it disappears from this pending-work
+      // widget immediately rather than lingering as a crossed-out row.
+      setTasks((ts) => (data.status === 'COMPLETED' ? ts.filter((t) => t.id !== task.id) : ts.map((t) => (t.id === task.id ? data : t))));
       onChanged?.();
     } catch (e: any) {
       toast.error(e.message ?? 'Could not update task');

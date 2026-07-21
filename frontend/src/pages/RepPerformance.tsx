@@ -30,6 +30,12 @@ interface StageHistoryRow {
   changed_at: string;
 }
 
+interface ActivityRow {
+  creator_id: string;
+  type: string;
+  occurred_at: string;
+}
+
 interface AttentionItem {
   id: string;
   kind: 'No open task' | 'Overdue task' | 'Stuck in stage';
@@ -112,6 +118,7 @@ export function RepPerformance() {
   const [dealStages, setDealStages] = useState<DealStage[]>([]);
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
   const [stageHistory, setStageHistory] = useState<StageHistoryRow[]>([]);
+  const [activities, setActivities] = useState<ActivityRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [range, setRange] = useState<DateRangeState>({ preset: 'month', customStart: '', customEnd: '' });
@@ -127,7 +134,7 @@ export function RepPerformance() {
     async function load() {
       const dealRows = await fetchAllDeals();
       const dealIds = dealRows.map((d) => d.id);
-      const [leadRows, taskRows, userRows, dealStageRows, pipelineRows, stageHistoryRes] = await Promise.all([
+      const [leadRows, taskRows, userRows, dealStageRows, pipelineRows, stageHistoryRes, activitiesRes] = await Promise.all([
         fetchAllLeads(),
         fetchAllTasks(),
         listUsers(),
@@ -136,6 +143,11 @@ export function RepPerformance() {
         dealIds.length
           ? supabase.from('stage_history').select('opportunity_id, from_stage_id, to_stage_id, changed_at').in('opportunity_id', dealIds)
           : Promise.resolve({ data: [] as StageHistoryRow[], error: null }),
+        // Completed Call/Email/Meeting/Other work now lives here, not in
+        // tasks (a Task means "still pending") — this is the single source
+        // of truth for "logged" activity, whether it was logged fresh or
+        // derived from completing a task that was actually scheduled.
+        supabase.from('activities').select('creator_id, type, occurred_at').in('type', ['CALL', 'EMAIL', 'MEETING', 'OTHER']),
       ]);
       setDeals(dealRows);
       setLeads(leadRows);
@@ -144,6 +156,7 @@ export function RepPerformance() {
       setPipelines(pipelineRows);
       setUsers(userRows);
       setStageHistory((stageHistoryRes.data ?? []) as StageHistoryRow[]);
+      setActivities((activitiesRes.data ?? []) as ActivityRow[]);
     }
     load().finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -196,15 +209,23 @@ export function RepPerformance() {
     return set;
   }, [tasks]);
 
+  const activitiesScoped = useMemo(() => activities.filter((a) => (
+    !selectedRepIds.length || selectedRepIds.includes(a.creator_id)
+  )), [activities, selectedRepIds]);
+
   // --- Activity metrics per rep ---------------------------------------
+  // Calls/emails/meetings/other "completed" counts come from `activities`,
+  // not `tasks` — a Task means "still pending," so completed work (whether
+  // logged fresh via a quick action or derived from completing a task that
+  // was actually scheduled) only ever lives in the Activity Log.
   const activityByRep = useMemo(() => {
     const map = new Map<string, {
-      repId: string; repName: string; calls: number; emails: number; meetings: number;
+      repId: string; repName: string; calls: number; emails: number; meetings: number; other: number;
       completed: number; overdueNow: number; quickAction: number; manual: number;
     }>();
     for (const rep of scopedRoster) {
       map.set(rep.id, {
-        repId: rep.id, repName: rep.name, calls: 0, emails: 0, meetings: 0, completed: 0, overdueNow: 0, quickAction: 0, manual: 0,
+        repId: rep.id, repName: rep.name, calls: 0, emails: 0, meetings: 0, other: 0, completed: 0, overdueNow: 0, quickAction: 0, manual: 0,
       });
     }
     const now = Date.now();
@@ -212,19 +233,23 @@ export function RepPerformance() {
       if (!t.assignee) continue;
       const row = map.get(t.assignee.id);
       if (!row) continue;
-      if (t.status === 'COMPLETED' && isInRange(t.completedAt, rangeStart, rangeEnd)) {
-        row.completed += 1;
-        if (t.type === 'CALL') row.calls += 1;
-        else if (t.type === 'EMAIL') row.emails += 1;
-        else if (t.type === 'MEETING') row.meetings += 1;
-      }
       if (t.status !== 'COMPLETED' && t.status !== 'CANCELLED' && new Date(t.dueAt).getTime() < now) row.overdueNow += 1;
       if (isInRange(t.createdAt, rangeStart, rangeEnd)) {
         if (t.createdVia === 'QUICK_ACTION') row.quickAction += 1; else row.manual += 1;
       }
     }
+    for (const a of activitiesScoped) {
+      if (!isInRange(a.occurred_at, rangeStart, rangeEnd)) continue;
+      const row = map.get(a.creator_id);
+      if (!row) continue;
+      row.completed += 1;
+      if (a.type === 'CALL') row.calls += 1;
+      else if (a.type === 'EMAIL') row.emails += 1;
+      else if (a.type === 'MEETING') row.meetings += 1;
+      else if (a.type === 'OTHER') row.other += 1;
+    }
     return map;
-  }, [tasksScoped, scopedRoster, rangeStart, rangeEnd]);
+  }, [tasksScoped, activitiesScoped, scopedRoster, rangeStart, rangeEnd]);
 
   // --- Outcomes per rep -------------------------------------------------
   const outcomesByRep = useMemo(() => {
@@ -509,7 +534,7 @@ export function RepPerformance() {
         <table>
           <thead>
             <tr>
-              <th>Rep</th><th>Calls</th><th>Emails</th><th>Meetings</th><th>Completed</th><th>Overdue (now)</th><th>Quick action</th><th>Manual</th>
+              <th>Rep</th><th>Calls</th><th>Emails</th><th>Meetings</th><th>Other</th><th>Completed</th><th>Overdue (now)</th><th>Quick action</th><th>Manual</th>
             </tr>
           </thead>
           <tbody>
@@ -522,6 +547,7 @@ export function RepPerformance() {
                   <td>{a.calls}</td>
                   <td>{a.emails}</td>
                   <td>{a.meetings}</td>
+                  <td>{a.other}</td>
                   <td>{a.completed}</td>
                   <td style={{ color: a.overdueNow > 0 ? '#DC2626' : undefined, fontWeight: a.overdueNow > 0 ? 600 : undefined }}>{a.overdueNow}</td>
                   <td>{a.quickAction}</td>

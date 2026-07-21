@@ -38,9 +38,9 @@ create type lead_unqualified_reason as enum (
 
 create type salutation as enum ('MR', 'MS', 'MRS', 'DR', 'PROF');
 
-create type activity_type as enum ('CALL', 'EMAIL', 'MEETING', 'NOTE', 'FIELD_UPDATE');
+create type activity_type as enum ('CALL', 'EMAIL', 'MEETING', 'NOTE', 'FIELD_UPDATE', 'OTHER');
 
-create type task_type as enum ('TODO', 'CALL', 'EMAIL', 'FOLLOW_UP', 'MEETING');
+create type task_type as enum ('TODO', 'CALL', 'EMAIL', 'FOLLOW_UP', 'MEETING', 'OTHER');
 
 create type task_status as enum ('NOT_STARTED', 'IN_PROGRESS', 'WAITING', 'COMPLETED', 'CANCELLED');
 
@@ -668,6 +668,7 @@ create table activities (
   lead_id uuid references leads(id) on delete cascade,
   account_id uuid references accounts(id) on delete cascade,
   opportunity_id uuid references opportunities(id) on delete cascade,
+  contact_id uuid references contacts(id) on delete set null,
   task_id uuid references tasks(id) on delete cascade,
   created_at timestamptz not null default now()
 );
