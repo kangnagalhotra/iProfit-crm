@@ -1,15 +1,19 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type {
-  Account, Currency, Lead, LeadRating, LeadSourceOption, LeadStage, LeadUnqualifiedReason, RevenueBand, User,
+  Account, Currency, Lead, LeadRating, LeadSourceOption, LeadStage, LeadUnqualifiedReason, Product, RevenueBand, User,
 } from '../api/types';
 import {
   createLead, updateLead, checkDuplicateLead,
 } from '../api/leads';
 import type { DuplicateLeadMatch } from '../api/leads';
+import { findOpenDealMatch } from '../api/deals';
+import type { OpenDealMatch } from '../api/deals';
+import { LeadDealDuplicateModal } from './LeadDealDuplicateModal';
 import { listStages } from '../api/stages';
 import { listUsers } from '../api/users';
 import { listAccounts } from '../api/accounts';
+import { listProducts } from '../api/products';
 import { listLeadSourceOptions } from '../api/leadSourceOptions';
 import { listAttachments, uploadAttachment, deleteAttachment } from '../api/leadAttachments';
 import { SearchSelect } from './SearchSelect';
@@ -17,6 +21,7 @@ import type { SearchSelectOption } from './SearchSelect';
 import { MultiEntitySelect } from './MultiEntitySelect';
 import { SelectWithOther } from './SelectWithOther';
 import { UNQUALIFIED_REASONS } from '../utils/leadUnqualifiedReasons';
+import { DEPARTMENT_OPTIONS, DEPARTMENT_OTHER } from '../utils/departmentOptions';
 import { SocialLinksEditor, validateSocialUrl } from './SocialLinksEditor';
 import type { OtherSocialLink } from './SocialLinksEditor';
 import { CreateUserModal } from './CreateUserModal';
@@ -69,6 +74,10 @@ interface LeadFormState {
   state: string;
   postalCode: string;
   country: string;
+  city: string;
+  department: string;
+  departmentOther: string;
+  productInterestId: string;
   sourceId: string;
   sourceDetails: string;
   ownerId: string;
@@ -83,6 +92,11 @@ interface LeadFormState {
 }
 
 function initialState(lead?: Lead, defaultStageId?: string): LeadFormState {
+  // A recognized preset pre-selects that option; any other existing text
+  // (legacy/free-text entries predating this field, or a hand-typed Other)
+  // pre-fills the Other box instead of being silently dropped — same
+  // resolution as DealForm's lossReasonCode/lossReasonOther.
+  const knownDepartment = !!lead?.department && DEPARTMENT_OPTIONS.some((d) => d.value === lead.department);
   return {
     firstName: lead?.firstName ?? '',
     lastName: lead?.lastName ?? '',
@@ -105,6 +119,10 @@ function initialState(lead?: Lead, defaultStageId?: string): LeadFormState {
     state: '',
     postalCode: '',
     country: '',
+    city: lead?.city ?? '',
+    department: lead?.department ? (knownDepartment ? lead.department : DEPARTMENT_OTHER) : '',
+    departmentOther: lead?.department && !knownDepartment ? lead.department : '',
+    productInterestId: lead?.productInterest?.id ?? '',
     sourceId: lead?.source?.id ?? '',
     sourceDetails: lead?.sourceDetails ?? '',
     ownerId: lead?.owner?.id ?? '',
@@ -136,6 +154,7 @@ export function LeadForm({
   const [stages, setStages] = useState<LeadStage[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [sourceOptions, setSourceOptions] = useState<LeadSourceOption[]>([]);
   const [otherSocialLinks, setOtherSocialLinks] = useState<OtherSocialLink[]>(
     lead?.socialLinks?.map((l) => ({ platform: l.platform, url: l.url })) ?? [],
@@ -145,6 +164,7 @@ export function LeadForm({
   const [emailError, setEmailError] = useState('');
   const [socialError, setSocialError] = useState('');
   const [dupMatch, setDupMatch] = useState<DuplicateLeadMatch | null>(null);
+  const [duplicateMatch, setDuplicateMatch] = useState<{ lead: Lead; match: OpenDealMatch; sameDepartment: boolean } | null>(null);
   const [saving, setSaving] = useState(false);
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [showCreateCompany, setShowCreateCompany] = useState(false);
@@ -161,12 +181,14 @@ export function LeadForm({
       listUsers(),
       listAccounts({ pageSize: 100 }),
       listLeadSourceOptions(),
-    ]).then(([stageRes, userRes, accountRes, sourceRes]) => {
+      listProducts(),
+    ]).then(([stageRes, userRes, accountRes, sourceRes, productRes]) => {
       const stagesTyped = stageRes as LeadStage[];
       setStages(stagesTyped);
       setUsers(userRes);
       setAccounts(accountRes.data);
       setSourceOptions(sourceRes);
+      setProducts(productRes);
       if (!isEdit && !defaultStageId) {
         const defaultStage = stagesTyped.find((s) => s.isDefault) ?? stagesTyped[0];
         if (defaultStage) set('stageId', defaultStage.id);
@@ -321,6 +343,9 @@ export function LeadForm({
       accountId: form.accountId || undefined,
       companyName: form.companyName || undefined,
       companyEnrichment,
+      city: form.city || undefined,
+      department: form.department ? (form.department === DEPARTMENT_OTHER ? form.departmentOther.trim() : form.department) : undefined,
+      productInterestId: form.productInterestId || undefined,
       sourceId: form.sourceId || undefined,
       sourceDetails: form.sourceDetails || undefined,
       ownerId: form.ownerId || undefined,
@@ -349,6 +374,22 @@ export function LeadForm({
     setSaving(true);
     try {
       const data = await doSave();
+      // B1 — only worth checking for a brand-new Lead with enough data to
+      // compare (Company + Product Interest both set); an edit isn't a new
+      // buying process, so it never re-triggers this. Reads productInterestId
+      // straight from form state rather than the saved Lead's productInterest
+      // join, since that join is unavailable until phase-x has been run.
+      if (!isEdit && data.account?.id && form.productInterestId) {
+        try {
+          const match = await findOpenDealMatch(data.account.id, form.productInterestId);
+          if (match) {
+            setDuplicateMatch({ lead: data, match, sameDepartment: !!data.department && data.department === match.department });
+            return;
+          }
+        } catch {
+          // duplicate-deal check is advisory only — never block the save on failure
+        }
+      }
       onSaved(data);
     } catch (e: any) {
       setError(e.message ?? 'Could not save lead');
@@ -430,6 +471,27 @@ export function LeadForm({
             </div>
             <div className="field"><label>Lead value</label>
               <input type="number" min="0" value={form.value} onChange={(e) => set('value', e.target.value)} placeholder="0.00" /></div>
+            <div className="field"><label>Department / Division</label>
+              <SelectWithOther
+                options={DEPARTMENT_OPTIONS}
+                value={form.department}
+                onChange={(v) => set('department', v)}
+                otherValue={form.departmentOther}
+                onOtherChange={(v) => set('departmentOther', v)}
+                otherTriggerValue={DEPARTMENT_OTHER}
+                emptyLabel="Select department"
+              />
+            </div>
+            <div className="field"><label>Location (City / Branch / Site)</label>
+              <input value={form.city} onChange={(e) => set('city', e.target.value)} placeholder="e.g. Mumbai HQ" /></div>
+            <div className="field field-span-2"><label>Product interest</label>
+              <SearchSelect
+                options={products.map((p) => ({ value: p.id, label: p.name }))}
+                value={form.productInterestId}
+                onChange={(v) => set('productInterestId', v)}
+                placeholder="Search products…"
+              />
+            </div>
             <div className="field"><label>Lead source*</label>
               <SelectWithOther
                 options={sourceOptions.map((s) => ({ value: s.id, label: s.name }))}
@@ -638,6 +700,16 @@ export function LeadForm({
           lead={convertingLead}
           onClose={() => { onSaved(convertingLead); onClose(); }}
           onConverted={() => { onSaved(convertingLead); onClose(); }}
+        />
+      )}
+
+      {duplicateMatch && (
+        <LeadDealDuplicateModal
+          lead={duplicateMatch.lead}
+          match={duplicateMatch.match}
+          sameDepartment={duplicateMatch.sameDepartment}
+          onClose={() => { const { lead: savedLead } = duplicateMatch; setDuplicateMatch(null); onSaved(savedLead); }}
+          onMerged={() => { const { lead: savedLead } = duplicateMatch; setDuplicateMatch(null); onSaved(savedLead); }}
         />
       )}
     </>

@@ -10,6 +10,8 @@ import { listStages } from '../api/stages';
 import { listUsers } from '../api/users';
 import { listAccounts } from '../api/accounts';
 import { listContacts } from '../api/contacts';
+import { listAssociatedLeads } from '../api/leads';
+import type { AssociatedLead } from '../api/leads';
 import { listDealContacts, replaceDealContacts } from '../api/dealContacts';
 import { LinkContactsModal } from '../components/LinkContactsModal';
 import { NotesSection } from '../components/NotesSection';
@@ -22,6 +24,7 @@ import { QuickTaskModal } from '../components/QuickTaskModal';
 import { AiAssistCard } from '../components/AiAssistCard';
 import { EngagementScoreCell } from '../components/EngagementScoreCell';
 import { DispositionReasonModal } from '../components/DispositionReasonModal';
+import { DealMergeModal } from '../components/DealMergeModal';
 import { DEAL_LOSS_REASONS, DEAL_LOSS_REASON_OTHER } from '../utils/dealLossReasons';
 import { Icon } from '../components/Icon';
 import { CollapsibleCard } from '../components/CollapsibleCard';
@@ -123,6 +126,9 @@ export function DealDetail() {
   const [moreOpen, setMoreOpen] = useState(false);
   const [activityKey, setActivityKey] = useState(0);
   const [showLinkContacts, setShowLinkContacts] = useState(false);
+  const [associatedLeads, setAssociatedLeads] = useState<AssociatedLead[]>([]);
+  const [showMergeModal, setShowMergeModal] = useState(false);
+  const [mergeSurvivorDeal, setMergeSurvivorDeal] = useState<{ id: string; name: string } | null>(null);
   const moreRef = useRef<HTMLDivElement>(null);
 
   function loadDealContacts() {
@@ -130,9 +136,17 @@ export function DealDetail() {
     listDealContacts(id).then(setDealContacts).catch(() => {});
   }
 
+  function loadAssociatedLeads(dealId: string, originatingLeadId?: string) {
+    listAssociatedLeads(dealId, originatingLeadId).then(setAssociatedLeads).catch(() => {});
+  }
+
   useEffect(() => {
     if (!id) return;
-    getDeal(id).then(setDeal).catch(() => {});
+    getDeal(id).then((d) => {
+      setDeal(d);
+      loadAssociatedLeads(d.id, d.lead?.id);
+      if (d.mergedIntoOpportunityId) getDeal(d.mergedIntoOpportunityId).then(setMergeSurvivorDeal).catch(() => {});
+    }).catch(() => {});
     loadDealContacts();
     Promise.all([
       listUsers(),
@@ -159,6 +173,8 @@ export function DealDetail() {
   useRecordRecentlyViewed('deal', deal?.id, deal?.name);
 
   if (!deal) return <SkeletonDetailPage />;
+
+  const locked = !!deal.mergedIntoOpportunityId;
 
   async function saveField(data: Record<string, any>) {
     const prevStage = deal!.stage;
@@ -281,6 +297,7 @@ export function DealDetail() {
               <div className="detail-meta-row">
                 <span className="record-type-badge">Deal</span>
                 <span className="chip" style={{ background: deal.stage.color + '22', color: deal.stage.color }}>{deal.stage.name}</span>
+                {locked && <span className="chip lead-locked-badge" style={{ background: '#F59E0B22', color: '#B45309' }}>Merged into another deal</span>}
                 {deal.owner && (
                   <span className="owner-chip">
                     <span className="avatar avatar-sm">{initials(deal.owner.fullName)}</span>
@@ -292,9 +309,13 @@ export function DealDetail() {
             </div>
           </div>
           <div className="detail-header-actions">
-            <button className="btn btn-icon" onClick={() => setShowEditModal(true)}><Icon name="edit" size={14} /> Edit Details</button>
-            <button className="btn secondary btn-icon" onClick={scrollToTasks}><Icon name="check" size={14} /> Add Task</button>
-            <button className="btn secondary btn-icon" onClick={() => setQuickTaskType('MEETING')}><Icon name="calendar" size={14} /> Schedule Meeting</button>
+            {!locked && (
+              <>
+                <button className="btn btn-icon" onClick={() => setShowEditModal(true)}><Icon name="edit" size={14} /> Edit Details</button>
+                <button className="btn secondary btn-icon" onClick={scrollToTasks}><Icon name="check" size={14} /> Add Task</button>
+                <button className="btn secondary btn-icon" onClick={() => setQuickTaskType('MEETING')}><Icon name="calendar" size={14} /> Schedule Meeting</button>
+              </>
+            )}
             <div className="dropdown-wrap" ref={moreRef}>
               <button className="btn secondary btn-icon" onClick={() => setMoreOpen((o) => !o)}><Icon name="dots" size={14} /> More Actions</button>
               {moreOpen && (
@@ -306,6 +327,7 @@ export function DealDetail() {
                   <button onClick={() => { setMoreOpen(false); scrollToTasks(); }}>Add Task</button>
                   <button onClick={() => { setMoreOpen(false); setQuickTaskType('MEETING'); }}>Schedule Meeting</button>
                   <button onClick={() => { setMoreOpen(false); duplicateRecord(); }}>Duplicate Record</button>
+                  <button onClick={() => { setMoreOpen(false); setShowMergeModal(true); }}>Merge with another deal…</button>
                   <button onClick={() => { setMoreOpen(false); saveField({ archivedAt: deal.archivedAt ? null : new Date().toISOString() }); }}>
                     {deal.archivedAt ? 'Unarchive Record' : 'Archive Record'}
                   </button>
@@ -316,6 +338,7 @@ export function DealDetail() {
           </div>
         </div>
 
+        {!locked && (
         <div className="quick-actions">
           <button
             type="button"
@@ -346,6 +369,7 @@ export function DealDetail() {
             <span className="icon"><Icon name="dots" size={18} /></span>Other
           </button>
         </div>
+        )}
       </div>
 
       <div className="detail-sidebar">
@@ -515,6 +539,9 @@ export function DealDetail() {
           />
           <Row label="Last activity date" value={deal.lastActivityAt ? new Date(deal.lastActivityAt).toLocaleDateString() : undefined} />
           <Row label="Days in current stage" value={deal.daysInCurrentStage !== undefined ? String(deal.daysInCurrentStage) : undefined} />
+          {mergeSurvivorDeal && (
+            <Row label="Merged into Deal" value={<Link to={`/deals/${mergeSurvivorDeal.id}`}>{mergeSurvivorDeal.name}</Link>} />
+          )}
         </div>
         {deal.description && (
           <div style={{ marginTop: 18, paddingTop: 18, borderTop: '1px solid var(--line)' }}>
@@ -546,6 +573,35 @@ export function DealDetail() {
                     )}
                   </>
                 ),
+              },
+            ],
+          },
+          {
+            key: 'leads',
+            label: 'Associated Leads',
+            icon: 'person',
+            emptyLabel: 'No associated leads.',
+            items: associatedLeads,
+            onRowClick: (l: AssociatedLead) => navigate(`/leads/${l.id}`),
+            columns: [
+              {
+                header: 'Lead',
+                render: (l: AssociatedLead) => <Link to={`/leads/${l.id}`} onClick={(e) => e.stopPropagation()}>{l.name}</Link>,
+              },
+              {
+                header: 'Status',
+                render: (l: AssociatedLead) => (
+                  <span
+                    className="chip"
+                    style={l.tag === 'Merged — Duplicate' ? { background: '#F59E0B22', color: '#B45309' } : undefined}
+                  >
+                    {l.tag}
+                  </span>
+                ),
+              },
+              {
+                header: 'Merged on',
+                render: (l: AssociatedLead) => (l.mergedAt ? new Date(l.mergedAt).toLocaleDateString() : '—'),
               },
             ],
           },
@@ -634,6 +690,18 @@ export function DealDetail() {
           contactPhone={deal.contact?.mobile}
           onClose={() => setQuickTaskType(null)}
           onSaved={onQuickTaskSaved}
+        />
+      )}
+
+      {showMergeModal && (
+        <DealMergeModal
+          deal={deal}
+          onClose={() => setShowMergeModal(false)}
+          onMerged={(survivorId) => {
+            setShowMergeModal(false);
+            toast.success('Deals merged');
+            if (survivorId === deal.id) { setActivityKey((k) => k + 1); getDeal(deal.id).then(setDeal); } else navigate(`/deals/${survivorId}`);
+          }}
         />
       )}
 

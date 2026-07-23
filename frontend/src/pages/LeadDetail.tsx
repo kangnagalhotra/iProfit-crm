@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import type { DealContactRole, Lead, LeadStage, User } from '../api/types';
 import {
-  getLead, updateLead, createLead, deleteLead, getConvertedDeal,
+  getLead, updateLead, createLead, deleteLead, getConvertedDeal, getMergeTargetDeal,
 } from '../api/leads';
 import {
   listLeadContacts, replaceLeadContacts, setLeadContactRole,
@@ -124,6 +124,7 @@ export function LeadDetail() {
   const [showConvertModal, setShowConvertModal] = useState(false);
   const [showQualifiedPrompt, setShowQualifiedPrompt] = useState(false);
   const [convertedDeal, setConvertedDeal] = useState<{ id: string; name: string } | null>(null);
+  const [mergeTargetDeal, setMergeTargetDeal] = useState<{ id: string; name: string } | null>(null);
   const [contacts, setContacts] = useState<LeadContact[]>([]);
   const [showLinkContacts, setShowLinkContacts] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -139,7 +140,10 @@ export function LeadDetail() {
 
   function load() {
     if (!id) return;
-    getLead(id).then(setLead).catch(() => {});
+    getLead(id).then((l) => {
+      setLead(l);
+      if (l.mergedIntoOpportunityId) getMergeTargetDeal(l.mergedIntoOpportunityId).then(setMergeTargetDeal).catch(() => {});
+    }).catch(() => {});
     getConvertedDeal(id).then(setConvertedDeal).catch(() => {});
     loadContacts();
   }
@@ -166,7 +170,7 @@ export function LeadDetail() {
   if (!lead) return <SkeletonDetailPage />;
 
   const name = lead.leadName || [lead.firstName, lead.lastName].filter(Boolean).join(' ') || lead.email || 'Untitled lead';
-  const locked = !!lead.convertedAt;
+  const locked = !!lead.convertedAt || !!lead.mergedAt;
   const canEdit = !locked || overrideEdit;
 
   async function onInlineStageChange(newStageId: string) {
@@ -292,7 +296,11 @@ export function LeadDetail() {
               <div className="detail-meta-row">
                 <span className="record-type-badge">Lead</span>
                 <span className="chip" style={{ background: lead.stage.color + '22', color: lead.stage.color }}>{lead.stage.name}</span>
-                {locked && <span className="chip lead-locked-badge">Converted — locked</span>}
+                {lead.mergedAt ? (
+                  <span className="chip lead-locked-badge" style={{ background: '#F59E0B22', color: '#B45309' }}>Merged — Duplicate</span>
+                ) : locked ? (
+                  <span className="chip lead-locked-badge">Converted — locked</span>
+                ) : null}
                 {lead.owner && (
                   <span className="owner-chip">
                     <span className="avatar avatar-sm">{ownerInitials(lead.owner.fullName)}</span>
@@ -472,6 +480,9 @@ export function LeadDetail() {
           </EditableRow>
           {convertedDeal && (
             <Row label="Converted to Deal" value={<Link to={`/deals/${convertedDeal.id}`}>{convertedDeal.name}</Link>} />
+          )}
+          {mergeTargetDeal && (
+            <Row label="Merged into Deal" value={<Link to={`/deals/${mergeTargetDeal.id}`}>{mergeTargetDeal.name}</Link>} />
           )}
           <Row label="Created By" value={lead.createdBy?.fullName} />
           <Row label="Created" value={new Date(lead.createdAt).toLocaleDateString()} />

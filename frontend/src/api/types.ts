@@ -56,7 +56,12 @@ export interface Lead {
   instagramUrl?: string;
   twitterUrl?: string;
   socialLinks?: SocialLink[];
+  // Shown in the Lead form as "Location (City/Branch/Site)" — a specific
+  // branch/site at a multi-location company, distinct from the linked
+  // Company's own address city.
   city?: string;
+  department?: string;
+  productInterest?: { id: string; name: string };
   value?: string;
   notes?: string;
   stage: LeadStage;
@@ -88,6 +93,12 @@ export interface Lead {
   // enter a "won" (Qualified) stage; enforced server-side, see triggers.sql.
   icpMatch?: boolean;
   convertedAt?: string;
+  // Set when this lead was identified as a duplicate of an existing open
+  // Deal at the same company and merged in as a Contact instead (see
+  // mergeLeadIntoDeal() in api/leads.ts) — mirrors convertedAt's "locked,
+  // retained for audit" treatment, just a different terminal state.
+  mergedAt?: string;
+  mergedIntoOpportunityId?: string;
   archivedAt?: string;
   createdAt: string;
   updatedAt: string;
@@ -102,6 +113,7 @@ export interface Contact {
   mobile?: string;
   jobTitle?: string; // shown as "Designation" in the Contacts UI
   department?: string;
+  location?: string;
   linkedinUrl?: string;
   instagramUrl?: string;
   twitterUrl?: string;
@@ -300,6 +312,9 @@ export interface Opportunity {
   lead?: { id: string; firstName?: string; lastName?: string; email?: string };
   contact?: { id: string; firstName?: string; lastName?: string; email?: string; mobile?: string; phone?: string };
   archivedAt?: string;
+  // Set on the losing side of a manual Deal merge (Section C) — self-
+  // referencing onto the surviving Deal. See mergeDeals() in api/deals.ts.
+  mergedIntoOpportunityId?: string;
   createdAt: string;
   updatedAt: string;
   // Detail-view-only extra, populated by getDeal() but not listDeals().

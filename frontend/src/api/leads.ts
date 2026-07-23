@@ -8,11 +8,23 @@ import { setLeadAdditionalOwners } from './additionalOwners';
 import { setLeadSocialLinks, mapSocialLinks } from './socialLinks';
 import type { OtherSocialLink } from '../components/SocialLinksEditor';
 
-const SELECT = `*, stage:lead_stages(*), owner:profiles!leads_owner_id_fkey(id, full_name),
+// BASE_SELECT/SELECT split: the productInterest join depends on
+// leads.product_interest_id, which doesn't exist until phase-x has been run
+// (see supabase/phase-x-lead-fields-and-duplicate-detection-patch.sql).
+// Every read below tries SELECT first and falls back to BASE_SELECT on a
+// "relationship not found" error, so lead reads keep working before the
+// migration runs — only the Product Interest field itself is unavailable
+// until then, not the whole Leads list/detail page.
+const BASE_SELECT = `*, stage:lead_stages(*), owner:profiles!leads_owner_id_fkey(id, full_name),
   createdByProfile:profiles!leads_created_by_fkey(id, full_name), account:accounts(id, name),
   sourceOption:lead_source_options(id, name),
   additionalOwnersRows:lead_additional_owners(user:profiles(id, full_name)),
   socialLinksRows:social_links(id, platform, url, order)`;
+const SELECT = `${BASE_SELECT}, productInterest:products(id, name)`;
+
+function isMissingRelationshipError(error: any): boolean {
+  return error?.code === 'PGRST200' || /relationship/i.test(error?.message ?? '');
+}
 
 const SORT_COLUMN: Record<string, string> = {
   firstName: 'first_name', lastName: 'last_name', value: 'value', updatedAt: 'updated_at', createdAt: 'created_at', score: 'score',
@@ -35,6 +47,8 @@ function mapLead(row: any): Lead {
     twitterUrl: row.twitter_url ?? undefined,
     socialLinks: mapSocialLinks(row.socialLinksRows),
     city: row.city ?? undefined,
+    department: row.department ?? undefined,
+    productInterest: row.productInterest ? { id: row.productInterest.id, name: row.productInterest.name } : undefined,
     value: row.value !== null && row.value !== undefined ? String(row.value) : undefined,
     notes: row.notes ?? undefined,
     stage: {
@@ -62,6 +76,8 @@ function mapLead(row: any): Lead {
     qualificationNotes: row.qualification_notes ?? undefined,
     icpMatch: row.icp_match ?? undefined,
     convertedAt: row.converted_at ?? undefined,
+    mergedAt: row.merged_at ?? undefined,
+    mergedIntoOpportunityId: row.merged_into_opportunity_id ?? undefined,
     archivedAt: row.archived_at ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -74,10 +90,8 @@ export interface ListLeadsParams {
   sourceId?: string; includeArchived?: boolean;
 }
 
-export async function listLeads(params: ListLeadsParams = {}): Promise<Paginated<Lead>> {
-  const page = Math.max(1, params.page ?? 1);
-  const pageSize = Math.min(100, params.pageSize ?? 25);
-  let query = supabase.from('leads').select(SELECT, { count: 'exact' });
+function buildListLeadsQuery(select: string, params: ListLeadsParams, page: number, pageSize: number) {
+  let query = supabase.from('leads').select(select, { count: 'exact' });
 
   if (!params.includeArchived) query = query.is('archived_at', null);
   if (params.stageId) query = query.eq('stage_id', params.stageId);
@@ -97,9 +111,17 @@ export async function listLeads(params: ListLeadsParams = {}): Promise<Paginated
     query = query.order(column, { ascending: params.sortDir === 'asc' });
   }
 
-  query = query.range((page - 1) * pageSize, page * pageSize - 1);
+  return query.range((page - 1) * pageSize, page * pageSize - 1);
+}
 
-  const { data, error, count } = await query;
+export async function listLeads(params: ListLeadsParams = {}): Promise<Paginated<Lead>> {
+  const page = Math.max(1, params.page ?? 1);
+  const pageSize = Math.min(100, params.pageSize ?? 25);
+
+  let { data, error, count } = await buildListLeadsQuery(SELECT, params, page, pageSize);
+  if (error && isMissingRelationshipError(error)) {
+    ({ data, error, count } = await buildListLeadsQuery(BASE_SELECT, params, page, pageSize));
+  }
   if (error) throw error;
   return {
     data: (data ?? []).map(mapLead), page, pageSize, total: count ?? 0,
@@ -107,7 +129,10 @@ export async function listLeads(params: ListLeadsParams = {}): Promise<Paginated
 }
 
 export async function getLead(id: string): Promise<Lead> {
-  const { data, error } = await supabase.from('leads').select(SELECT).eq('id', id).single();
+  let { data, error } = await supabase.from('leads').select(SELECT).eq('id', id).single();
+  if (error && isMissingRelationshipError(error)) {
+    ({ data, error } = await supabase.from('leads').select(BASE_SELECT).eq('id', id).single());
+  }
   if (error) throw error;
   return mapLead(data);
 }
@@ -246,7 +271,8 @@ export async function createLead(input: Record<string, any>): Promise<Lead> {
     salutation: rest.salutation, first_name: rest.firstName, last_name: rest.lastName,
     email: rest.email, email_opt_in: rest.emailOptIn, phone: rest.phone, mobile: rest.mobile,
     job_title: rest.jobTitle, linkedin_url: rest.linkedinUrl, instagram_url: rest.instagramUrl,
-    twitter_url: rest.twitterUrl, city: rest.city, value: rest.value, notes: rest.notes,
+    twitter_url: rest.twitterUrl, city: rest.city, department: rest.department,
+    product_interest_id: rest.productInterestId, value: rest.value, notes: rest.notes,
     source_id: rest.sourceId, source_details: rest.sourceDetails, score: rest.score, rating: rest.rating,
     unqualified_reason: rest.unqualifiedReason, unqualified_reason_other: rest.unqualifiedReasonOther, tags: rest.tags,
     owner_id: ownerId, created_by: currentUser?.id, account_id: accountId, stage_id: stageId,
@@ -280,13 +306,15 @@ export async function updateLead(id: string, input: Record<string, any>): Promis
     salutation: rest.salutation, first_name: rest.firstName, last_name: rest.lastName,
     email: rest.email, email_opt_in: rest.emailOptIn, phone: rest.phone, mobile: rest.mobile,
     job_title: rest.jobTitle, linkedin_url: rest.linkedinUrl, instagram_url: rest.instagramUrl,
-    twitter_url: rest.twitterUrl, city: rest.city, value: rest.value, notes: rest.notes,
+    twitter_url: rest.twitterUrl, city: rest.city, department: rest.department,
+    product_interest_id: rest.productInterestId, value: rest.value, notes: rest.notes,
     source_id: rest.sourceId, source_details: rest.sourceDetails, owner_id: rest.ownerId, stage_id: rest.stageId,
     score: rest.score, rating: rest.rating, unqualified_reason: rest.unqualifiedReason, tags: rest.tags,
     account_id: accountId,
     budget_score: rest.budgetScore, authority_score: rest.authorityScore, need_score: rest.needScore,
     timeline_score: rest.timelineScore, qualification_notes: rest.qualificationNotes, icp_match: rest.icpMatch,
     archived_at: rest.archivedAt,
+    merged_at: rest.mergedAt, merged_into_opportunity_id: rest.mergedIntoOpportunityId,
   };
   Object.keys(row).forEach((k) => { if (row[k] === undefined) delete row[k]; });
 
@@ -340,6 +368,39 @@ export async function getConvertedDeal(leadId: string): Promise<{ id: string; na
   return data;
 }
 
+// Mirrors getConvertedDeal() above, for the "Merged — Duplicate" terminal
+// state instead of "Converted" — see mergeLeadIntoDeal().
+export async function getMergeTargetDeal(opportunityId: string): Promise<{ id: string; name: string } | null> {
+  const { data, error } = await supabase.from('opportunities').select('id, name').eq('id', opportunityId).maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+export interface AssociatedLead { id: string; name: string; tag: 'Originating' | 'Merged — Duplicate'; mergedAt?: string; }
+
+// B3 — read-only "Associated Leads" panel on the Deal page: the lead this
+// deal was originally converted from (if any), plus every lead later
+// identified as a duplicate and merged in via mergeLeadIntoDeal(). No add/
+// link action exists here or anywhere else — this is purely informational.
+export async function listAssociatedLeads(dealId: string, originatingLeadId?: string): Promise<AssociatedLead[]> {
+  const ids = originatingLeadId ? [originatingLeadId] : [];
+  const [originating, merged] = await Promise.all([
+    ids.length > 0
+      ? supabase.from('leads').select('id, lead_name, first_name, last_name, email').in('id', ids)
+      : Promise.resolve({ data: [], error: null }),
+    supabase.from('leads').select('id, lead_name, first_name, last_name, email, merged_at').eq('merged_into_opportunity_id', dealId),
+  ]);
+  if (originating.error) throw originating.error;
+  if (merged.error) throw merged.error;
+
+  const nameOf = (row: any) => row.lead_name || [row.first_name, row.last_name].filter(Boolean).join(' ') || row.email || 'Untitled lead';
+  const originatingRows = (originating.data ?? []).map((row: any) => ({ id: row.id, name: nameOf(row), tag: 'Originating' as const }));
+  const mergedRows = (merged.data ?? []).map((row: any) => ({
+    id: row.id, name: nameOf(row), tag: 'Merged — Duplicate' as const, mergedAt: row.merged_at ?? undefined,
+  }));
+  return [...originatingRows, ...mergedRows];
+}
+
 export async function convertLeadToDeal(
   lead: Lead,
   dealName: string,
@@ -367,6 +428,8 @@ export async function convertLeadToDeal(
       email: lead.email,
       mobile: lead.mobile,
       jobTitle: lead.jobTitle,
+      department: lead.department,
+      location: lead.city,
       accountId: lead.account?.id,
       ownerId: lead.owner?.id,
       leadIds: [lead.id],
@@ -415,4 +478,39 @@ export async function convertLeadToDeal(
   await supabase.from('leads').update({ converted_at: new Date().toISOString() }).eq('id', lead.id);
 
   return deal;
+}
+
+// B2 — the rep confirmed a new Lead is a duplicate of an existing open Deal
+// at the same company: create a Contact from the Lead's info, link it to
+// that Deal, and mark the Lead merged (never deleted — retained for audit,
+// same treatment as convertLeadToDeal's converted_at above).
+export async function mergeLeadIntoDeal(lead: Lead, targetDealId: string): Promise<void> {
+  const contact = await createContact({
+    firstName: lead.firstName,
+    lastName: lead.lastName,
+    email: lead.email,
+    mobile: lead.mobile,
+    jobTitle: lead.jobTitle,
+    department: lead.department,
+    location: lead.city,
+    accountId: lead.account?.id,
+    ownerId: lead.owner?.id,
+    leadIds: [lead.id],
+  });
+
+  // Role 'OTHER' — a Lead carries no deal-contact role; the rep can change
+  // it afterward via the existing "Contacts by Role" UI on the deal.
+  await supabase.from('deal_contacts').insert({ opportunity_id: targetDealId, contact_id: contact.id, role: 'OTHER' });
+
+  await updateLead(lead.id, { mergedAt: new Date().toISOString(), mergedIntoOpportunityId: targetDealId });
+
+  const currentUser = (await supabase.auth.getUser()).data.user;
+  const contactName = [contact.firstName, contact.lastName].filter(Boolean).join(' ') || contact.email || 'Contact';
+  const leadName = lead.leadName || [lead.firstName, lead.lastName].filter(Boolean).join(' ') || 'Lead';
+  await supabase.from('activities').insert({
+    type: 'FIELD_UPDATE',
+    body: `Lead "${leadName}" merged in as a duplicate — added ${contactName} as a Contact.`,
+    creator_id: currentUser?.id,
+    opportunity_id: targetDealId,
+  });
 }

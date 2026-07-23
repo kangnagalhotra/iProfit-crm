@@ -39,6 +39,7 @@ export function ContactForm({
     mobile: stripPhoneDigits(contact?.mobile ?? ''),
     jobTitle: contact?.jobTitle ?? '',
     department: contact?.department ?? '',
+    location: contact?.location ?? '',
     linkedinUrl: contact?.linkedinUrl ?? '',
     instagramUrl: contact?.instagramUrl ?? '',
     twitterUrl: contact?.twitterUrl ?? '',
@@ -157,6 +158,8 @@ export function ContactForm({
           <input value={form.jobTitle} onChange={(e) => set('jobTitle', e.target.value)} /></div>
         <div className="field"><label>Department</label>
           <input value={form.department} onChange={(e) => set('department', e.target.value)} /></div>
+        <div className="field"><label>Location</label>
+          <input value={form.location} onChange={(e) => set('location', e.target.value)} placeholder="e.g. Mumbai HQ" /></div>
         <SocialLinksEditor
           linkedinUrl={form.linkedinUrl}
           instagramUrl={form.instagramUrl}

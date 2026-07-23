@@ -20,6 +20,7 @@ function mapContact(row: any): Contact {
     mobile: row.mobile ?? undefined,
     jobTitle: row.job_title ?? undefined,
     department: row.department ?? undefined,
+    location: row.location ?? undefined,
     linkedinUrl: row.linkedin_url ?? undefined,
     instagramUrl: row.instagram_url ?? undefined,
     twitterUrl: row.twitter_url ?? undefined,
@@ -75,7 +76,7 @@ export async function getContact(id: string): Promise<Contact> {
 function toRow(input: Record<string, any>) {
   const row: Record<string, any> = {
     first_name: input.firstName, last_name: input.lastName, email: input.email, phone: input.phone,
-    mobile: input.mobile, job_title: input.jobTitle, department: input.department, notes: input.notes,
+    mobile: input.mobile, job_title: input.jobTitle, department: input.department, location: input.location, notes: input.notes,
     linkedin_url: input.linkedinUrl, instagram_url: input.instagramUrl, twitter_url: input.twitterUrl,
     account_id: input.accountId, owner_id: input.ownerId,
   };

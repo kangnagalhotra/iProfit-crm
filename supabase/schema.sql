@@ -224,7 +224,16 @@ create table leads (
   linkedin_url varchar(500) check (linkedin_url is null or linkedin_url ~* '^https?://([a-z]{2,3}\.)?linkedin\.com/.*$'),
   instagram_url varchar(500),
   twitter_url varchar(500),
+  -- city is shown in the Lead form as "Location (City/Branch/Site)" — a
+  -- multi-location company's Lead may name a specific branch/site, distinct
+  -- from the Company's own address city.
   city varchar(120),
+  -- Department/Division + Product Interest (product_interest_id, FK added
+  -- below once `products` exists) — used to tell apart genuinely separate
+  -- buying processes at a multi-department company from true duplicates,
+  -- see the duplicate-lead-detection logic in frontend/src/components/
+  -- LeadForm.tsx / LeadDealDuplicateModal.tsx.
+  department varchar(120),
   value numeric(15, 2) check (value is null or value >= 0),
   notes text,
   stage_id uuid not null references lead_stages(id) on delete restrict,
@@ -285,6 +294,7 @@ create table contacts (
   mobile varchar(40) check (mobile is null or mobile ~ '^\+?[0-9]{10}$'),
   job_title varchar(150), -- shown as "Designation" in the Contacts UI
   department varchar(120),
+  location varchar(120),
   linkedin_url varchar(500),
   instagram_url varchar(500),
   twitter_url varchar(500),
@@ -383,6 +393,11 @@ create table opportunities (
   closed_at timestamptz,
   last_inactivity_alert_at timestamptz, -- last time the 7-day-inactive alert fired; null until the first one
   archived_at timestamptz,
+  -- Manual Deal merge (Section C): set on the losing side of a merge, self-
+  -- referencing onto the surviving Deal. A merged-away Deal is otherwise a
+  -- normal archived_at record — never deleted, still viewable for audit.
+  -- See mergeDeals() in frontend/src/api/deals.ts.
+  merged_into_opportunity_id uuid references opportunities(id) on delete set null,
   currency currency_code not null default 'USD',
   probability_override int check (probability_override is null or probability_override between 0 and 100), -- null = inherit deal_stages.win_probability
   next_step varchar(250),
@@ -415,8 +430,18 @@ create index opportunities_pipeline_id_idx on opportunities(pipeline_id);
 create index opportunities_partner_account_id_idx on opportunities(partner_account_id);
 create index opportunities_tags_idx on opportunities using gin(tags);
 create index opportunities_next_activity_date_idx on opportunities(next_activity_date);
+create index opportunities_merged_into_opportunity_id_idx on opportunities(merged_into_opportunity_id);
 create trigger opportunities_set_updated_at before update on opportunities
   for each row execute function set_updated_at();
+
+-- leads.merged_at/merged_into_opportunity_id reference opportunities, which
+-- didn't exist yet where `leads` was created above — added here via ALTER.
+-- Set when a Lead is identified as a duplicate of an existing open Deal at
+-- the same company and merged in as a Contact instead of converting on its
+-- own — mirrors converted_at's "locked, retained for audit" treatment.
+alter table leads add column merged_at timestamptz;
+alter table leads add column merged_into_opportunity_id uuid references opportunities(id) on delete set null;
+create index leads_merged_into_opportunity_id_idx on leads(merged_into_opportunity_id);
 
 -- Additional contacts on a deal, each tagged with a role. The single
 -- opportunities.contact_id above stays as "Primary Contact" — orthogonal.
@@ -483,6 +508,11 @@ create table products (
 create index products_sector_idx on products(sector);
 create trigger products_set_updated_at before update on products
   for each row execute function set_updated_at();
+
+-- leads.product_interest_id references products, which didn't exist yet
+-- where `leads` was created above — added here via ALTER once it does.
+alter table leads add column product_interest_id uuid references products(id) on delete set null;
+create index leads_product_interest_id_idx on leads(product_interest_id);
 
 -- Repeatable product/qty/price rows. No trigger syncs the sum into
 -- opportunities.amount — that's a frontend-only convenience so Value stays

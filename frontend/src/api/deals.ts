@@ -67,8 +67,37 @@ function mapDeal(row: any): Opportunity {
       phone: row.contact.phone ?? undefined,
     } : undefined,
     archivedAt: row.archived_at ?? undefined,
+    mergedIntoOpportunityId: row.merged_into_opportunity_id ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+export interface OpenDealMatch { id: string; name: string; department?: string; }
+
+// Duplicate-lead detection (B1): does this Company already have an open Deal
+// for this Product? Deals themselves carry no department — the closest
+// available signal for "which department this Deal belongs to" is its
+// originating Lead's department, falling back to its primary Contact's.
+export async function findOpenDealMatch(accountId: string, productId: string): Promise<OpenDealMatch | null> {
+  const { data, error } = await supabase
+    .from('deal_line_items')
+    .select(`opportunity:opportunities!inner(id, name, archived_at,
+      stage:deal_stages(is_closed_won, is_closed_lost),
+      lead:leads(department), contact:contacts(department))`)
+    .eq('product_id', productId)
+    .eq('opportunity.account_id', accountId);
+  if (error) throw error;
+
+  const match = (data ?? [])
+    .map((r: any) => r.opportunity)
+    .find((o: any) => o && !o.archived_at && !o.stage?.is_closed_won && !o.stage?.is_closed_lost);
+  if (!match) return null;
+
+  return {
+    id: match.id,
+    name: match.name,
+    department: match.lead?.department ?? match.contact?.department ?? undefined,
   };
 }
 
@@ -152,6 +181,7 @@ function toRow(input: Record<string, any>) {
     forecast_category: input.forecastCategory, forecast_justification: input.forecastJustification,
     expected_revenue: input.expectedRevenue,
     renewal_date: input.renewalDate,
+    merged_into_opportunity_id: input.mergedIntoOpportunityId,
   };
   Object.keys(row).forEach((k) => { if (row[k] === undefined) delete row[k]; });
   return row;
@@ -192,6 +222,66 @@ export async function updateDeal(id: string, input: Record<string, any>): Promis
   if (rest.additionalOwnerIds) await setOpportunityAdditionalOwners(id, rest.additionalOwnerIds);
 
   return getDeal(id);
+}
+
+// Section C — manual merge of two open Deals at the same company (always
+// available, no restriction on stage/age). The rep picks which deal
+// survives; the other is archived and pointed at the survivor via
+// merged_into_opportunity_id, never deleted — still viewable for audit.
+export async function mergeDeals(
+  dealAId: string,
+  dealBId: string,
+  resolution: { survivorId: string; stageId: string; amount?: string; ownerId: string },
+): Promise<Opportunity> {
+  const { survivorId } = resolution;
+  const loserId = survivorId === dealAId ? dealBId : dealAId;
+  const [survivor, loser] = await Promise.all([getDeal(survivorId), getDeal(loserId)]);
+
+  await updateDeal(survivorId, { stageId: resolution.stageId, amount: resolution.amount, ownerId: resolution.ownerId });
+
+  // Consolidate Contacts: the loser's primary contact (if any, and not
+  // already linked) plus every deal_contacts row, onto the survivor —
+  // ignoreDuplicates skips any contact already linked to the survivor.
+  const loserContactRows: { contact_id: string; role: string; role_other?: string }[] = [];
+  if (loser.contact && loser.contact.id !== survivor.contact?.id) {
+    loserContactRows.push({ contact_id: loser.contact.id, role: 'OTHER' });
+  }
+  const { data: loserDealContacts } = await supabase.from('deal_contacts').select('contact_id, role, role_other').eq('opportunity_id', loserId);
+  (loserDealContacts ?? []).forEach((r: any) => {
+    loserContactRows.push({ contact_id: r.contact_id, role: r.role, role_other: r.role_other ?? undefined });
+  });
+  if (loserContactRows.length > 0) {
+    await supabase.from('deal_contacts').upsert(
+      loserContactRows.map((r) => ({
+        opportunity_id: survivorId, contact_id: r.contact_id, role: r.role, role_other: r.role_other,
+      })),
+      { onConflict: 'opportunity_id,contact_id', ignoreDuplicates: true },
+    );
+  }
+
+  // Consolidate Associated Leads (B3) onto the survivor: anything already
+  // merged into the loser repoints to the survivor, and the loser's own
+  // originating lead (if any) becomes a "merged into the survivor" lead too.
+  await supabase.from('leads').update({ merged_into_opportunity_id: survivorId }).eq('merged_into_opportunity_id', loserId);
+  if (loser.lead?.id) {
+    await supabase.from('leads')
+      .update({ merged_into_opportunity_id: survivorId, merged_at: new Date().toISOString() })
+      .eq('id', loser.lead.id)
+      .is('merged_at', null);
+  }
+
+  // Archive the loser, pointing it at the survivor.
+  await supabase.from('opportunities')
+    .update({ archived_at: new Date().toISOString(), merged_into_opportunity_id: survivorId })
+    .eq('id', loserId);
+
+  const currentUser = (await supabase.auth.getUser()).data.user;
+  await supabase.from('activities').insert([
+    { type: 'FIELD_UPDATE', creator_id: currentUser?.id, opportunity_id: survivorId, body: `Merged deal "${loser.name}" into this deal.` },
+    { type: 'FIELD_UPDATE', creator_id: currentUser?.id, opportunity_id: loserId, body: `Merged into deal "${survivor.name}".` },
+  ]);
+
+  return getDeal(survivorId);
 }
 
 export async function deleteDeal(id: string): Promise<void> {
