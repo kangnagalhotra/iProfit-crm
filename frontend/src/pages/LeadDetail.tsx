@@ -347,18 +347,16 @@ export function LeadDetail() {
         <div className="quick-actions">
           <button
             type="button"
-            className={`quick-action${lead.email ? '' : ' disabled'}`}
-            disabled={!lead.email}
-            title={lead.email ? `Log an email to ${lead.email}` : 'No email on file'}
+            className="quick-action"
+            title={lead.email ? `Log an email to ${lead.email}` : 'Log an email'}
             onClick={() => setQuickTaskType('EMAIL')}
           >
             <span className="icon"><Icon name="mail" size={18} /></span>Email
           </button>
           <button
             type="button"
-            className={`quick-action${lead.mobile ? '' : ' disabled'}`}
-            disabled={!lead.mobile}
-            title={lead.mobile ? `Log a call to ${lead.mobile}` : 'No mobile number on file'}
+            className="quick-action"
+            title={lead.mobile ? `Log a call to ${lead.mobile}` : 'Log a call'}
             onClick={() => setQuickTaskType('CALL')}
           >
             <span className="icon"><Icon name="phone" size={18} /></span>Call

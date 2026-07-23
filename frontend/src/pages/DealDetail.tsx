@@ -319,18 +319,16 @@ export function DealDetail() {
         <div className="quick-actions">
           <button
             type="button"
-            className={`quick-action${deal.contact?.email ? '' : ' disabled'}`}
-            disabled={!deal.contact?.email}
-            title={deal.contact?.email ? `Log an email to ${deal.contact.email}` : 'No email on file'}
+            className="quick-action"
+            title={deal.contact?.email ? `Log an email to ${deal.contact.email}` : 'Log an email'}
             onClick={() => setQuickTaskType('EMAIL')}
           >
             <span className="icon"><Icon name="mail" size={18} /></span>Email
           </button>
           <button
             type="button"
-            className={`quick-action${deal.contact?.mobile ? '' : ' disabled'}`}
-            disabled={!deal.contact?.mobile}
-            title={deal.contact?.mobile ? `Log a call to ${deal.contact.mobile}` : 'No mobile number on file'}
+            className="quick-action"
+            title={deal.contact?.mobile ? `Log a call to ${deal.contact.mobile}` : 'Log a call'}
             onClick={() => setQuickTaskType('CALL')}
           >
             <span className="icon"><Icon name="phone" size={18} /></span>Call

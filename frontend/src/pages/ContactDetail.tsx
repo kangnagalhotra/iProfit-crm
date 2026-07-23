@@ -134,18 +134,16 @@ export function ContactDetail() {
           <div className="quick-actions">
             <button
               type="button"
-              className={`quick-action${contact.email ? '' : ' disabled'}`}
-              disabled={!contact.email}
-              title={contact.email ? `Log an email to ${contact.email}` : 'No email on file'}
+              className="quick-action"
+              title={contact.email ? `Log an email to ${contact.email}` : 'Log an email'}
               onClick={() => setQuickTaskType('EMAIL')}
             >
               <span className="icon"><Icon name="mail" size={18} /></span>Email
             </button>
             <button
               type="button"
-              className={`quick-action${contact.mobile ? '' : ' disabled'}`}
-              disabled={!contact.mobile}
-              title={contact.mobile ? `Log a call to ${contact.mobile}` : 'No mobile number on file'}
+              className="quick-action"
+              title={contact.mobile ? `Log a call to ${contact.mobile}` : 'Log a call'}
               onClick={() => setQuickTaskType('CALL')}
             >
               <span className="icon"><Icon name="phone" size={18} /></span>Call
