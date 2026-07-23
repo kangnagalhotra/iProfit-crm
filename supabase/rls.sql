@@ -166,6 +166,14 @@ create policy "lead_contacts_select" on lead_contacts for select to authenticate
 create policy "lead_contacts_insert" on lead_contacts for insert to authenticated
   with check (exists (select 1 from leads l where l.id = lead_contacts.lead_id and (is_manager_or_admin() or l.owner_id = auth.uid())));
 
+-- Missing until phase-z: RLS silently blocks any update with no error when
+-- no UPDATE policy exists, so role edits (setLeadContactRole in
+-- frontend/src/api/leadContacts.ts) appeared to succeed while never
+-- actually persisting. Mirrors deal_contacts_update's exact shape.
+create policy "lead_contacts_update" on lead_contacts for update to authenticated
+  using (exists (select 1 from leads l where l.id = lead_contacts.lead_id and (is_manager_or_admin() or l.owner_id = auth.uid())))
+  with check (exists (select 1 from leads l where l.id = lead_contacts.lead_id and (is_manager_or_admin() or l.owner_id = auth.uid())));
+
 create policy "lead_contacts_delete" on lead_contacts for delete to authenticated
   using (exists (select 1 from leads l where l.id = lead_contacts.lead_id and (is_manager_or_admin() or l.owner_id = auth.uid())));
 
