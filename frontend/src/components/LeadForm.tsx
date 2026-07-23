@@ -26,6 +26,7 @@ import { SocialLinksEditor, validateSocialUrl } from './SocialLinksEditor';
 import type { OtherSocialLink } from './SocialLinksEditor';
 import { CreateUserModal } from './CreateUserModal';
 import { CompanyForm } from './CompanyForm';
+import { ProductForm } from './ProductForm';
 import { FormSection } from './FormSection';
 import { TagsInput } from './TagsInput';
 import { FileUploadList } from './FileUploadList';
@@ -168,6 +169,7 @@ export function LeadForm({
   const [saving, setSaving] = useState(false);
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [showCreateCompany, setShowCreateCompany] = useState(false);
+  const [showCreateProduct, setShowCreateProduct] = useState(false);
   const [showQualifiedPrompt, setShowQualifiedPrompt] = useState(false);
   const [convertingLead, setConvertingLead] = useState<Lead | null>(null);
 
@@ -490,6 +492,8 @@ export function LeadForm({
                 value={form.productInterestId}
                 onChange={(v) => set('productInterestId', v)}
                 placeholder="Search products…"
+                onCreateNew={() => setShowCreateProduct(true)}
+                createNewLabel="+ Add new product"
               />
             </div>
             <div className="field"><label>Lead source*</label>
@@ -678,6 +682,17 @@ export function LeadForm({
             setAccounts((as) => [...as, newAccount].sort((a, b) => a.name.localeCompare(b.name)));
             setCompany(newAccount.id);
             setShowCreateCompany(false);
+          }}
+        />
+      )}
+
+      {showCreateProduct && (
+        <ProductForm
+          onClose={() => setShowCreateProduct(false)}
+          onSaved={(newProduct) => {
+            setProducts((ps) => [...ps, newProduct].sort((a, b) => a.name.localeCompare(b.name)));
+            set('productInterestId', newProduct.id);
+            setShowCreateProduct(false);
           }}
         />
       )}
