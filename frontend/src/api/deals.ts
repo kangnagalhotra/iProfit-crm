@@ -4,7 +4,8 @@ import { listStageHistory } from './dealStageHistory';
 import { setOpportunityAdditionalOwners } from './additionalOwners';
 
 const SELECT = `*, pipeline:pipelines(id, name), stage:deal_stages(*), owner:profiles!opportunities_owner_id_fkey(id, full_name),
-  account:accounts!opportunities_account_id_fkey(id, name, description, stage:account_stages(name, color)), lead:leads(id, first_name, last_name, email),
+  account:accounts!opportunities_account_id_fkey(id, name, description, stage:account_stages(name, color)),
+  lead:leads!opportunities_lead_id_fkey(id, first_name, last_name, email),
   contact:contacts(id, first_name, last_name, email, mobile, phone),
   partner_account:accounts!opportunities_partner_account_id_fkey(id, name),
   additionalOwnersRows:opportunity_additional_owners(user:profiles(id, full_name))`;
@@ -84,7 +85,7 @@ export async function findOpenDealMatch(accountId: string, productId: string): P
     .from('deal_line_items')
     .select(`opportunity:opportunities!inner(id, name, archived_at,
       stage:deal_stages(is_closed_won, is_closed_lost),
-      lead:leads(department), contact:contacts(department))`)
+      lead:leads!opportunities_lead_id_fkey(department), contact:contacts(department))`)
     .eq('product_id', productId)
     .eq('opportunity.account_id', accountId);
   if (error) throw error;
