@@ -13,6 +13,10 @@ import { ContactForm } from '../components/ContactForm';
 import { QuickTaskModal } from '../components/QuickTaskModal';
 import { Icon } from '../components/Icon';
 import { CollapsibleCard } from '../components/CollapsibleCard';
+import { DetailTabs } from '../components/DetailTabs';
+import { ActivityTimeline } from '../components/ActivityTimeline';
+import { TasksWidget } from '../components/TasksWidget';
+import { EmptyState } from '../components/EmptyState';
 import { SkeletonDetailPage } from '../components/Skeleton';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
@@ -45,6 +49,7 @@ export function ContactDetail() {
   const [editingField, setEditingField] = useState<string | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [quickTaskType, setQuickTaskType] = useState<'CALL' | 'EMAIL' | 'MEETING' | 'OTHER' | null>(null);
+  const [activityKey, setActivityKey] = useState(0);
 
   useEffect(() => {
     if (!id) return;
@@ -262,16 +267,36 @@ export function ContactDetail() {
                 />
               </EditableRow>
             </div>
-            {contact.notes && (
-              <div style={{ marginTop: 18, paddingTop: 18, borderTop: '1px solid var(--line)' }}>
-                <div className="label" style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 4 }}>Notes</div>
-                <div style={{ fontSize: 14, whiteSpace: 'pre-wrap' }}>{contact.notes}</div>
-              </div>
-            )}
           </CollapsibleCard>
         </div>
 
-        <div className="detail-main" />
+        <div className="detail-main">
+          <DetailTabs
+            tabs={[
+              {
+                key: 'activity',
+                label: 'Activity History',
+                content: <ActivityTimeline key={`activity-${activityKey}`} contactId={contact.id} />,
+              },
+              {
+                key: 'tasks',
+                label: 'Tasks',
+                content: <TasksWidget key={`tasks-${activityKey}`} contactId={contact.id} onChanged={() => setActivityKey((k) => k + 1)} />,
+              },
+            ]}
+          />
+        </div>
+
+        <div className="detail-notes">
+          <div className="card">
+            <h3 style={{ marginTop: 0 }}>Notes</h3>
+            {contact.notes ? (
+              <div style={{ fontSize: 14, whiteSpace: 'pre-wrap' }}>{contact.notes}</div>
+            ) : (
+              <EmptyState icon="note" description="No notes yet — add one via Edit Details." size="sm" />
+            )}
+          </div>
+        </div>
       </div>
 
       {showEditModal && (
@@ -293,6 +318,7 @@ export function ContactDetail() {
           onClose={() => setQuickTaskType(null)}
           onSaved={(_activityType, wasCompleted) => {
             setQuickTaskType(null);
+            setActivityKey((k) => k + 1);
             toast.success(wasCompleted ? 'Logged' : 'Task scheduled');
           }}
         />

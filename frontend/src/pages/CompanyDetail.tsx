@@ -25,6 +25,7 @@ import { Icon } from '../components/Icon';
 import { CollapsibleCard } from '../components/CollapsibleCard';
 import { AssociationsPanel } from '../components/AssociationsPanel';
 import type { AssociationGroup } from '../components/AssociationsPanel';
+import { DetailTabs } from '../components/DetailTabs';
 import { SkeletonDetailPage } from '../components/Skeleton';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -367,65 +368,89 @@ export function CompanyDetail() {
       </div>
 
       <div className="detail-main">
-      <AssociationsPanel
-        groups={[
+      <DetailTabs
+        tabs={[
           {
-            key: 'leads',
-            label: `Leads (${associatedLeads.length})`,
-            icon: 'person',
-            emptyLabel: 'No leads linked to this company yet.',
-            items: associatedLeads,
-            onRowClick: (l: Lead) => navigate(`/leads/${l.id}`),
-            columns: [
-              { header: 'Lead Name', render: (l: Lead) => <Link to={`/leads/${l.id}`} onClick={(e) => e.stopPropagation()}>{leadName(l)}</Link> },
-              { header: 'Owner', render: (l: Lead) => l.owner?.fullName ?? '—' },
-              { header: 'Stage', render: (l: Lead) => <span className="chip" style={{ background: l.stage.color + '22', color: l.stage.color }}>{l.stage.name}</span> },
-              { header: 'Email', render: (l: Lead) => l.email ?? '—' },
-              { header: 'Mobile Number', render: (l: Lead) => l.mobile ?? '—' },
-              { header: 'Last Activity', render: (l: Lead) => (l.lastActivityAt ? new Date(l.lastActivityAt).toLocaleDateString() : '—') },
-            ],
+            key: 'details',
+            label: 'Details',
+            content: (
+              <AssociationsPanel
+                groups={[
+                  {
+                    key: 'leads',
+                    label: `Leads (${associatedLeads.length})`,
+                    icon: 'person',
+                    emptyLabel: 'No leads linked to this company yet.',
+                    items: associatedLeads,
+                    onRowClick: (l: Lead) => navigate(`/leads/${l.id}`),
+                    columns: [
+                      { header: 'Lead Name', render: (l: Lead) => <Link to={`/leads/${l.id}`} onClick={(e) => e.stopPropagation()}>{leadName(l)}</Link> },
+                      { header: 'Owner', render: (l: Lead) => l.owner?.fullName ?? '—' },
+                      { header: 'Stage', render: (l: Lead) => <span className="chip" style={{ background: l.stage.color + '22', color: l.stage.color }}>{l.stage.name}</span> },
+                      { header: 'Email', render: (l: Lead) => l.email ?? '—' },
+                      { header: 'Mobile Number', render: (l: Lead) => l.mobile ?? '—' },
+                      { header: 'Last Activity', render: (l: Lead) => (l.lastActivityAt ? new Date(l.lastActivityAt).toLocaleDateString() : '—') },
+                    ],
+                  },
+                  {
+                    key: 'deals',
+                    label: `Deals (${associatedDeals.length})`,
+                    icon: 'dollar',
+                    emptyLabel: 'No deals linked to this company yet.',
+                    items: associatedDeals,
+                    onRowClick: (d: Opportunity) => navigate(`/deals/${d.id}`),
+                    columns: [
+                      { header: 'Deal Name', render: (d: Opportunity) => <Link to={`/deals/${d.id}`} onClick={(e) => e.stopPropagation()}>{d.name}</Link> },
+                      { header: 'Owner', render: (d: Opportunity) => d.owner?.fullName ?? '—' },
+                      { header: 'Stage', render: (d: Opportunity) => <span className="chip" style={{ background: d.stage.color + '22', color: d.stage.color }}>{d.stage.name}</span> },
+                      { header: 'Amount', render: (d: Opportunity) => (d.amount ? formatMoney(parseFloat(d.amount)) : '—') },
+                      { header: 'Close Date', render: (d: Opportunity) => (d.closeDate ? new Date(d.closeDate).toLocaleDateString() : '—') },
+                    ],
+                  },
+                  {
+                    key: 'contacts',
+                    label: `Contacts (${associatedContacts.length})`,
+                    icon: 'person',
+                    emptyLabel: 'No contacts linked to this company yet.',
+                    items: associatedContacts,
+                    addAction: { label: '+ Add Contact', onClick: () => setShowContactForm(true) },
+                    columns: [
+                      { header: 'Name', render: (c: Contact) => [c.firstName, c.lastName].filter(Boolean).join(' ') || c.email || 'Untitled contact' },
+                      { header: 'Email', render: (c: Contact) => c.email ?? '—' },
+                      { header: 'Job Title', render: (c: Contact) => c.jobTitle ?? '—' },
+                    ],
+                  },
+                ] as AssociationGroup[]}
+              />
+            ),
           },
           {
-            key: 'deals',
-            label: `Deals (${associatedDeals.length})`,
-            icon: 'dollar',
-            emptyLabel: 'No deals linked to this company yet.',
-            items: associatedDeals,
-            onRowClick: (d: Opportunity) => navigate(`/deals/${d.id}`),
-            columns: [
-              { header: 'Deal Name', render: (d: Opportunity) => <Link to={`/deals/${d.id}`} onClick={(e) => e.stopPropagation()}>{d.name}</Link> },
-              { header: 'Owner', render: (d: Opportunity) => d.owner?.fullName ?? '—' },
-              { header: 'Stage', render: (d: Opportunity) => <span className="chip" style={{ background: d.stage.color + '22', color: d.stage.color }}>{d.stage.name}</span> },
-              { header: 'Amount', render: (d: Opportunity) => (d.amount ? formatMoney(parseFloat(d.amount)) : '—') },
-              { header: 'Close Date', render: (d: Opportunity) => (d.closeDate ? new Date(d.closeDate).toLocaleDateString() : '—') },
-            ],
+            key: 'activity',
+            label: 'Activity History',
+            content: (
+              <ActivityTimeline
+                key={`activity-${activityKey}`}
+                accountId={account.id}
+                relatedLeadIds={associatedLeads.map((l) => l.id)}
+                relatedOpportunityIds={associatedDeals.map((d) => d.id)}
+              />
+            ),
           },
           {
-            key: 'contacts',
-            label: `Contacts (${associatedContacts.length})`,
-            icon: 'person',
-            emptyLabel: 'No contacts linked to this company yet.',
-            items: associatedContacts,
-            addAction: { label: '+ Add Contact', onClick: () => setShowContactForm(true) },
-            columns: [
-              { header: 'Name', render: (c: Contact) => [c.firstName, c.lastName].filter(Boolean).join(' ') || c.email || 'Untitled contact' },
-              { header: 'Email', render: (c: Contact) => c.email ?? '—' },
-              { header: 'Job Title', render: (c: Contact) => c.jobTitle ?? '—' },
-            ],
+            key: 'tasks',
+            label: 'Tasks',
+            content: <TasksWidget key={`tasks-${activityKey}`} accountId={account.id} onChanged={() => setActivityKey((k) => k + 1)} />,
           },
-        ] as AssociationGroup[]}
+          {
+            key: 'support-tickets',
+            label: 'Support Tickets',
+            content: <SupportTicketsWidget key={`tickets-${activityKey}`} accountId={account.id} />,
+          },
+        ]}
       />
+      </div>
 
-      {/* Distinct key prefixes — sibling components sharing the same key value
-          makes React reconciliation duplicate/omit cards on re-render. */}
-      <ActivityTimeline
-        key={`activity-${activityKey}`}
-        accountId={account.id}
-        relatedLeadIds={associatedLeads.map((l) => l.id)}
-        relatedOpportunityIds={associatedDeals.map((d) => d.id)}
-      />
-      <TasksWidget key={`tasks-${activityKey}`} accountId={account.id} onChanged={() => setActivityKey((k) => k + 1)} />
-      <SupportTicketsWidget key={`tickets-${activityKey}`} accountId={account.id} />
+      <div className="detail-notes">
       <NotesSection accountId={account.id} />
       </div>
       </div>

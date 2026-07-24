@@ -19,8 +19,10 @@ function priorityColor(p: TaskPriority) {
 }
 
 export function TasksWidget({
-  leadId, accountId, opportunityId, onChanged,
-}: { leadId?: string; accountId?: string; opportunityId?: string; onChanged?: () => void }) {
+  leadId, accountId, opportunityId, contactId, onChanged,
+}: {
+  leadId?: string; accountId?: string; opportunityId?: string; contactId?: string; onChanged?: () => void;
+}) {
   const toast = useToast();
   const confirm = useConfirm();
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -32,7 +34,9 @@ export function TasksWidget({
     setLoading(true);
     // A Task means "still pending" — once completed, it moves to the
     // Activity Log (see ActivityTimeline) and should never linger here.
-    listTasksFor({ leadId, accountId, opportunityId })
+    listTasksFor({
+      leadId, accountId, opportunityId, contactId,
+    })
       .then((data) => setTasks(data.filter((t) => t.status !== 'COMPLETED')))
       .finally(() => setLoading(false));
   }
@@ -40,7 +44,7 @@ export function TasksWidget({
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leadId, accountId, opportunityId]);
+  }, [leadId, accountId, opportunityId, contactId]);
 
   async function changeStatus(task: Task, status: TaskStatus) {
     try {
@@ -149,6 +153,7 @@ export function TasksWidget({
           leadId={leadId}
           accountId={accountId}
           opportunityId={opportunityId}
+          contactId={contactId}
           onClose={() => setShowForm(false)}
           onSaved={() => { setShowForm(false); load(); toast.success('Task added'); onChanged?.(); }}
         />

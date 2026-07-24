@@ -119,11 +119,12 @@ export async function listTasks(params: ListTasksParams = {}): Promise<Paginated
   };
 }
 
-export async function listTasksFor(params: { leadId?: string; accountId?: string; opportunityId?: string }): Promise<Task[]> {
+export async function listTasksFor(params: { leadId?: string; accountId?: string; opportunityId?: string; contactId?: string }): Promise<Task[]> {
   let query = supabase.from('tasks').select(SELECT).order('due_at', { ascending: true });
   if (params.leadId) query = query.eq('lead_id', params.leadId);
   else if (params.accountId) query = query.eq('account_id', params.accountId);
   else if (params.opportunityId) query = query.eq('opportunity_id', params.opportunityId);
+  else if (params.contactId) query = query.eq('contact_id', params.contactId);
   const { data, error } = await query;
   if (error) throw error;
   return (data ?? []).map(mapTask);

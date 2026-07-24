@@ -75,9 +75,9 @@ function fromTask(t: Task): TimelineEntry {
 // regardless of whether it was logged fresh or derived from completing a
 // scheduled task.
 export function ActivityTimeline({
-  leadId, accountId, opportunityId, taskId, relatedLeadIds, relatedOpportunityIds, showNotes = false,
+  leadId, accountId, opportunityId, contactId, taskId, relatedLeadIds, relatedOpportunityIds, showNotes = false,
 }: {
-  leadId?: string; accountId?: string; opportunityId?: string; taskId?: string;
+  leadId?: string; accountId?: string; opportunityId?: string; contactId?: string; taskId?: string;
   relatedLeadIds?: string[]; relatedOpportunityIds?: string[]; showNotes?: boolean;
 }) {
   const [entries, setEntries] = useState<TimelineEntry[]>([]);
@@ -89,12 +89,12 @@ export function ActivityTimeline({
     setLoading(true);
     Promise.all([
       listActivities({
-        leadId, accountId, opportunityId, taskId, relatedLeadIds, relatedOpportunityIds,
+        leadId, accountId, opportunityId, contactId, taskId, relatedLeadIds, relatedOpportunityIds,
       }).then((data) => data.filter((a) => a.type !== 'NOTE' || showNotes)),
       // taskId-scoped usage (a task's own audit trail) has no matching
-      // lead/account/opportunity to fetch tasks for — skip it there.
-      (leadId || accountId || opportunityId)
-        ? listTasksFor({ leadId, accountId, opportunityId }).then((tasks) => tasks.filter((t) => t.status !== 'COMPLETED'))
+      // lead/account/opportunity/contact to fetch tasks for — skip it there.
+      (leadId || accountId || opportunityId || contactId)
+        ? listTasksFor({ leadId, accountId, opportunityId, contactId }).then((tasks) => tasks.filter((t) => t.status !== 'COMPLETED'))
         : Promise.resolve([] as Task[]),
     ]).then(([activities, tasks]) => {
       const merged = [...activities.map(fromActivity), ...tasks.map(fromTask)]
@@ -102,7 +102,7 @@ export function ActivityTimeline({
       setEntries(merged);
     }).finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leadId, accountId, opportunityId, taskId, relatedLeadKey, relatedOpportunityKey, showNotes]);
+  }, [leadId, accountId, opportunityId, contactId, taskId, relatedLeadKey, relatedOpportunityKey, showNotes]);
 
   return (
     <div className="card">

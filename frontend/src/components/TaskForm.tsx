@@ -48,18 +48,19 @@ function computeReminderAt(dueDate: string, dueTime: string, offset: ReminderOff
 }
 
 export function TaskForm({
-  task, leadId, accountId, opportunityId, defaultStatus, onClose, onSaved,
+  task, leadId, accountId, opportunityId, contactId, defaultStatus, onClose, onSaved,
 }: {
   task?: Task;
   leadId?: string;
   accountId?: string;
   opportunityId?: string;
+  contactId?: string;
   defaultStatus?: TaskStatus;
   onClose: () => void;
   onSaved: (task: Task) => void;
 }) {
   const isEdit = !!task;
-  const isScoped = !!(leadId || accountId || opportunityId);
+  const isScoped = !!(leadId || accountId || opportunityId || contactId);
 
   const initialModule: RelatedModule = task?.lead ? 'lead' : task?.account ? 'account' : task?.opportunity ? 'opportunity' : '';
   const initialRecordId = task?.lead?.id ?? task?.account?.id ?? task?.opportunity?.id ?? '';
@@ -115,7 +116,9 @@ export function TaskForm({
     setError(''); setSaving(true);
     try {
       const relation = isScoped
-        ? { leadId, accountId, opportunityId }
+        ? {
+          leadId, accountId, opportunityId, contactId,
+        }
         : {
           leadId: relatedModule === 'lead' ? relatedRecordId : undefined,
           accountId: relatedModule === 'account' ? relatedRecordId : undefined,

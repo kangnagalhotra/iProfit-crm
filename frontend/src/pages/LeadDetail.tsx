@@ -28,6 +28,7 @@ import { SelectWithOther } from '../components/SelectWithOther';
 import { Icon } from '../components/Icon';
 import { CollapsibleCard } from '../components/CollapsibleCard';
 import { AssociationsPanel } from '../components/AssociationsPanel';
+import { DetailTabs } from '../components/DetailTabs';
 import type { AssociationGroup } from '../components/AssociationsPanel';
 import { SkeletonDetailPage } from '../components/Skeleton';
 import { useToast } from '../context/ToastContext';
@@ -498,64 +499,87 @@ export function LeadDetail() {
       </div>
 
       <div className="detail-main">
-      <AssociationsPanel
-        groups={[
+      <DetailTabs
+        tabs={[
           {
-            key: 'company',
-            label: 'Company',
-            icon: 'building',
-            emptyLabel: 'Not linked to a company yet.',
-            items: lead.account ? [lead.account] : [],
-            onRowClick: (a: { id: string; name: string }) => navigate(`/companies/${a.id}`),
-            columns: [
-              { header: 'Company Name', render: (a: { id: string; name: string }) => <Link to={`/companies/${a.id}`} onClick={(e) => e.stopPropagation()}>{a.name}</Link> },
-            ],
+            key: 'details',
+            label: 'Details',
+            content: (
+              <AssociationsPanel
+                groups={[
+                  {
+                    key: 'company',
+                    label: 'Company',
+                    icon: 'building',
+                    emptyLabel: 'Not linked to a company yet.',
+                    items: lead.account ? [lead.account] : [],
+                    onRowClick: (a: { id: string; name: string }) => navigate(`/companies/${a.id}`),
+                    columns: [
+                      { header: 'Company Name', render: (a: { id: string; name: string }) => <Link to={`/companies/${a.id}`} onClick={(e) => e.stopPropagation()}>{a.name}</Link> },
+                    ],
+                  },
+                  {
+                    key: 'deal',
+                    label: 'Deal',
+                    icon: 'dollar',
+                    emptyLabel: 'Not converted to a deal yet.',
+                    items: convertedDeal ? [convertedDeal] : [],
+                    onRowClick: (d: { id: string; name: string }) => navigate(`/deals/${d.id}`),
+                    columns: [
+                      { header: 'Deal Name', render: (d: { id: string; name: string }) => <Link to={`/deals/${d.id}`} onClick={(e) => e.stopPropagation()}>{d.name}</Link> },
+                    ],
+                  },
+                  {
+                    key: 'contacts',
+                    label: `Contacts (${contacts.length})`,
+                    icon: 'person',
+                    emptyLabel: 'No contacts linked to this lead yet.',
+                    items: contacts,
+                    addAction: { label: '+ Link Contact', onClick: () => setShowLinkContacts(true) },
+                    onRowClick: (c: LeadContact) => navigate(`/contacts/${c.id}`),
+                    columns: [
+                      { header: 'Name', render: (c: LeadContact) => <Link to={`/contacts/${c.id}`} onClick={(e) => e.stopPropagation()}>{[c.firstName, c.lastName].filter(Boolean).join(' ') || c.email || 'Untitled contact'}</Link> },
+                      { header: 'Email', render: (c: LeadContact) => c.email ?? '—' },
+                      { header: 'Designation', render: (c: LeadContact) => c.jobTitle ?? '—' },
+                      {
+                        header: 'Role',
+                        render: (c: LeadContact) => (
+                          <LeadContactRoleCell
+                            contact={c}
+                            onSave={(role, roleOther) => {
+                              setLeadContactRole(lead!.id, c.id, role, roleOther)
+                                .then(() => { loadContacts(); toast.success('Contact role updated'); })
+                                .catch((err) => toast.error(err.message ?? 'Could not update role'));
+                            }}
+                          />
+                        ),
+                      },
+                    ],
+                  },
+                ] as AssociationGroup[]}
+              />
+            ),
           },
           {
-            key: 'deal',
-            label: 'Deal',
-            icon: 'dollar',
-            emptyLabel: 'Not converted to a deal yet.',
-            items: convertedDeal ? [convertedDeal] : [],
-            onRowClick: (d: { id: string; name: string }) => navigate(`/deals/${d.id}`),
-            columns: [
-              { header: 'Deal Name', render: (d: { id: string; name: string }) => <Link to={`/deals/${d.id}`} onClick={(e) => e.stopPropagation()}>{d.name}</Link> },
-            ],
+            key: 'activity',
+            label: 'Activity History',
+            content: <ActivityTimeline key={`activity-${activityKey}`} leadId={lead.id} />,
           },
           {
-            key: 'contacts',
-            label: `Contacts (${contacts.length})`,
-            icon: 'person',
-            emptyLabel: 'No contacts linked to this lead yet.',
-            items: contacts,
-            addAction: { label: '+ Link Contact', onClick: () => setShowLinkContacts(true) },
-            onRowClick: (c: LeadContact) => navigate(`/contacts/${c.id}`),
-            columns: [
-              { header: 'Name', render: (c: LeadContact) => <Link to={`/contacts/${c.id}`} onClick={(e) => e.stopPropagation()}>{[c.firstName, c.lastName].filter(Boolean).join(' ') || c.email || 'Untitled contact'}</Link> },
-              { header: 'Email', render: (c: LeadContact) => c.email ?? '—' },
-              { header: 'Designation', render: (c: LeadContact) => c.jobTitle ?? '—' },
-              {
-                header: 'Role',
-                render: (c: LeadContact) => (
-                  <LeadContactRoleCell
-                    contact={c}
-                    onSave={(role, roleOther) => {
-                      setLeadContactRole(lead!.id, c.id, role, roleOther)
-                        .then(() => { loadContacts(); toast.success('Contact role updated'); })
-                        .catch((err) => toast.error(err.message ?? 'Could not update role'));
-                    }}
-                  />
-                ),
-              },
-            ],
+            key: 'tasks',
+            label: 'Tasks',
+            content: <TasksWidget key={`tasks-${activityKey}`} leadId={lead.id} onChanged={() => setActivityKey((k) => k + 1)} />,
           },
-        ] as AssociationGroup[]}
+          {
+            key: 'ai-assistant',
+            label: 'AI Assistant',
+            content: <AiAssistCard leadId={lead.id} contactName={name} contactEmail={lead.email} contactPhone={lead.mobile} />,
+          },
+        ]}
       />
-      <AiAssistCard leadId={lead.id} contactName={name} contactEmail={lead.email} contactPhone={lead.mobile} />
-      {/* Distinct key prefixes — sibling components sharing the same key value
-          makes React reconciliation duplicate/omit cards on re-render. */}
-      <ActivityTimeline key={`activity-${activityKey}`} leadId={lead.id} />
-      <TasksWidget key={`tasks-${activityKey}`} leadId={lead.id} onChanged={() => setActivityKey((k) => k + 1)} />
+      </div>
+
+      <div className="detail-notes">
       <NotesSection leadId={lead.id} />
       </div>
       </div>

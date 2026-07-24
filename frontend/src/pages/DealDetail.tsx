@@ -30,6 +30,7 @@ import { Icon } from '../components/Icon';
 import { CollapsibleCard } from '../components/CollapsibleCard';
 import { AssociationsPanel } from '../components/AssociationsPanel';
 import type { AssociationGroup } from '../components/AssociationsPanel';
+import { DetailTabs } from '../components/DetailTabs';
 import { SkeletonDetailPage } from '../components/Skeleton';
 import { StageHistoryCard } from '../components/StageHistoryCard';
 import { ProposalsCard } from '../components/ProposalsCard';
@@ -553,116 +554,157 @@ export function DealDetail() {
       </div>
 
       <div className="detail-main">
-      <AssociationsPanel
-        groups={[
+      <DetailTabs
+        tabs={[
           {
-            key: 'company',
-            label: 'Company',
-            icon: 'building',
-            emptyLabel: 'Not linked to a company yet.',
-            items: deal.account ? [deal.account] : [],
-            onRowClick: (a: NonNullable<Opportunity['account']>) => navigate(`/companies/${a.id}`),
-            columns: [
-              {
-                header: 'Company Name',
-                render: (a: NonNullable<Opportunity['account']>) => (
-                  <>
-                    <Link to={`/companies/${a.id}`} onClick={(e) => e.stopPropagation()}>{a.name}</Link>
-                    {a.stage && (
-                      <span className="chip" style={{ background: a.stage.color + '22', color: a.stage.color, marginLeft: 6 }}>{a.stage.name}</span>
-                    )}
-                  </>
-                ),
-              },
-            ],
+            key: 'details',
+            label: 'Details',
+            content: (
+              <AssociationsPanel
+                groups={[
+                  {
+                    key: 'company',
+                    label: 'Company',
+                    icon: 'building',
+                    emptyLabel: 'Not linked to a company yet.',
+                    items: deal.account ? [deal.account] : [],
+                    onRowClick: (a: NonNullable<Opportunity['account']>) => navigate(`/companies/${a.id}`),
+                    columns: [
+                      {
+                        header: 'Company Name',
+                        render: (a: NonNullable<Opportunity['account']>) => (
+                          <>
+                            <Link to={`/companies/${a.id}`} onClick={(e) => e.stopPropagation()}>{a.name}</Link>
+                            {a.stage && (
+                              <span className="chip" style={{ background: a.stage.color + '22', color: a.stage.color, marginLeft: 6 }}>{a.stage.name}</span>
+                            )}
+                          </>
+                        ),
+                      },
+                    ],
+                  },
+                  {
+                    key: 'leads',
+                    label: 'Associated Leads',
+                    icon: 'person',
+                    emptyLabel: 'No associated leads.',
+                    items: associatedLeads,
+                    onRowClick: (l: AssociatedLead) => navigate(`/leads/${l.id}`),
+                    columns: [
+                      {
+                        header: 'Lead',
+                        render: (l: AssociatedLead) => <Link to={`/leads/${l.id}`} onClick={(e) => e.stopPropagation()}>{l.name}</Link>,
+                      },
+                      {
+                        header: 'Status',
+                        render: (l: AssociatedLead) => (
+                          <span
+                            className="chip"
+                            style={l.tag === 'Merged — Duplicate' ? { background: '#F59E0B22', color: '#B45309' } : undefined}
+                          >
+                            {l.tag}
+                          </span>
+                        ),
+                      },
+                      {
+                        header: 'Merged on',
+                        render: (l: AssociatedLead) => (l.mergedAt ? new Date(l.mergedAt).toLocaleDateString() : '—'),
+                      },
+                    ],
+                  },
+                ] as AssociationGroup[]}
+              />
+            ),
           },
           {
-            key: 'leads',
-            label: 'Associated Leads',
-            icon: 'person',
-            emptyLabel: 'No associated leads.',
-            items: associatedLeads,
-            onRowClick: (l: AssociatedLead) => navigate(`/leads/${l.id}`),
-            columns: [
-              {
-                header: 'Lead',
-                render: (l: AssociatedLead) => <Link to={`/leads/${l.id}`} onClick={(e) => e.stopPropagation()}>{l.name}</Link>,
-              },
-              {
-                header: 'Status',
-                render: (l: AssociatedLead) => (
-                  <span
-                    className="chip"
-                    style={l.tag === 'Merged — Duplicate' ? { background: '#F59E0B22', color: '#B45309' } : undefined}
-                  >
-                    {l.tag}
-                  </span>
-                ),
-              },
-              {
-                header: 'Merged on',
-                render: (l: AssociatedLead) => (l.mergedAt ? new Date(l.mergedAt).toLocaleDateString() : '—'),
-              },
-            ],
+            key: 'contacts-by-role',
+            label: `Contacts by Role (${dealContacts.length + (deal.contact ? 1 : 0)})`,
+            content: (
+              <CollapsibleCard title={`Contacts by Role (${dealContacts.length + (deal.contact ? 1 : 0)})`} storageKey="collapsible:deal:contacts-by-role">
+                <button className="btn secondary btn-icon" style={{ marginBottom: 12 }} onClick={() => setShowLinkContacts(true)}>
+                  <Icon name="person" size={13} /> Link Contact
+                </button>
+                {!deal.contact && dealContacts.length === 0 && (
+                  <p style={{ fontSize: 14, color: 'var(--muted)', marginTop: 0 }}>No contacts linked to this deal yet.</p>
+                )}
+                {deal.contact && (
+                  <div style={{ marginBottom: 14 }}>
+                    <div className="label" style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 4 }}>Primary Contact</div>
+                    <div style={{ fontSize: 14 }}>
+                      <Link to={`/contacts/${deal.contact.id}`}>
+                        {[deal.contact.firstName, deal.contact.lastName].filter(Boolean).join(' ') || deal.contact.email || 'Untitled contact'}
+                      </Link>
+                      {deal.contact.email && <span style={{ color: 'var(--muted)' }}> — {deal.contact.email}</span>}
+                    </div>
+                  </div>
+                )}
+                {ROLE_GROUP_ORDER.map((role) => {
+                  const group = dealContacts.filter((dc) => dc.role === role && dc.contact);
+                  if (group.length === 0) return null;
+                  return (
+                    <div key={role} style={{ marginBottom: 14 }}>
+                      <div className="label" style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 4 }}>{ROLE_LABELS[role]}</div>
+                      {group.map((dc) => (
+                        <div key={dc.contactId} style={{ fontSize: 14, padding: '2px 0' }}>
+                          <Link to={`/contacts/${dc.contact!.id}`}>
+                            {[dc.contact!.firstName, dc.contact!.lastName].filter(Boolean).join(' ') || dc.contact!.email || 'Untitled contact'}
+                          </Link>
+                          {dc.contact!.email && <span style={{ color: 'var(--muted)' }}> — {dc.contact!.email}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+                {!dealContacts.some((dc) => dc.role === 'DECISION_MAKER') && (deal.contact || dealContacts.length > 0) && (
+                  <div className="helper-text" style={{ color: '#DC2626' }}>
+                    ⚠ No Decision Maker identified on this deal — a known win-rate risk.
+                  </div>
+                )}
+              </CollapsibleCard>
+            ),
           },
-        ] as AssociationGroup[]}
+          {
+            key: 'proposals',
+            label: 'Proposals',
+            content: <ProposalsCard opportunityId={deal.id} deal={deal} />,
+          },
+          {
+            key: 'activity',
+            label: 'Activity History',
+            content: <ActivityTimeline key={`activity-${activityKey}`} opportunityId={deal.id} />,
+          },
+          {
+            key: 'tasks',
+            label: 'Tasks',
+            content: <TasksWidget key={`tasks-${activityKey}`} opportunityId={deal.id} onChanged={() => setActivityKey((k) => k + 1)} />,
+          },
+          {
+            key: 'ai-assistant',
+            label: 'AI Assistant',
+            content: (
+              <AiAssistCard
+                dealId={deal.id}
+                contactName={deal.contact ? [deal.contact.firstName, deal.contact.lastName].filter(Boolean).join(' ') : undefined}
+                contactEmail={deal.contact?.email}
+                contactPhone={deal.contact?.mobile}
+              />
+            ),
+          },
+          ...(deal.stage.isClosedWon ? [{
+            key: 'health-renewal',
+            label: 'Health & Renewal',
+            content: <HealthRenewalCard deal={deal} onDealUpdated={setDeal} />,
+          }] : []),
+          {
+            key: 'stage-history',
+            label: 'Stage History',
+            content: <StageHistoryCard opportunityId={deal.id} />,
+          },
+        ]}
       />
+      </div>
 
-      <CollapsibleCard title={`Contacts by Role (${dealContacts.length + (deal.contact ? 1 : 0)})`} storageKey="collapsible:deal:contacts-by-role">
-        <button className="btn secondary btn-icon" style={{ marginBottom: 12 }} onClick={() => setShowLinkContacts(true)}>
-          <Icon name="person" size={13} /> Link Contact
-        </button>
-        {!deal.contact && dealContacts.length === 0 && (
-          <p style={{ fontSize: 14, color: 'var(--muted)', marginTop: 0 }}>No contacts linked to this deal yet.</p>
-        )}
-        {deal.contact && (
-          <div style={{ marginBottom: 14 }}>
-            <div className="label" style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 4 }}>Primary Contact</div>
-            <div style={{ fontSize: 14 }}>
-              <Link to={`/contacts/${deal.contact.id}`}>
-                {[deal.contact.firstName, deal.contact.lastName].filter(Boolean).join(' ') || deal.contact.email || 'Untitled contact'}
-              </Link>
-              {deal.contact.email && <span style={{ color: 'var(--muted)' }}> — {deal.contact.email}</span>}
-            </div>
-          </div>
-        )}
-        {ROLE_GROUP_ORDER.map((role) => {
-          const group = dealContacts.filter((dc) => dc.role === role && dc.contact);
-          if (group.length === 0) return null;
-          return (
-            <div key={role} style={{ marginBottom: 14 }}>
-              <div className="label" style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 4 }}>{ROLE_LABELS[role]}</div>
-              {group.map((dc) => (
-                <div key={dc.contactId} style={{ fontSize: 14, padding: '2px 0' }}>
-                  <Link to={`/contacts/${dc.contact!.id}`}>
-                    {[dc.contact!.firstName, dc.contact!.lastName].filter(Boolean).join(' ') || dc.contact!.email || 'Untitled contact'}
-                  </Link>
-                  {dc.contact!.email && <span style={{ color: 'var(--muted)' }}> — {dc.contact!.email}</span>}
-                </div>
-              ))}
-            </div>
-          );
-        })}
-        {!dealContacts.some((dc) => dc.role === 'DECISION_MAKER') && (deal.contact || dealContacts.length > 0) && (
-          <div className="helper-text" style={{ color: '#DC2626' }}>
-            ⚠ No Decision Maker identified on this deal — a known win-rate risk.
-          </div>
-        )}
-      </CollapsibleCard>
-
-      <ProposalsCard opportunityId={deal.id} deal={deal} />
-      <AiAssistCard
-        dealId={deal.id}
-        contactName={deal.contact ? [deal.contact.firstName, deal.contact.lastName].filter(Boolean).join(' ') : undefined}
-        contactEmail={deal.contact?.email}
-        contactPhone={deal.contact?.mobile}
-      />
-      {deal.stage.isClosedWon && <HealthRenewalCard deal={deal} onDealUpdated={setDeal} />}
-      <StageHistoryCard opportunityId={deal.id} />
-      {/* Distinct key prefixes — sibling components sharing the same key value
-          makes React reconciliation duplicate/omit cards on re-render. */}
-      <ActivityTimeline key={`activity-${activityKey}`} opportunityId={deal.id} />
-      <TasksWidget key={`tasks-${activityKey}`} opportunityId={deal.id} onChanged={() => setActivityKey((k) => k + 1)} />
+      <div className="detail-notes">
       <NotesSection opportunityId={deal.id} />
       </div>
       </div>
