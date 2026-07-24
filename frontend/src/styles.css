@@ -373,8 +373,9 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
 .quick-action:not(:disabled):not(.disabled):hover .icon { border-color: var(--blue); color: var(--blue); }
 
 .key-info { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px 32px; }
+.key-info .row { min-width: 0; }
 .key-info .row .label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-bottom: 5px; }
-.key-info .row .value { font-size: 14px; font-weight: 500; color: var(--ink); }
+.key-info .row .value { font-size: 14px; font-weight: 500; color: var(--ink); overflow-wrap: anywhere; }
 .value-empty { color: var(--muted); font-style: italic; font-weight: 400; }
 
 .detail-header-top { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
