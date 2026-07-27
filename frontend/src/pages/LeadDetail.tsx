@@ -101,10 +101,6 @@ function scrollToNotes() {
   document.getElementById('notes-section')?.scrollIntoView({ behavior: 'smooth' });
 }
 
-function scrollToTasks() {
-  document.getElementById('tasks-section')?.scrollIntoView({ behavior: 'smooth' });
-}
-
 function scrollToKeyInfo() {
   document.querySelector('.key-info')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
@@ -132,6 +128,7 @@ export function LeadDetail() {
   const [showLinkContacts, setShowLinkContacts] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [activityKey, setActivityKey] = useState(0);
+  const [activeDetailTab, setActiveDetailTab] = useState('details');
   const [overrideEdit, setOverrideEdit] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
   const canOverride = currentUser?.role === 'ADMIN' || currentUser?.role === 'SALES_MANAGER';
@@ -171,6 +168,14 @@ export function LeadDetail() {
     : undefined);
 
   if (!lead) return <SkeletonDetailPage />;
+
+  // Tasks only exists in the DOM while its DetailTabs tab is active (only the
+  // active tab's content is mounted) — switch to it first, then scroll once
+  // that's committed, instead of a plain scrollIntoView that would find nothing.
+  function scrollToTasks() {
+    setActiveDetailTab('tasks');
+    requestAnimationFrame(() => document.getElementById('tasks-section')?.scrollIntoView({ behavior: 'smooth' }));
+  }
 
   const name = lead.leadName || [lead.firstName, lead.lastName].filter(Boolean).join(' ') || lead.email || 'Untitled lead';
   const locked = !!lead.convertedAt || !!lead.mergedAt;
@@ -501,6 +506,8 @@ export function LeadDetail() {
 
       <div className="detail-main">
       <DetailTabs
+        activeKey={activeDetailTab}
+        onActiveKeyChange={setActiveDetailTab}
         tabs={[
           {
             key: 'details',

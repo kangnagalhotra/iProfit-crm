@@ -99,10 +99,6 @@ function scrollToNotes() {
   document.getElementById('notes-section')?.scrollIntoView({ behavior: 'smooth' });
 }
 
-function scrollToTasks() {
-  document.getElementById('tasks-section')?.scrollIntoView({ behavior: 'smooth' });
-}
-
 function scrollToKeyInfo() {
   document.querySelector('.key-info')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
@@ -126,6 +122,7 @@ export function DealDetail() {
   const [forecastJustificationDraft, setForecastJustificationDraft] = useState('');
   const [moreOpen, setMoreOpen] = useState(false);
   const [activityKey, setActivityKey] = useState(0);
+  const [activeDetailTab, setActiveDetailTab] = useState('details');
   const [showLinkContacts, setShowLinkContacts] = useState(false);
   const [associatedLeads, setAssociatedLeads] = useState<AssociatedLead[]>([]);
   const [showMergeModal, setShowMergeModal] = useState(false);
@@ -174,6 +171,14 @@ export function DealDetail() {
   useRecordRecentlyViewed('deal', deal?.id, deal?.name);
 
   if (!deal) return <SkeletonDetailPage />;
+
+  // Tasks only exists in the DOM while its DetailTabs tab is active (only the
+  // active tab's content is mounted) — switch to it first, then scroll once
+  // that's committed, instead of a plain scrollIntoView that would find nothing.
+  function scrollToTasks() {
+    setActiveDetailTab('tasks');
+    requestAnimationFrame(() => document.getElementById('tasks-section')?.scrollIntoView({ behavior: 'smooth' }));
+  }
 
   const locked = !!deal.mergedIntoOpportunityId;
 
@@ -555,6 +560,8 @@ export function DealDetail() {
 
       <div className="detail-main">
       <DetailTabs
+        activeKey={activeDetailTab}
+        onActiveKeyChange={setActiveDetailTab}
         tabs={[
           {
             key: 'details',

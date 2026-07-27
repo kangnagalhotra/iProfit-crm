@@ -9,10 +9,29 @@ export interface DetailTab { key: string; label: string; content: ReactNode; }
 // here). Each tab's content is arbitrary — an ActivityTimeline, a
 // TasksWidget, the AssociationsPanel itself, whatever that page used to
 // always show stacked in .detail-main.
-export function DetailTabs({ tabs }: { tabs: DetailTab[] }) {
-  const [active, setActive] = useState(tabs[0]?.key);
+//
+// activeKey/onActiveKeyChange are optional — pass them when something
+// outside this component needs to jump to a specific tab (e.g. the "Task"
+// quick-action button switching to the Tasks tab, since only the active
+// tab's content is ever mounted — id="tasks-section" doesn't exist in the
+// DOM until that tab is selected, so a plain scrollIntoView can't reach it
+// on its own). Uncontrolled (internal state) when omitted.
+export function DetailTabs({
+  tabs, activeKey, onActiveKeyChange,
+}: {
+  tabs: DetailTab[];
+  activeKey?: string;
+  onActiveKeyChange?: (key: string) => void;
+}) {
+  const [internalActive, setInternalActive] = useState(tabs[0]?.key);
+  const active = activeKey ?? internalActive;
   const activeTab = tabs.find((t) => t.key === active) ?? tabs[0];
   if (!activeTab) return null;
+
+  function select(key: string) {
+    setInternalActive(key);
+    onActiveKeyChange?.(key);
+  }
 
   return (
     <div className="card detail-tabs-card">
@@ -22,7 +41,7 @@ export function DetailTabs({ tabs }: { tabs: DetailTab[] }) {
             key={t.key}
             type="button"
             className={`detail-tab${t.key === activeTab.key ? ' active' : ''}`}
-            onClick={() => setActive(t.key)}
+            onClick={() => select(t.key)}
           >
             {t.label}
           </button>
