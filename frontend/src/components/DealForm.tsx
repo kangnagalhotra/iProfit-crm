@@ -348,7 +348,7 @@ export function DealForm({
                   />
                   <div className="helper-text">
                     {expectedRevenueTouched && form.expectedRevenue !== ''
-                      ? `Custom estimate (auto would be ${autoExpectedRevenue.toLocaleString(undefined, { style: 'currency', currency: form.currency })}) — clear the field to go back to auto.`
+                      ? `Custom estimate (auto would be ${autoExpectedRevenue.toLocaleString('en-IN', { style: 'currency', currency: form.currency })}) — clear the field to go back to auto.`
                       : 'Auto-calculated: Value × Probability. Type your own estimate to override.'}
                   </div>
                 </div>
@@ -410,7 +410,12 @@ export function DealForm({
                 )}
               </div>
               <div className="field"><label>Products / line items</label>
-                <LineItemsEditor value={form.lineItems} onChange={(v) => set('lineItems', v)} products={products} />
+                <LineItemsEditor
+                  value={form.lineItems}
+                  onChange={(v) => set('lineItems', v)}
+                  products={products}
+                  onProductCreated={(p) => setProducts((ps) => [...ps, p].sort((a, b) => a.name.localeCompare(b.name)))}
+                />
               </div>
             </FormSection>
 

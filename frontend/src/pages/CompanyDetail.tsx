@@ -78,7 +78,7 @@ function formatRevenue(value?: string) {
 }
 
 function formatMoney(n: number) {
-  return n.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
+  return n.toLocaleString('en-IN', { style: 'currency', currency: 'USD' });
 }
 
 function scrollToNotes() {

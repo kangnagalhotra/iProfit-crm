@@ -183,7 +183,7 @@ export function Dashboard() {
     .reduce((sum, d) => sum + (d.amount ? parseFloat(d.amount) : 0), 0);
 
   function formatMoney(n: number) {
-    return n.toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+    return n.toLocaleString('en-IN', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
   }
 
   return (

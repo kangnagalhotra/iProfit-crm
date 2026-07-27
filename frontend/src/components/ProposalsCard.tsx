@@ -20,7 +20,7 @@ function formatValue(value?: string) {
   if (!value) return '—';
   const n = parseFloat(value);
   if (Number.isNaN(n)) return '—';
-  return n.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
+  return n.toLocaleString('en-IN', { style: 'currency', currency: 'USD' });
 }
 
 // Versioned proposal/quote history for a deal — append-only so the offer's

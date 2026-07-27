@@ -103,7 +103,7 @@ export function ClientHealth() {
                 </td>
                 <td>{p.account ? <Link to={`/companies/${p.account.id}`}>{p.account.name}</Link> : '—'}</td>
                 <td>{p.opportunity ? <Link to={`/deals/${p.opportunity.id}`}>{p.opportunity.name}</Link> : '—'}</td>
-                <td>{p.value ? parseFloat(p.value).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) : '—'}</td>
+                <td>{p.value ? parseFloat(p.value).toLocaleString('en-IN', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) : '—'}</td>
                 <td>
                   <select
                     value={p.health}

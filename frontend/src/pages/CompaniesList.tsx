@@ -52,7 +52,7 @@ function formatRevenue(value?: string) {
   if (!value) return '—';
   const n = parseFloat(value);
   if (Number.isNaN(n)) return '—';
-  return n.toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+  return n.toLocaleString('en-IN', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 }
 
 const EXPORT_COLUMNS: ExportColumn<Account>[] = [

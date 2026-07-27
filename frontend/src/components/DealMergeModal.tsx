@@ -5,7 +5,7 @@ import { listStages } from '../api/stages';
 import { SearchSelect } from './SearchSelect';
 
 function dealLabel(d: Opportunity) {
-  return `${d.name} — ${d.stage.name}${d.amount ? ` — $${Number(d.amount).toLocaleString()}` : ''}`;
+  return `${d.name} — ${d.stage.name}${d.amount ? ` — $${Number(d.amount).toLocaleString('en-IN')}` : ''}`;
 }
 
 // Section C — "Merge with another deal at this company", always available
@@ -116,11 +116,11 @@ export function DealMergeModal({
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <input type="radio" checked={valueChoice === 'this'} onChange={() => setValueChoice('this')} />
-                  {deal.name}&apos;s value {deal.amount ? `($${Number(deal.amount).toLocaleString()})` : '(none)'}
+                  {deal.name}&apos;s value {deal.amount ? `($${Number(deal.amount).toLocaleString('en-IN')})` : '(none)'}
                 </label>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <input type="radio" checked={valueChoice === 'other'} onChange={() => setValueChoice('other')} />
-                  {target.name}&apos;s value {target.amount ? `($${Number(target.amount).toLocaleString()})` : '(none)'}
+                  {target.name}&apos;s value {target.amount ? `($${Number(target.amount).toLocaleString('en-IN')})` : '(none)'}
                 </label>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <input type="radio" checked={valueChoice === 'combine'} onChange={() => setValueChoice('combine')} />

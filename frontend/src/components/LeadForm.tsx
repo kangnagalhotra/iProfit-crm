@@ -310,7 +310,7 @@ export function LeadForm({
       setError('Unqualified reason is required for an unqualified lead.');
       return false;
     }
-    if (form.value !== '' && Number(form.value) < 0) { setError('Lead value cannot be negative.'); return false; }
+    if (form.value !== '' && Number(form.value) < 0) { setError('Average Contract Value cannot be negative.'); return false; }
     setError('');
     return true;
   }
@@ -471,7 +471,7 @@ export function LeadForm({
               />
               {mobileError && <div className="error" style={{ margin: '4px 0 0' }}>{mobileError}</div>}
             </div>
-            <div className="field"><label>Lead value</label>
+            <div className="field"><label>Average Contract Value</label>
               <input type="number" min="0" value={form.value} onChange={(e) => set('value', e.target.value)} placeholder="0.00" /></div>
             <div className="field"><label>Department / Division</label>
               <SelectWithOther

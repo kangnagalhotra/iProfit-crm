@@ -434,8 +434,8 @@ export function LeadDetail() {
             />
           )}
           <EditableRow
-            label="Lead Value"
-            value={lead.value ? parseFloat(lead.value).toLocaleString(undefined, { style: 'currency', currency: 'USD' }) : undefined}
+            label="Average Contract Value"
+            value={lead.value ? parseFloat(lead.value).toLocaleString('en-IN', { style: 'currency', currency: 'USD' }) : undefined}
             editing={editingField === 'value'}
             onStartEdit={() => setEditingField('value')}
             editable={canEdit}
@@ -447,7 +447,7 @@ export function LeadDetail() {
               defaultValue={lead.value ?? ''}
               placeholder="0.00"
               onBlur={(e) => {
-                if (Number(e.target.value) < 0) { toast.error('Lead value cannot be negative.'); return; }
+                if (Number(e.target.value) < 0) { toast.error('Average Contract Value cannot be negative.'); return; }
                 saveField({ value: e.target.value });
               }}
               onKeyDown={(e) => {

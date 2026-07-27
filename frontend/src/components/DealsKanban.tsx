@@ -33,7 +33,7 @@ function formatValue(value?: string) {
   if (!value) return null;
   const n = parseFloat(value);
   if (Number.isNaN(n)) return null;
-  return n.toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+  return n.toLocaleString('en-IN', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 }
 
 function initials(name: string) {

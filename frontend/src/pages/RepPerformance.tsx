@@ -84,7 +84,7 @@ async function fetchAllTasks(): Promise<Task[]> {
 }
 
 function money(n: number) {
-  return n.toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+  return n.toLocaleString('en-IN', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 }
 
 function median(nums: number[]): number | null {

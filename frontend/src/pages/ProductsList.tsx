@@ -14,7 +14,7 @@ const SECTOR_LABELS: Record<ProductSector, string> = {
 function formatPrice(value: string) {
   const n = parseFloat(value);
   if (Number.isNaN(n)) return '—';
-  return n.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
+  return n.toLocaleString('en-IN', { style: 'currency', currency: 'USD' });
 }
 
 export function ProductsList() {
@@ -85,7 +85,7 @@ export function ProductsList() {
             <tr>
               <th>Name</th>
               <th>SKU</th>
-              <th>Category</th>
+              <th>Services</th>
               <th>Sector</th>
               <th>Unit Price</th>
               <th>Status</th>

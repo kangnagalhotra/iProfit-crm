@@ -48,7 +48,7 @@ async function fetchAllLeads(): Promise<Lead[]> {
 }
 
 function money(n: number) {
-  return n.toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+  return n.toLocaleString('en-IN', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 }
 
 function amountOf(d: Opportunity) {

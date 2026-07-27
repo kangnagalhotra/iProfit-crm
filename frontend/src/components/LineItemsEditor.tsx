@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import type { LineItem, Product } from '../api/types';
 import { Icon } from './Icon';
 import { SearchSelect } from './SearchSelect';
 import type { SearchSelectOption } from './SearchSelect';
+import { ProductForm } from './ProductForm';
 
 export interface LineItemsEditorProps {
   value: LineItem[];
@@ -9,13 +11,20 @@ export interface LineItemsEditorProps {
   // Optional single product catalog — picking one auto-fills name/price;
   // free text is still allowed (allowCustom) for ad hoc, uncataloged items.
   products?: Product[];
+  // Called when a new product is created inline via "+ Add new product" —
+  // lets the parent add it to its own catalog list so it shows up as an
+  // option immediately, without a full reload.
+  onProductCreated?: (product: Product) => void;
 }
 
 function lineTotal(r: LineItem) {
   return (Number(r.quantity) || 0) * (Number(r.unitPrice) || 0);
 }
 
-export function LineItemsEditor({ value, onChange, products = [] }: LineItemsEditorProps) {
+export function LineItemsEditor({
+  value, onChange, products = [], onProductCreated,
+}: LineItemsEditorProps) {
+  const [creatingForRowId, setCreatingForRowId] = useState<string | null>(null);
   const productOptions: SearchSelectOption[] = products.map((p) => ({ value: p.id, label: p.name, sublabel: p.sku }));
 
   function updateRow(id: string, patch: Partial<LineItem>) {
@@ -52,13 +61,15 @@ export function LineItemsEditor({ value, onChange, products = [] }: LineItemsEdi
               onChange={(v) => pickProduct(row.id, v)}
               allowCustom
               placeholder="Product name"
+              onCreateNew={() => setCreatingForRowId(row.id)}
+              createNewLabel="+ Add new product"
             />
           ) : (
             <input value={row.productName} onChange={(e) => updateRow(row.id, { productName: e.target.value })} placeholder="Product name" />
           )}
           <input type="number" min="0" value={row.quantity} onChange={(e) => updateRow(row.id, { quantity: e.target.value })} />
           <input type="number" min="0" value={row.unitPrice} onChange={(e) => updateRow(row.id, { unitPrice: e.target.value })} placeholder="0.00" />
-          <span className="line-item-total">{lineTotal(row).toLocaleString(undefined, { style: 'currency', currency: 'USD' })}</span>
+          <span className="line-item-total">{lineTotal(row).toLocaleString('en-IN', { style: 'currency', currency: 'USD' })}</span>
           <button type="button" className="row-remove-btn" onClick={() => removeRow(row.id)} aria-label="Remove line item">
             <Icon name="trash" size={14} />
           </button>
@@ -67,6 +78,17 @@ export function LineItemsEditor({ value, onChange, products = [] }: LineItemsEdi
       <button type="button" className="btn secondary btn-icon" onClick={addRow} style={{ marginTop: 8 }}>
         <Icon name="plus" size={14} /> Add row
       </button>
+
+      {creatingForRowId && (
+        <ProductForm
+          onClose={() => setCreatingForRowId(null)}
+          onSaved={(product) => {
+            onProductCreated?.(product);
+            updateRow(creatingForRowId, { productId: product.id, productName: product.name, unitPrice: product.unitPrice });
+            setCreatingForRowId(null);
+          }}
+        />
+      )}
     </div>
   );
 }
