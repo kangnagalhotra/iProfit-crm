@@ -7,7 +7,16 @@ import { celebrate } from '../utils/celebrate';
 export function ConvertToDealModal({
   lead, onClose, onConverted,
 }: { lead: Lead; onClose: () => void; onConverted: (deal: { id: string }) => void }) {
-  const defaultName = `${lead.leadName || [lead.firstName, lead.lastName].filter(Boolean).join(' ')} - Deal`;
+  // Company + Deal + Product Interest (when set) — e.g. "Microsoft - Deal -
+  // Cloud Services", or just "Microsoft - Deal" if no product was picked on
+  // the lead. Falls back to the lead's own name if it isn't linked to a
+  // company yet (shouldn't normally happen — Company is required on Lead
+  // creation — but keeps this usable rather than showing a blank name).
+  const defaultName = [
+    lead.account?.name || lead.leadName || [lead.firstName, lead.lastName].filter(Boolean).join(' '),
+    'Deal',
+    lead.productInterest?.name,
+  ].filter(Boolean).join(' - ');
   const [name, setName] = useState(defaultName);
   const [value, setValue] = useState(lead.value ?? '');
   const [stageId, setStageId] = useState('');
