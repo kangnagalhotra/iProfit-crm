@@ -55,7 +55,6 @@ export function CompanyForm({
     city: account?.city ?? '', state: account?.state ?? '', country: account?.country ?? '',
     ownerId: account?.owner?.id ?? '', stageId: account?.stage.id ?? defaultStageId ?? '',
   });
-  const [stages, setStages] = useState<AccountStage[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [error, setError] = useState('');
   const [domainError, setDomainError] = useState('');
@@ -73,7 +72,6 @@ export function CompanyForm({
     Promise.all([listStages('account_stages'), listUsers()])
       .then(([stageRes, userRes]) => {
         const stagesTyped = stageRes as AccountStage[];
-        setStages(stagesTyped);
         setUsers(userRes);
         if (!isEdit && !defaultStageId) {
           const defaultStage = stagesTyped.find((s) => s.isDefault) ?? stagesTyped[0];
@@ -111,7 +109,6 @@ export function CompanyForm({
     { value: '', label: 'Assign to me' },
     ...users.map((u) => ({ value: u.id, label: u.fullName, sublabel: u.email })),
   ];
-  const stageOptions: SearchSelectOption[] = stages.map((s) => ({ value: s.id, label: s.name }));
 
   // HubSpot-style duplicate detection. Domain is a hard signal — the same
   // website can't legitimately be two companies, so a domain match blocks
@@ -260,14 +257,6 @@ export function CompanyForm({
                   <option value="">—</option>
                   {REVENUE_BANDS.map((b) => <option key={b.value} value={b.value}>{b.label}</option>)}
                 </select>
-              </div>
-              <div className="field"><label>Lifecycle Stage</label>
-                <SearchSelect
-                  options={stageOptions}
-                  value={form.stageId}
-                  onChange={(v) => set('stageId', v)}
-                  placeholder="Search lifecycle stage…"
-                />
               </div>
             </FormSection>
 
