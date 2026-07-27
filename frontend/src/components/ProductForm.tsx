@@ -3,6 +3,7 @@ import type { Product } from '../api/types';
 import { createProduct, updateProduct } from '../api/products';
 import { SelectWithOther } from './SelectWithOther';
 import { PRODUCT_SERVICE_OPTIONS, PRODUCT_SERVICE_OTHER } from '../utils/productServiceOptions';
+import { CurrencyInput } from './CurrencyInput';
 
 export function ProductForm({
   product, onClose, onSaved,
@@ -68,7 +69,8 @@ export function ProductForm({
           />
         </div>
         <div className="field"><label>Unit price</label>
-          <input type="number" min="0" value={form.unitPrice} onChange={(e) => set('unitPrice', e.target.value)} placeholder="0.00" /></div>
+          <CurrencyInput value={form.unitPrice} onChange={(v) => set('unitPrice', v)} placeholder="0.00" />
+        </div>
         {error && <div className="error">{error}</div>}
         <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
           <button className="btn" onClick={submit} disabled={saving}>

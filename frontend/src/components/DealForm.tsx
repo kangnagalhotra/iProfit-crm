@@ -25,6 +25,7 @@ import { FileUploadList } from './FileUploadList';
 import type { PendingOrUploadedFile } from './FileUploadList';
 import { SelectWithOther } from './SelectWithOther';
 import { DEAL_LOSS_REASONS, DEAL_LOSS_REASON_OTHER } from '../utils/dealLossReasons';
+import { CurrencyInput } from './CurrencyInput';
 
 const DEAL_TYPES: DealType[] = ['NEW_BUSINESS', 'EXISTING_BUSINESS', 'RENEWAL', 'UPSELL'];
 const DEAL_PRIORITIES: DealPriority[] = ['LOW', 'MEDIUM', 'HIGH'];
@@ -272,8 +273,12 @@ export function DealForm({
           <div className="field field-span-2"><label>Deal name*</label>
             <input value={form.name} onChange={(e) => set('name', e.target.value)} /></div>
           <div className="field"><label>Value</label>
-            <input type="number" min="0" value={form.amount}
-              onChange={(e) => { setAmountTouched(true); set('amount', e.target.value); }} placeholder="0.00" /></div>
+            <CurrencyInput
+              value={form.amount}
+              onChange={(v) => { setAmountTouched(true); set('amount', v); }}
+              placeholder="0.00"
+            />
+          </div>
           <div className="field"><label>Company</label>
             <SearchSelect
               options={accounts.map((a) => ({ value: a.id, label: a.name }))}
@@ -338,13 +343,11 @@ export function DealForm({
                   />
                 </div>
                 <div className="field"><label>Expected revenue</label>
-                  <input
-                    type="number"
-                    min="0"
+                  <CurrencyInput
                     value={form.expectedRevenue}
                     placeholder="0.00"
-                    onChange={(e) => { setExpectedRevenueTouched(true); set('expectedRevenue', e.target.value); }}
-                    onBlur={(e) => { if (e.target.value === '') setExpectedRevenueTouched(false); }}
+                    onChange={(v) => { setExpectedRevenueTouched(true); set('expectedRevenue', v); }}
+                    onBlur={() => { if (form.expectedRevenue === '') setExpectedRevenueTouched(false); }}
                   />
                   <div className="helper-text">
                     {expectedRevenueTouched && form.expectedRevenue !== ''

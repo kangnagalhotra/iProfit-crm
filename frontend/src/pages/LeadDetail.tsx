@@ -35,6 +35,7 @@ import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 import { useAuth } from '../context/AuthContext';
 import { timeAgo } from '../utils/timeAgo';
+import { CurrencyInput } from '../components/CurrencyInput';
 import { evaluateLeadAutomation } from '../utils/leadAutomation';
 import { isMqlReady, BANT_WARNING_MESSAGE } from '../utils/leadQualification';
 import { useRecordRecentlyViewed } from '../hooks/useRecentlyViewed';
@@ -119,6 +120,7 @@ export function LeadDetail() {
   const [users, setUsers] = useState<User[]>([]);
   const [stages, setStages] = useState<LeadStage[]>([]);
   const [editingField, setEditingField] = useState<string | null>(null);
+  const [valueDraft, setValueDraft] = useState('');
   const [showEditModal, setShowEditModal] = useState(false);
   const [quickTaskType, setQuickTaskType] = useState<'CALL' | 'EMAIL' | 'MEETING' | 'OTHER' | null>(null);
   const [pendingLeadStageId, setPendingLeadStageId] = useState<string | null>(null);
@@ -437,18 +439,17 @@ export function LeadDetail() {
             label="Average Contract Value"
             value={lead.value ? parseFloat(lead.value).toLocaleString('en-IN', { style: 'currency', currency: 'USD' }) : undefined}
             editing={editingField === 'value'}
-            onStartEdit={() => setEditingField('value')}
+            onStartEdit={() => { setEditingField('value'); setValueDraft(lead.value ?? ''); }}
             editable={canEdit}
           >
-            <input
-              type="number"
-              min="0"
+            <CurrencyInput
               autoFocus
-              defaultValue={lead.value ?? ''}
+              value={valueDraft}
               placeholder="0.00"
-              onBlur={(e) => {
-                if (Number(e.target.value) < 0) { toast.error('Average Contract Value cannot be negative.'); return; }
-                saveField({ value: e.target.value });
+              onChange={setValueDraft}
+              onBlur={() => {
+                if (Number(valueDraft) < 0) { toast.error('Average Contract Value cannot be negative.'); return; }
+                saveField({ value: valueDraft });
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') (e.target as HTMLInputElement).blur();

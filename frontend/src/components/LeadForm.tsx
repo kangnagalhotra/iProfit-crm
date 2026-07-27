@@ -41,6 +41,7 @@ import {
   stripPhoneDigits, formatPhoneDisplay, isValidPhone, PHONE_ERROR_MESSAGE,
   stripEmailInput, isValidEmail, EMAIL_ERROR_MESSAGE,
 } from '../utils/validation';
+import { CurrencyInput } from './CurrencyInput';
 
 const RATINGS: LeadRating[] = ['HOT', 'WARM', 'COLD'];
 const CURRENCIES: Currency[] = ['USD', 'EUR', 'GBP', 'INR'];
@@ -472,7 +473,8 @@ export function LeadForm({
               {mobileError && <div className="error" style={{ margin: '4px 0 0' }}>{mobileError}</div>}
             </div>
             <div className="field"><label>Average Contract Value</label>
-              <input type="number" min="0" value={form.value} onChange={(e) => set('value', e.target.value)} placeholder="0.00" /></div>
+              <CurrencyInput value={form.value} onChange={(v) => set('value', v)} placeholder="0.00" />
+            </div>
             <div className="field"><label>Department / Division</label>
               <SelectWithOther
                 options={DEPARTMENT_OPTIONS}

@@ -4,6 +4,7 @@ import { Icon } from './Icon';
 import { SearchSelect } from './SearchSelect';
 import type { SearchSelectOption } from './SearchSelect';
 import { ProductForm } from './ProductForm';
+import { CurrencyInput } from './CurrencyInput';
 
 export interface LineItemsEditorProps {
   value: LineItem[];
@@ -68,7 +69,11 @@ export function LineItemsEditor({
             <input value={row.productName} onChange={(e) => updateRow(row.id, { productName: e.target.value })} placeholder="Product name" />
           )}
           <input type="number" min="0" value={row.quantity} onChange={(e) => updateRow(row.id, { quantity: e.target.value })} />
-          <input type="number" min="0" value={row.unitPrice} onChange={(e) => updateRow(row.id, { unitPrice: e.target.value })} placeholder="0.00" />
+          <CurrencyInput
+            value={row.unitPrice}
+            onChange={(v) => updateRow(row.id, { unitPrice: v })}
+            placeholder="0.00"
+          />
           <span className="line-item-total">{lineTotal(row).toLocaleString('en-IN', { style: 'currency', currency: 'USD' })}</span>
           <button type="button" className="row-remove-btn" onClick={() => removeRow(row.id)} aria-label="Remove line item">
             <Icon name="trash" size={14} />

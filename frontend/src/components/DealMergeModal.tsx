@@ -3,6 +3,7 @@ import type { DealStage, Opportunity } from '../api/types';
 import { listDeals, mergeDeals } from '../api/deals';
 import { listStages } from '../api/stages';
 import { SearchSelect } from './SearchSelect';
+import { CurrencyInput } from './CurrencyInput';
 
 function dealLabel(d: Opportunity) {
   return `${d.name} — ${d.stage.name}${d.amount ? ` — $${Number(d.amount).toLocaleString('en-IN')}` : ''}`;
@@ -131,7 +132,12 @@ export function DealMergeModal({
                   Custom
                 </label>
                 {valueChoice === 'custom' && (
-                  <input type="number" min="0" value={customAmount} onChange={(e) => setCustomAmount(e.target.value)} placeholder="0.00" style={{ marginLeft: 26, width: 160 }} />
+                  <CurrencyInput
+                    value={customAmount}
+                    onChange={setCustomAmount}
+                    placeholder="0.00"
+                    style={{ marginLeft: 26, width: 160 }}
+                  />
                 )}
               </div>
             </div>
