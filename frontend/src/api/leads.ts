@@ -484,7 +484,28 @@ export async function convertLeadToDeal(
 // at the same company: create a Contact from the Lead's info, link it to
 // that Deal, and mark the Lead merged (never deleted — retained for audit,
 // same treatment as convertLeadToDeal's converted_at above).
-export async function mergeLeadIntoDeal(lead: Lead, targetDealId: string): Promise<void> {
+// Shared by the automatic duplicate-merge flow (B1/B2) and the manual
+// "Link Lead" action on a Deal's Contacts-by-Role tab — both need "make
+// sure this Lead's info is a Contact on this Deal," they just differ in
+// how they got triggered and what the activity log should say about it.
+// Reuses the Lead's existing linked Contact(s) if it already has any
+// (a manually-picked, already-established Lead often will), rather than
+// always creating a fresh one and risking a duplicate Contact record.
+async function linkLeadContactsToDeal(lead: Lead, targetDealId: string): Promise<string> {
+  const { data: existingLinks } = await supabase
+    .from('lead_contacts')
+    .select('contact_id, role, contact:contacts(id, first_name, last_name, email)')
+    .eq('lead_id', lead.id);
+
+  if (existingLinks && existingLinks.length > 0) {
+    await Promise.all(existingLinks.map((link: any) => supabase.from('deal_contacts').upsert(
+      { opportunity_id: targetDealId, contact_id: link.contact_id, role: link.role ?? 'OTHER' },
+      { onConflict: 'opportunity_id,contact_id', ignoreDuplicates: true },
+    )));
+    const first = (existingLinks[0] as any).contact;
+    return first ? [first.first_name, first.last_name].filter(Boolean).join(' ') || first.email || 'Contact' : 'Contact';
+  }
+
   const contact = await createContact({
     firstName: lead.firstName,
     lastName: lead.lastName,
@@ -497,19 +518,40 @@ export async function mergeLeadIntoDeal(lead: Lead, targetDealId: string): Promi
     ownerId: lead.owner?.id,
     leadIds: [lead.id],
   });
-
   // Role 'OTHER' — a Lead carries no deal-contact role; the rep can change
   // it afterward via the existing "Contacts by Role" UI on the deal.
   await supabase.from('deal_contacts').insert({ opportunity_id: targetDealId, contact_id: contact.id, role: 'OTHER' });
+  return [contact.firstName, contact.lastName].filter(Boolean).join(' ') || contact.email || 'Contact';
+}
 
+export async function mergeLeadIntoDeal(lead: Lead, targetDealId: string): Promise<void> {
+  const contactName = await linkLeadContactsToDeal(lead, targetDealId);
   await updateLead(lead.id, { mergedAt: new Date().toISOString(), mergedIntoOpportunityId: targetDealId });
 
   const currentUser = (await supabase.auth.getUser()).data.user;
-  const contactName = [contact.firstName, contact.lastName].filter(Boolean).join(' ') || contact.email || 'Contact';
   const leadName = lead.leadName || [lead.firstName, lead.lastName].filter(Boolean).join(' ') || 'Lead';
   await supabase.from('activities').insert({
     type: 'FIELD_UPDATE',
     body: `Lead "${leadName}" merged in as a duplicate — added ${contactName} as a Contact.`,
+    creator_id: currentUser?.id,
+    opportunity_id: targetDealId,
+  });
+}
+
+// Manual counterpart to mergeLeadIntoDeal — same underlying effect (Lead's
+// Contact(s) linked to the Deal, Lead marked merged/locked, same as the
+// automatic duplicate flow, since either way the Lead's info now lives on
+// the Deal via a Contact going forward), triggered by a rep deliberately
+// picking a Lead via "+ Link Lead" rather than an automatic duplicate check.
+export async function linkLeadToDeal(lead: Lead, targetDealId: string): Promise<void> {
+  const contactName = await linkLeadContactsToDeal(lead, targetDealId);
+  await updateLead(lead.id, { mergedAt: new Date().toISOString(), mergedIntoOpportunityId: targetDealId });
+
+  const currentUser = (await supabase.auth.getUser()).data.user;
+  const leadName = lead.leadName || [lead.firstName, lead.lastName].filter(Boolean).join(' ') || 'Lead';
+  await supabase.from('activities').insert({
+    type: 'FIELD_UPDATE',
+    body: `Lead "${leadName}" linked to this deal — added ${contactName} as a Contact.`,
     creator_id: currentUser?.id,
     opportunity_id: targetDealId,
   });

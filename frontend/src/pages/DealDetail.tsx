@@ -12,8 +12,8 @@ import { listAccounts } from '../api/accounts';
 import { listContacts } from '../api/contacts';
 import { listAssociatedLeads } from '../api/leads';
 import type { AssociatedLead } from '../api/leads';
-import { listDealContacts, replaceDealContacts } from '../api/dealContacts';
-import { LinkContactsModal } from '../components/LinkContactsModal';
+import { listDealContacts } from '../api/dealContacts';
+import { LinkLeadModal } from '../components/LinkLeadModal';
 import { NotesSection } from '../components/NotesSection';
 import { TasksWidget } from '../components/TasksWidget';
 import { ActivityTimeline } from '../components/ActivityTimeline';
@@ -123,7 +123,7 @@ export function DealDetail() {
   const [moreOpen, setMoreOpen] = useState(false);
   const [activityKey, setActivityKey] = useState(0);
   const [activeDetailTab, setActiveDetailTab] = useState('details');
-  const [showLinkContacts, setShowLinkContacts] = useState(false);
+  const [showLinkLead, setShowLinkLead] = useState(false);
   const [associatedLeads, setAssociatedLeads] = useState<AssociatedLead[]>([]);
   const [showMergeModal, setShowMergeModal] = useState(false);
   const [mergeSurvivorDeal, setMergeSurvivorDeal] = useState<{ id: string; name: string } | null>(null);
@@ -628,8 +628,8 @@ export function DealDetail() {
             label: `Contacts by Role (${dealContacts.length + (deal.contact ? 1 : 0)})`,
             content: (
               <CollapsibleCard title={`Contacts by Role (${dealContacts.length + (deal.contact ? 1 : 0)})`} storageKey="collapsible:deal:contacts-by-role">
-                <button className="btn secondary btn-icon" style={{ marginBottom: 12 }} onClick={() => setShowLinkContacts(true)}>
-                  <Icon name="person" size={13} /> Link Contact
+                <button className="btn secondary btn-icon" style={{ marginBottom: 12 }} onClick={() => setShowLinkLead(true)}>
+                  <Icon name="person" size={13} /> Link Lead
                 </button>
                 {!deal.contact && dealContacts.length === 0 && (
                   <p style={{ fontSize: 14, color: 'var(--muted)', marginTop: 0 }}>No contacts linked to this deal yet.</p>
@@ -764,18 +764,15 @@ export function DealDetail() {
         />
       )}
 
-      {showLinkContacts && (
-        <LinkContactsModal
-          currentContactIds={dealContacts.map((dc) => dc.contactId)}
+      {showLinkLead && (
+        <LinkLeadModal
+          dealId={deal.id}
           accountId={deal.account?.id}
-          onClose={() => setShowLinkContacts(false)}
-          onSave={async (contactIds) => {
-            const roleByContact = new Map(dealContacts.map((dc) => [dc.contactId, dc.role]));
-            await replaceDealContacts(deal.id, contactIds.map((contactId) => ({
-              contactId, role: roleByContact.get(contactId) ?? 'OTHER',
-            })));
+          onClose={() => setShowLinkLead(false)}
+          onLinked={() => {
             loadDealContacts();
-            toast.success('Contacts updated');
+            loadAssociatedLeads(deal.id, deal.lead?.id);
+            toast.success('Lead linked');
           }}
         />
       )}

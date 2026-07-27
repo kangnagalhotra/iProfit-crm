@@ -93,7 +93,7 @@ interface LeadFormState {
   notes: string;
 }
 
-function initialState(lead?: Lead, defaultStageId?: string): LeadFormState {
+function initialState(lead?: Lead, defaultStageId?: string, defaultAccountId?: string): LeadFormState {
   // A recognized preset pre-selects that option; any other existing text
   // (legacy/free-text entries predating this field, or a hand-typed Other)
   // pre-fills the Other box instead of being silently dropped — same
@@ -109,7 +109,7 @@ function initialState(lead?: Lead, defaultStageId?: string): LeadFormState {
     linkedinUrl: lead?.linkedinUrl ?? '',
     instagramUrl: lead?.instagramUrl ?? '',
     twitterUrl: lead?.twitterUrl ?? '',
-    accountId: lead?.account?.id ?? '',
+    accountId: lead?.account?.id ?? defaultAccountId ?? '',
     companyName: '',
     industry: '',
     sizeBucket: '',
@@ -140,17 +140,18 @@ function initialState(lead?: Lead, defaultStageId?: string): LeadFormState {
 }
 
 export function LeadForm({
-  lead, defaultStageId, onClose, onSaved,
+  lead, defaultStageId, defaultAccountId, onClose, onSaved,
 }: {
   lead?: Lead;
   defaultStageId?: string;
+  defaultAccountId?: string;
   onClose: () => void;
   onSaved: (lead: Lead) => void;
 }) {
   const { user: currentUser } = useAuth();
   const confirm = useConfirm();
   const isEdit = !!lead;
-  const [form, setForm] = useState<LeadFormState>(() => initialState(lead, defaultStageId));
+  const [form, setForm] = useState<LeadFormState>(() => initialState(lead, defaultStageId, defaultAccountId));
   const [expanded, setExpanded] = useState(isEdit);
   const [attachments, setAttachments] = useState<PendingOrUploadedFile[]>([]);
   const [stages, setStages] = useState<LeadStage[]>([]);
